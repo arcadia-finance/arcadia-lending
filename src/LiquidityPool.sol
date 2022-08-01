@@ -6,6 +6,7 @@ import {Auth} from "../lib/solmate/src/auth/Auth.sol";
 import "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "../lib/solmate/src/utils/FixedPointMathLib.sol";
+import "./interfaces/ITranche.sol";
 
 
 contract LiquidityPool is ERC4626, Owned {
@@ -46,7 +47,14 @@ contract LiquidityPool is ERC4626, Owned {
         weights.push(weight);
         tranches.push(tranche);
         isTranche[tranche] = true;
-        asset.approve(tranche, type(uint256).max);
+        asset.approve(tranche, type(uint256).max); //todo Avoid approve if we send tokens via LP instead of tranche on redeems
+    }
+
+    function removeLastTranche(uint256 index, address tranche) internal {
+        totalWeight -= weights[index];
+        isTranche[tranche] = false;
+        weights.pop();
+        tranches.pop();
     }
 
     function setWeight(uint256 index, uint256 weight) public onlyOwner {
@@ -177,28 +185,29 @@ contract LiquidityPool is ERC4626, Owned {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            BAD DEBT LOGIC
+                            LOAN DEFAULT LOGIC
     //////////////////////////////////////////////////////////////*/
 
     function _processDefault(uint256 assets) internal {
         uint256 shares = convertToShares(assets);
 
-        for (uint256 i; i < tranches.length; ) {
+        for (uint256 i = tranches.length-1; i >= 0; ) {
             address tranche = tranches[i];
             uint256 maxShares = maxRedeem(tranche);
             if (shares < maxShares) {
                 _burn(tranche, shares);
                 break;
             } else {
-                //ToDo: What to do with emptied tranche? block it?
+                ITranche(tranche).lock();
                 _burn(tranche, maxShares);
+                removeLastTranche(i, tranche);
                 unchecked {
                     shares -= maxShares;
                 }
             }
 
             unchecked {
-                ++i;
+                --i;
             }
         }
 
