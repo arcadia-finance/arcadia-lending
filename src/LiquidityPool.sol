@@ -2,12 +2,15 @@
 pragma solidity ^0.8.13;
 
 import "../lib/solmate/src/auth/Owned.sol";
+import {Auth} from "../lib/solmate/src/auth/Auth.sol";
 import "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
+import {FixedPointMathLib} from "../lib/solmate/src/utils/FixedPointMathLib.sol";
 
 
 contract LiquidityPool is ERC4626, Owned {
     using SafeTransferLib for ERC20;
+    using FixedPointMathLib for uint256;
 
     uint256 totalWeight;
     address liquidator;
@@ -26,10 +29,16 @@ contract LiquidityPool is ERC4626, Owned {
         ERC20 _asset,
         string memory _name,
         string memory _symbol,
-        address _liquidator
+        address _liquidator,
+        address _feeCollector
     ) ERC4626(_asset, _name, _symbol) Owned(msg.sender) {
         liquidator = _liquidator;
+        feeCollector = _feeCollector;
     }
+
+    /*//////////////////////////////////////////////////////////////
+                            TRANCHES LOGIC
+    //////////////////////////////////////////////////////////////*/
 
     //For now manually add newly created tranche, do via factory in future?
     function addTranche(address tranche, uint256 weight) public onlyOwner {
@@ -41,7 +50,24 @@ contract LiquidityPool is ERC4626, Owned {
     }
 
     function setWeight(uint256 index, uint256 weight) public onlyOwner {
+        totalWeight = totalWeight - weights[index] + weight;
         weights[index] = weight;
+    }
+
+    /*///////////////////////////////////////////////////////////////
+                           FEE CONFIGURATION
+    //////////////////////////////////////////////////////////////*/
+
+    uint256 public feeWeight;
+    address public feeCollector;
+
+    function setFeeWeight(uint256 _feeWeight) external onlyOwner {
+        totalWeight = totalWeight - feeWeight + _feeWeight;
+        feeWeight = _feeWeight;
+    }
+
+    function setFeeCollector(address newFeeCollector) external onlyOwner {
+        feeCollector = newFeeCollector;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -60,7 +86,7 @@ contract LiquidityPool is ERC4626, Owned {
 
         emit Deposit(msg.sender, receiver, assets, shares);
 
-        afterDeposit(assets, shares);
+        totalHoldings += assets;    
     }
 
     function mint(uint256 shares, address receiver) public override returns (uint256 assets) {
@@ -74,7 +100,7 @@ contract LiquidityPool is ERC4626, Owned {
 
         emit Deposit(msg.sender, receiver, assets, shares);
 
-        afterDeposit(assets, shares);
+        totalHoldings += assets;
     }
 
     function withdraw(
@@ -82,21 +108,8 @@ contract LiquidityPool is ERC4626, Owned {
         address receiver,
         address owner
     ) public override returns (uint256 shares) {
-        shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
-
-        if (msg.sender != owner) {
-            uint256 allowed = allowance[owner][msg.sender]; // Saves gas for limited approvals.
-
-            if (allowed != type(uint256).max) allowance[owner][msg.sender] = allowed - shares;
-        }
-
-        beforeWithdraw(assets, shares);
-
-        _burn(owner, shares);
-
-        emit Withdraw(msg.sender, receiver, owner, assets, shares);
-
-        asset.safeTransfer(receiver, assets);
+        shares = super.withdraw(assets, receiver, owner);
+        totalHoldings -= assets;
     }
 
     function redeem(
@@ -104,22 +117,8 @@ contract LiquidityPool is ERC4626, Owned {
         address receiver,
         address owner
     ) public override returns (uint256 assets) {
-        if (msg.sender != owner) {
-            uint256 allowed = allowance[owner][msg.sender]; // Saves gas for limited approvals.
-
-            if (allowed != type(uint256).max) allowance[owner][msg.sender] = allowed - shares;
-        }
-
-        // Check for rounding error since we round down in previewRedeem.
-        require((assets = previewRedeem(shares)) != 0, "ZERO_ASSETS");
-
-        beforeWithdraw(assets, shares);
-
-        _burn(owner, shares);
-
-        emit Withdraw(msg.sender, receiver, owner, assets, shares);
-
-        asset.safeTransfer(receiver, assets);
+        assets = super.redeem(shares, receiver, owner);
+        totalHoldings -= assets;
     }
 
     function depositViaTranche(uint256 assets) external onlyTranche {
@@ -128,6 +127,8 @@ contract LiquidityPool is ERC4626, Owned {
         require(shares != 0, "ZERO_SHARES");
 
         _mint(msg.sender, shares);
+
+        totalHoldings += assets;
     }
 
     function withdrawViaTranche(uint256 assets) external onlyTranche {
@@ -135,14 +136,76 @@ contract LiquidityPool is ERC4626, Owned {
 
         _burn(owner, shares);
 
+        totalHoldings -= assets;
     }
 
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    uint256 public totalHoldings;
+
     function totalAssets() public view override returns (uint256) {
-        return asset.balanceOf(address(this));
+        return totalHoldings;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            INTERESTS LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function _processInterests(uint256 assets) internal {
+        uint256 shares = previewDeposit(assets);
+        uint256 remainingShares = shares;
+
+        for (uint256 i; i < tranches.length; ) {
+            uint256 trancheShare = shares.mulDivUp(weights[i], totalWeight);
+            _mint(tranches[i], trancheShare);
+            unchecked {
+                remainingShares -= remainingShares;
+                ++i;
+            }
+        }
+
+        _mint(feeCollector, remainingShares);
+
+        totalHoldings += assets;
+        
+    }
+
+    function testProcessInterests(uint256 assets) public onlyOwner {
+        _processInterests(assets);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            BAD DEBT LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function _processDefault(uint256 assets) internal {
+        uint256 shares = convertToShares(assets);
+
+        for (uint256 i; i < tranches.length; ) {
+            address tranche = tranches[i];
+            uint256 maxShares = maxRedeem(tranche);
+            if (shares < maxShares) {
+                _burn(tranche, shares);
+                break;
+            } else {
+                //ToDo: What to do with emptied tranche? block it?
+                _burn(tranche, maxShares);
+                unchecked {
+                    shares -= maxShares;
+                }
+            }
+
+            unchecked {
+                ++i;
+            }
+        }
+
+    }
+
+    function testProcessDefault(uint256 assets) public onlyOwner {
+        _processDefault(assets);
     }
 
     /*//////////////////////////////////////////////////////////////
