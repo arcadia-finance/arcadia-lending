@@ -189,6 +189,13 @@ contract LiquidityPool is ERC4626, Owned {
     //////////////////////////////////////////////////////////////*/
 
     function _processDefault(uint256 assets) internal {
+        if (totalHoldings < assets) {
+            //Should never be possible
+            assets = totalHoldings;
+        }
+
+        totalHoldings -= assets;
+
         uint256 shares = convertToShares(assets);
 
         for (uint256 i = tranches.length-1; i >= 0; ) {
