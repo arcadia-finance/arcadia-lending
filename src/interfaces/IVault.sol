@@ -8,7 +8,6 @@
  */
 pragma solidity >=0.4.22 <0.9.0;
 
-interface ILiquidityPool {
-    function depositViaTranche(uint256 assets, address from) external;
-    function withdrawViaTranche(uint256 assets, address receiver) external;
+interface IVault {
+    function lockCollateral(address vault, address baseCurrency) external returns (bool);
 }
