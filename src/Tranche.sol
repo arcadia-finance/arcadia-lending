@@ -46,10 +46,7 @@ contract LiquidityPool is ERC4626, Owned {
     function deposit(uint256 assets, address receiver) public override notLocked returns (uint256 shares) {
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
-        ILiquidityPool(address(liquidityPool)).depositViaTranche(assets);
-
-        // Need to transfer before minting or ERC777s could reenter.
-        asset.safeTransferFrom(msg.sender, address(liquidityPool), assets);
+        ILiquidityPool(address(liquidityPool)).depositViaTranche(assets, msg.sender);
 
         _mint(receiver, shares);
 
@@ -61,10 +58,7 @@ contract LiquidityPool is ERC4626, Owned {
 
     function mint(uint256 shares, address receiver) public override notLocked returns (uint256 assets) {
         assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
-        ILiquidityPool(address(liquidityPool)).depositViaTranche(assets);
-
-        // Need to transfer before minting or ERC777s could reenter.
-        asset.safeTransferFrom(msg.sender, address(liquidityPool), assets);
+        ILiquidityPool(address(liquidityPool)).depositViaTranche(assets, msg.sender);
 
         _mint(receiver, shares);
 
@@ -87,7 +81,7 @@ contract LiquidityPool is ERC4626, Owned {
             if (allowed != type(uint256).max) allowance[_owner][msg.sender] = allowed - shares;
         }
 
-        ILiquidityPool(address(liquidityPool)).withdrawViaTranche(assets);
+        ILiquidityPool(address(liquidityPool)).withdrawViaTranche(assets, receiver);
 
         //beforeWithdraw(assets, shares);
 
@@ -95,7 +89,6 @@ contract LiquidityPool is ERC4626, Owned {
 
         emit Withdraw(msg.sender, receiver, _owner, assets, shares);
 
-        asset.safeTransfer(receiver, assets);
     }
 
     function redeem(
@@ -111,7 +104,6 @@ contract LiquidityPool is ERC4626, Owned {
 
         // Check for rounding error since we round down in previewRedeem.
         require((assets = previewRedeem(shares)) != 0, "ZERO_ASSETS");
-        ILiquidityPool(address(liquidityPool)).withdrawViaTranche(assets);
 
         //beforeWithdraw(assets, shares);
 
@@ -119,15 +111,16 @@ contract LiquidityPool is ERC4626, Owned {
 
         emit Withdraw(msg.sender, receiver, _owner, assets, shares);
 
-        asset.safeTransfer(receiver, assets);
+        ILiquidityPool(address(liquidityPool)).withdrawViaTranche(assets, receiver);
+
     }
 
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function totalAssets() public view override returns (uint256) {
-        return liquidityPool.maxWithdraw(address(this));
+    function totalAssets() public view override returns (uint256 assets) {
+        assets =  liquidityPool.maxWithdraw(address(this));
     }
 
     /*//////////////////////////////////////////////////////////////
