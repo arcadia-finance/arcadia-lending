@@ -6,6 +6,7 @@ import {Auth} from "../lib/solmate/src/auth/Auth.sol";
 import "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "../lib/solmate/src/utils/FixedPointMathLib.sol";
+import {LogExpMath} from "./utils/LogExpMath.sol";
 import "./interfaces/ITranche.sol";
 import "./interfaces/IDebtToken.sol";
 import "./interfaces/IFactory.sol";
@@ -152,7 +153,7 @@ contract LiquidityPool is ERC4626, Owned {
         asset.safeTransferFrom(from, address(this), assets);
     }
 
-    function withdrawViaTranche(uint256 assets) external onlyTranche {
+    function withdrawViaTranche(uint256 assets, address receiver) external onlyTranche {
         _syncInterests();
         
         uint256 shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
@@ -188,7 +189,7 @@ contract LiquidityPool is ERC4626, Owned {
 
         //Check if there is sufficient liquidity in pool? (check or let is fail on the transfer?)
         //Update allowances
-        asset.safeTransfer(to, assets);
+        asset.safeTransfer(to, amount);
 
         ERC4626(debtToken).deposit(amount, vault);
 
@@ -202,7 +203,7 @@ contract LiquidityPool is ERC4626, Owned {
         //Process interests since last update
         _syncInterests();
 
-        asset.safeTransferFrom(from, address(this), assets);
+        asset.safeTransferFrom(from, address(this), amount);
 
         ERC4626(debtToken).withdraw(amount, from, vault);
 
@@ -236,13 +237,11 @@ contract LiquidityPool is ERC4626, Owned {
         IDebtToken(debtToken).syncInterests(unrealisedDebt);
 
         //Sync interests for LPs and Protocol Treasury
-        _syncInterestsToLiquidityPoolxccsdcx
-        
-        (unrealisedDebt);
+        _syncInterestsToLiquidityPool(unrealisedDebt);
     }
 
-    function _calcUnrealisedDebt() internal returns (uint128 unrealisedDebt) {
-        realisedDebt = uint128(ERC4626(debtToken).totalAssets());
+    function _calcUnrealisedDebt() internal view returns (uint128 unrealisedDebt) {
+        uint128 realisedDebt = uint128(ERC4626(debtToken).totalAssets());
 
         uint128 base;
         uint128 exponent;
@@ -291,7 +290,7 @@ contract LiquidityPool is ERC4626, Owned {
     }
 
     function testProcessInterests(uint256 assets) public onlyOwner {
-        _processInterests(assets);
+        _syncInterestsToLiquidityPool(assets);
     }
 
     /*//////////////////////////////////////////////////////////////

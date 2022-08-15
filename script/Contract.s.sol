@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.13;
 
-import "forge-std/Script.sol";
+import "../lib/forge-std/src/Script.sol";
 
-import {Contract} from "src/Contract.sol";
+import {LiquidityPool} from "src/LiquidityPool.sol";
 
-contract ContractScript is Script {
+contract LiquidityPoolScript is Script {
     function setUp() public {}
 
     function run() public {
         vm.broadcast();
-        new Contract();
+        //new LiquidityPool();
     }
 }
