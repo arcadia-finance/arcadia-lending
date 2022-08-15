@@ -90,7 +90,7 @@ contract LiquidityPool is ERC4626, Owned {
     //////////////////////////////////////////////////////////////*/
 
     function deposit(uint256 assets, address receiver) public override onlyTranche returns (uint256 shares) {
-        syncInterests();
+        _syncInterests();
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
@@ -101,11 +101,11 @@ contract LiquidityPool is ERC4626, Owned {
 
         emit Deposit(msg.sender, receiver, assets, shares);
 
-        totalHoldings += assets;    
+        totalHoldings += assets;
     }
 
     function mint(uint256 shares, address receiver) public override onlyTranche returns (uint256 assets) {
-        syncInterests();
+        _syncInterests();
         assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
 
         // Need to transfer before minting or ERC777s could reenter.
@@ -123,7 +123,7 @@ contract LiquidityPool is ERC4626, Owned {
         address receiver,
         address owner
     ) public override returns (uint256 shares) {
-        syncInterests();
+        _syncInterests();
         shares = super.withdraw(assets, receiver, owner);
         totalHoldings -= assets;
     }
@@ -133,13 +133,13 @@ contract LiquidityPool is ERC4626, Owned {
         address receiver,
         address owner
     ) public override returns (uint256 assets) {
-        syncInterests();
+        _syncInterests();
         assets = super.redeem(shares, receiver, owner);
         totalHoldings -= assets;
     }
 
     function depositViaTranche(uint256 assets, address from) external onlyTranche {
-        syncInterests();
+        _syncInterests();
 
         uint256 shares = previewDeposit(assets);
         // Check for rounding error since we round down in previewDeposit.
@@ -153,7 +153,7 @@ contract LiquidityPool is ERC4626, Owned {
     }
 
     function withdrawViaTranche(uint256 assets) external onlyTranche {
-        syncInterests();
+        _syncInterests();
         
         uint256 shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
 
@@ -184,7 +184,7 @@ contract LiquidityPool is ERC4626, Owned {
         //Check allowances to send underlying to to
 
         //Process interests since last update
-        syncInterests();
+        _syncInterests();
 
         //Check if there is sufficient liquidity in pool? (check or let is fail on the transfer?)
         //Update allowances
@@ -200,7 +200,7 @@ contract LiquidityPool is ERC4626, Owned {
         require(IFactory(vaultFactory).isVault(vault), "LP_RL: Not a vault");
 
         //Process interests since last update
-        syncInterests();
+        _syncInterests();
 
         asset.safeTransferFrom(from, address(this), assets);
 
@@ -229,17 +229,19 @@ contract LiquidityPool is ERC4626, Owned {
     uint32 lastSyncedBlock;
     uint256 public constant YEARLY_BLOCKS = 2628000;
 
-    function syncInterests() internal {
-        uint256 unrealisedDebt = uint256(calcUnrealisedDebt());
+    function _syncInterests() internal {
+        uint256 unrealisedDebt = uint256(_calcUnrealisedDebt());
 
         //Sync interests for borrowers
         IDebtToken(debtToken).syncInterests(unrealisedDebt);
 
-        //Sync interests for LP and Protocol Treasury
-        _processInterests(unrealisedDebt);
+        //Sync interests for LPs and Protocol Treasury
+        _syncInterestsToLiquidityPoolxccsdcx
+        
+        (unrealisedDebt);
     }
 
-    function calcUnrealisedDebt() internal returns (uint128 unrealisedDebt) {
+    function _calcUnrealisedDebt() internal returns (uint128 unrealisedDebt) {
         realisedDebt = uint128(ERC4626(debtToken).totalAssets());
 
         uint128 base;
@@ -268,7 +270,7 @@ contract LiquidityPool is ERC4626, Owned {
         }
     }
 
-    function _processInterests(uint256 assets) internal {
+    function _syncInterestsToLiquidityPool(uint256 assets) internal {
         uint256 shares = previewDeposit(assets);
         uint256 remainingShares = shares;
 
@@ -281,6 +283,7 @@ contract LiquidityPool is ERC4626, Owned {
             }
         }
 
+        //Protocol fee
         _mint(feeCollector, remainingShares);
 
         totalHoldings += assets;
