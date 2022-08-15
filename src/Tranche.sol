@@ -6,7 +6,7 @@ import "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
 import "./interfaces/ILiquidityPool.sol";
 
-contract LiquidityPool is ERC4626, Owned {
+contract Tranche is ERC4626, Owned {
     using SafeTransferLib for ERC20;
 
     ERC4626 liquidityPool;
@@ -18,11 +18,14 @@ contract LiquidityPool is ERC4626, Owned {
     }
 
     constructor(
-        ERC20 _asset,
-        string memory _name,
-        string memory _symbol,
-        ERC4626 _liquidityPool
-    ) ERC4626(_asset, _name, _symbol) Owned(msg.sender) {
+        ERC4626 _liquidityPool,
+        string memory _prefix,
+        string memory _prefixSymbol
+    ) ERC4626(
+        _liquidityPool.asset(),
+        string(abi.encodePacked(_prefix, " Arcadia ", _liquidityPool.asset().name())),
+        string(abi.encodePacked(_prefixSymbol, "arc", _liquidityPool.asset().name())))
+    Owned(msg.sender) {
         liquidityPool = _liquidityPool;
     }
 

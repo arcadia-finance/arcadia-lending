@@ -21,12 +21,14 @@ contract LiquidityPool is ERC4626, Owned {
 
     constructor(
         ERC20 _asset,
-        string memory _name,
-        string memory _symbol,
         address _liquidator,
         address _feeCollector,
         address _vaultFactory
-    ) ERC4626(_asset, _name, _symbol) Owned(msg.sender) {
+    ) ERC4626(
+        _asset,
+        string(abi.encodePacked("Arcadia ", _asset.name(), " Pool")),
+        string(abi.encodePacked("arc", _asset.symbol()))
+    ) Owned(msg.sender) {
         liquidator = _liquidator;
         feeCollector = _feeCollector;
         vaultFactory = _vaultFactory;
@@ -51,11 +53,17 @@ contract LiquidityPool is ERC4626, Owned {
 
     //For now manually add newly created tranche, do via factory in future?
     function addTranche(address tranche, uint256 weight) public onlyOwner {
+        require(!isTranche[tranche], "TR_AD: Already exists");
         totalWeight += weight;
         weights.push(weight);
         tranches.push(tranche);
         isTranche[tranche] = true;
-        asset.approve(tranche, type(uint256).max); //todo Avoid approve if we send tokens via LP instead of tranche on redeems
+    }
+
+    function setWeight(uint256 index, uint256 weight) public onlyOwner {
+        require(index < tranches.length, "TR_SW: Inexisting Tranche");
+        totalWeight = totalWeight - weights[index] + weight;
+        weights[index] = weight;
     }
 
     function removeLastTranche(uint256 index, address tranche) internal {
@@ -63,11 +71,6 @@ contract LiquidityPool is ERC4626, Owned {
         isTranche[tranche] = false;
         weights.pop();
         tranches.pop();
-    }
-
-    function setWeight(uint256 index, uint256 weight) public onlyOwner {
-        totalWeight = totalWeight - weights[index] + weight;
-        weights[index] = weight;
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -103,6 +106,8 @@ contract LiquidityPool is ERC4626, Owned {
         emit Deposit(msg.sender, receiver, assets, shares);
 
         totalHoldings += assets;
+
+        _updateInterestRate();
     }
 
     function mint(uint256 shares, address receiver) public override onlyTranche returns (uint256 assets) {
@@ -117,6 +122,8 @@ contract LiquidityPool is ERC4626, Owned {
         emit Deposit(msg.sender, receiver, assets, shares);
 
         totalHoldings += assets;
+
+        _updateInterestRate();
     }
 
     function withdraw(
@@ -127,6 +134,8 @@ contract LiquidityPool is ERC4626, Owned {
         _syncInterests();
         shares = super.withdraw(assets, receiver, owner);
         totalHoldings -= assets;
+
+        _updateInterestRate();
     }
 
     function redeem(
@@ -137,6 +146,8 @@ contract LiquidityPool is ERC4626, Owned {
         _syncInterests();
         assets = super.redeem(shares, receiver, owner);
         totalHoldings -= assets;
+
+        _updateInterestRate();
     }
 
     function depositViaTranche(uint256 assets, address from) external onlyTranche {
@@ -151,6 +162,8 @@ contract LiquidityPool is ERC4626, Owned {
         totalHoldings += assets;
 
         asset.safeTransferFrom(from, address(this), assets);
+
+        _updateInterestRate();
     }
 
     function withdrawViaTranche(uint256 assets, address receiver) external onlyTranche {
@@ -163,6 +176,8 @@ contract LiquidityPool is ERC4626, Owned {
         totalHoldings -= assets;
 
         asset.safeTransfer(receiver, assets);
+
+        _updateInterestRate();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -194,6 +209,7 @@ contract LiquidityPool is ERC4626, Owned {
         ERC4626(debtToken).deposit(amount, vault);
 
         //Update interest rates
+        _updateInterestRate();
     }
 
     function repayLoan(uint256 amount, address vault, address from) public {
@@ -208,7 +224,7 @@ contract LiquidityPool is ERC4626, Owned {
         ERC4626(debtToken).withdraw(amount, from, vault);
 
         //Update interest rates
-
+        _updateInterestRate();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -226,8 +242,8 @@ contract LiquidityPool is ERC4626, Owned {
     //////////////////////////////////////////////////////////////*/
 
     //ToDo: optimise storage allocations
-    uint64 interstRate; //18 decimals precision
-    uint32 lastSyncedBlock;
+    uint64 public interstRate; //18 decimals precision
+    uint32 public lastSyncedBlock;
     uint256 public constant YEARLY_BLOCKS = 2628000;
 
     function _syncInterests() internal {
@@ -289,8 +305,13 @@ contract LiquidityPool is ERC4626, Owned {
         
     }
 
-    function testProcessInterests(uint256 assets) public onlyOwner {
+    function testsyncInterestsToLiquidityPool(uint256 assets) public onlyOwner {
         _syncInterestsToLiquidityPool(assets);
+    }
+
+    function _updateInterestRate() internal {
+        //ToDo
+        interstRate = 200000000000000000;
     }
 
     /*//////////////////////////////////////////////////////////////
