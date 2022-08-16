@@ -16,22 +16,24 @@ abstract contract LiquidityPoolTest is Test {
     DebtToken debt;
 
     address creator = address(1);
-    address liquidator = address(2);
-    address feeCollector = address(3);
-    address vaultFactory = address(4);
+    address tokenCreator = address(2);
+    address liquidator = address(3);
+    address treasury = address(4);
+    address vaultFactory = address(5);
+    address liquidityProvider = address(6);
 
     //Before
     constructor() {
-        vm.startPrank(creator);
+        vm.startPrank(tokenCreator);
         asset = new Asset("Asset", "ASSET", 18);
+        asset.mint(liquidityProvider, type(uint256).max);
         vm.stopPrank();
     }
 
     //Before Each
-
     function setUp() virtual public {
         vm.startPrank(creator);
-        pool = new LiquidityPool(asset, liquidator, feeCollector, vaultFactory);
+        pool = new LiquidityPool(asset, liquidator, treasury, vaultFactory);
         srTranche = new Tranche(pool, "Senior", "SR");
         jrTranche = new Tranche(pool, "Junior", "JR");
         vm.stopPrank();
@@ -54,7 +56,7 @@ contract DeploymentTest is LiquidityPoolTest {
         assertEq(pool.decimals(), 18);
         assertEq(pool.vaultFactory(), vaultFactory);
         assertEq(pool.liquidator(), liquidator);
-        assertEq(pool.feeCollector(), feeCollector);
+        assertEq(pool.treasury(), treasury);
     }
 }
 
@@ -120,7 +122,7 @@ contract TranchesTest is LiquidityPoolTest {
         vm.stopPrank();
     }
 
-    function testRevert_SetWeightInexistingtranche() public {
+    function testRevert_SetWeightInexistingTranche() public {
         vm.startPrank(creator);
         vm.expectRevert("TR_SW: Inexisting Tranche");
         pool.setWeight(0, 50);
@@ -137,6 +139,158 @@ contract TranchesTest is LiquidityPoolTest {
     }
 
     //removeLastTranche
-    
+    function testSucces_removeLastTranche() public {
+        vm.startPrank(creator);
+        pool.addTranche(address(srTranche), 50);
+        pool.addTranche(address(jrTranche), 40);
+        vm.stopPrank();
+
+        pool.testRemoveLastTranche(1, address(jrTranche));
+
+        assertEq(pool.totalWeight(), 50);
+        assertEq(pool.weights(0), 50);
+        assertEq(pool.tranches(0), address(srTranche));
+        assertTrue(!pool.isTranche(address(jrTranche)));
+    }
+}
+
+/*//////////////////////////////////////////////////////////////
+                PROTOCOL FEE CONFIGURATION
+//////////////////////////////////////////////////////////////*/
+contract ProtocolFeeTest is LiquidityPoolTest {
+
+    function setUp() override public {
+        super.setUp();
+    }
+
+    //setFeeWeight
+    function testRevert_SetFeeWeightInvalidOwner(address unprivilegedAddress) public {
+        vm.assume(unprivilegedAddress != creator);
+
+        vm.startPrank(unprivilegedAddress);
+        vm.expectRevert("UNAUTHORIZED");
+        pool.setFeeWeight(5);
+        vm.stopPrank();
+    }
+
+    function testSuccess_SetFeeWeight() public {
+        vm.startPrank(creator);
+        pool.addTranche(address(srTranche), 50);
+        pool.setFeeWeight(5);
+        vm.stopPrank();
+
+        assertEq(pool.totalWeight(), 55);
+        assertEq(pool.feeWeight(), 5);
+
+        vm.startPrank(creator);
+        pool.setFeeWeight(10);
+        vm.stopPrank();
+
+        assertEq(pool.totalWeight(), 60);
+        assertEq(pool.feeWeight(), 10);
+    }
+
+    //setTreasury
+    function testRevert_SetTreasuryInvalidOwner(address unprivilegedAddress) public {
+        vm.assume(unprivilegedAddress != creator);
+
+        vm.startPrank(unprivilegedAddress);
+        vm.expectRevert("UNAUTHORIZED");
+        pool.setTreasury(creator);
+        vm.stopPrank();
+    }
+
+    function testSuccess_SetTreasury() public {
+        vm.startPrank(creator);
+        pool.setTreasury(creator);
+        vm.stopPrank();
+
+        assertEq(pool.treasury(), creator);
+    }
+}
+
+/*//////////////////////////////////////////////////////////////
+                    DEPOSIT/WITHDRAWAL LOGIC
+//////////////////////////////////////////////////////////////*/
+contract DepositAndWithdrawalTest is LiquidityPoolTest {
+
+    function setUp() override public {
+        super.setUp();
+
+        vm.startPrank(creator);
+        pool.addTranche(address(srTranche), 50);
+        pool.addTranche(address(jrTranche), 40);
+
+        debt = new DebtToken(pool);
+        pool.setDebtToken(address(debt));
+        vm.stopPrank();
+    }
+
+    //deposit (without debt -> ignore _syncInterests() and _updateInterestRate())
+    function testRevert_DepositByNonTranche(address unprivilegedAddress, uint128 assets, address from) public {
+        vm.assume(unprivilegedAddress != address(jrTranche));
+        vm.assume(unprivilegedAddress != address(srTranche));
+
+        vm.startPrank(unprivilegedAddress);
+        vm.expectRevert("UNAUTHORIZED");
+        pool.deposit(assets, from);
+        vm.stopPrank();
+    }
+
+    function testRevert_ZeroShares() public {
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+
+        vm.startPrank(address(srTranche));
+        vm.expectRevert("ZERO_SHARES");
+        pool.deposit(0, liquidityProvider);
+        vm.stopPrank();
+    }
+
+    function testSucces_FirstDepositByTranche(uint128 amount) public {
+        vm.assume(amount > 0);
+
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+
+        vm.prank(address(srTranche));
+        pool.deposit(amount, liquidityProvider);
+
+        assertEq(pool.maxWithdraw(address(srTranche)), amount);
+        assertEq(pool.maxRedeem(address(srTranche)), amount);
+        assertEq(pool.totalAssets(), amount);
+        assertEq(asset.balanceOf(address(pool)), amount);
+    }
+
+    function testSucces_MultipleDepositsByTranches(uint128 amount0, uint128 amount1) public {
+        vm.assume(amount0 > 0);
+        vm.assume(amount1 > 0);
+        uint256 totalAmount = uint256(amount0) + uint256(amount1);
+        vm.assume(amount0 <= type(uint256).max / totalAmount); //Overflow on maxWithdraw()
+        vm.assume(amount1 <= type(uint256).max / totalAmount); //Overflow on maxWithdraw()
+
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+
+        vm.prank(address(srTranche));
+        pool.deposit(amount0, liquidityProvider);
+        vm.prank(address(jrTranche));
+        pool.deposit(amount1, liquidityProvider);
+
+        assertEq(pool.maxWithdraw(address(jrTranche)), amount1);
+        assertEq(pool.maxRedeem(address(jrTranche)), amount1);
+        assertEq(pool.totalAssets(), totalAmount);
+        assertEq(asset.balanceOf(address(pool)), totalAmount);
+    }
+
+    //mint
+    function testRevert(uint256 shares, address receiver) public {
+        vm.expectRevert("MINT_NOT_SUPPORTED");
+        pool.mint(shares, receiver);
+    }
+
+    //withdraw
+
+    //redeem
 
 }

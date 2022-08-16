@@ -12,17 +12,30 @@ import "./interfaces/IDebtToken.sol";
 import "./interfaces/IFactory.sol";
 import "./interfaces/IVault.sol";
 
-
+/**
+ * @title Liquidity Pool
+ * @author Arcadia Finance
+ * @notice The Lending pool contains the main logic to provide liquidity and take or repay loans for a certain asset
+ * @dev Protocol is according the ERC4626 standard, with a certain ERC20 as underlying
+ */
 contract LiquidityPool is ERC4626, Owned {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
     address public vaultFactory;
 
+    /**
+     * @notice The constructor for a liquidity pool
+     * @param _asset The underlying ERC-20 token of the Liquidity Pool
+     * @param _liquidator The address of the liquidator
+     * @param _treasury The address of the protocol treasury
+     * @param _vaultFactory The address of the vault factory
+     * @dev The name and symbol of the pool are automatically generated, based on the name and symbol of the underlying token
+     */
     constructor(
         ERC20 _asset,
         address _liquidator,
-        address _feeCollector,
+        address _treasury,
         address _vaultFactory
     ) ERC4626(
         _asset,
@@ -30,7 +43,7 @@ contract LiquidityPool is ERC4626, Owned {
         string(abi.encodePacked("arc", _asset.symbol()))
     ) Owned(msg.sender) {
         liquidator = _liquidator;
-        feeCollector = _feeCollector;
+        treasury = _treasury;
         vaultFactory = _vaultFactory;
     }
 
@@ -51,7 +64,15 @@ contract LiquidityPool is ERC4626, Owned {
         _;
     }
 
-    //For now manually add newly created tranche, do via factory in future?
+    /**
+     * @notice Adds a tranche to the Liquidity Pool
+     * @param tranche The address of the Tranche
+     * @param weight The weight of the specific Tranche
+     * @dev The order of the tranches is important, the most senior tranche is at index 0, the most junior at the last index.
+     * @dev Each Tranche is an ERC-4626 contract
+     * @dev The weight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
+     * @dev ToDo: For now manually add newly created tranche, do via factory in future?
+     */
     function addTranche(address tranche, uint256 weight) public onlyOwner {
         require(!isTranche[tranche], "TR_AD: Already exists");
         totalWeight += weight;
@@ -60,12 +81,28 @@ contract LiquidityPool is ERC4626, Owned {
         isTranche[tranche] = true;
     }
 
+    /**
+     * @notice Changes the weight of a specific tranche
+     * @param index The index of the Tranche for which a new weight is being set
+     * @param weight The new weight of the Tranche at the index
+     * @dev The weight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
+     * @dev ToDo: TBD of we want the weight to be changeable?
+     */
     function setWeight(uint256 index, uint256 weight) public onlyOwner {
         require(index < tranches.length, "TR_SW: Inexisting Tranche");
         totalWeight = totalWeight - weights[index] + weight;
         weights[index] = weight;
     }
 
+    /**
+     * @notice Removes the tranche at the last index (most junior)
+     * @param index The index of the last Tranche
+     * @param tranche The address of the last Tranche
+     * @dev This function is only be called by the function _processDefault(uint256 assets), when there is a default as big (or bigger) 
+     *      as the complete principal of the most junior tranche
+     * @dev Passing the input parameters to the function saves gas compared to reading the address and index of the last tranche from memory.
+     *      No need to be check if index and tranche are indeed of the last tranche since function is only called by _processDefault.
+     */
     function removeLastTranche(uint256 index, address tranche) internal {
         totalWeight -= weights[index];
         isTranche[tranche] = false;
@@ -73,109 +110,114 @@ contract LiquidityPool is ERC4626, Owned {
         tranches.pop();
     }
 
+    /**
+     * @notice Function for unit testing purposes only
+     * @param index The index of the last Tranche
+     * @param tranche The address of the last Tranche
+     * @dev ToDo: Remove before deploying
+     */
+    function testRemoveLastTranche(uint256 index, address tranche) public {
+        removeLastTranche( index, tranche);
+    }
+
     /*///////////////////////////////////////////////////////////////
-                           FEE CONFIGURATION
+                    PROTOCOL FEE CONFIGURATION
     //////////////////////////////////////////////////////////////*/
 
     uint256 public feeWeight;
-    address public feeCollector;
+    address public treasury;
 
+    /**
+     * @notice Changes the weight of the protocol fee
+     * @param _feeWeight The new weight of the protocol fee
+     * @dev The weight the fee determines the relative share of the yield (interest payments) that goes to the protocol treasury
+     * @dev ToDo: TBD of we want the weight to be changeable, should be fixed percentage of weight? Now protocol yield is ruggable
+     */
     function setFeeWeight(uint256 _feeWeight) external onlyOwner {
         totalWeight = totalWeight - feeWeight + _feeWeight;
         feeWeight = _feeWeight;
     }
 
-    function setFeeCollector(address newFeeCollector) external onlyOwner {
-        feeCollector = newFeeCollector;
+    /**
+     * @notice Sets new treasury address
+     * @param _treasury The new address of the treasury
+     */
+    function setTreasury(address _treasury) external onlyOwner {
+        treasury = _treasury;
     }
 
     /*//////////////////////////////////////////////////////////////
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function deposit(uint256 assets, address receiver) public override onlyTranche returns (uint256 shares) {
+    /**
+     * @notice Modification of the standard ERC-4626 deposit implementation
+     * @param assets the amount of assets of the underlying ERC-20 token being deposited
+     * @param from The address of the origin of the underlying ERC-20 token, who deposits assets via a Tranche
+     * @return shares The corresponding amount of shares minted
+     * @dev This function can only be called by Tranches.
+     * @dev IMPORTANT, this function deviates from the standard, instead of the parameter 'receiver':
+     *      (this is always msg.sender, a tranche), the second parameter is 'from':
+     *      (the origin of the underlying ERC-20 token, who deposits assets via a Tranche)
+     */
+    function deposit(uint256 assets, address from) public override onlyTranche returns (uint256 shares) {
         _syncInterests();
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
-        // Need to transfer before minting or ERC777s could reenter.
-        asset.safeTransferFrom(msg.sender, address(this), assets);
-
-        _mint(receiver, shares);
-
-        emit Deposit(msg.sender, receiver, assets, shares);
-
-        totalHoldings += assets;
-
-        _updateInterestRate();
-    }
-
-    function mint(uint256 shares, address receiver) public override onlyTranche returns (uint256 assets) {
-        _syncInterests();
-        assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
-
-        // Need to transfer before minting or ERC777s could reenter.
-        asset.safeTransferFrom(msg.sender, address(this), assets);
-
-        _mint(receiver, shares);
-
-        emit Deposit(msg.sender, receiver, assets, shares);
-
-        totalHoldings += assets;
-
-        _updateInterestRate();
-    }
-
-    function withdraw(
-        uint256 assets,
-        address receiver,
-        address owner
-    ) public override returns (uint256 shares) {
-        _syncInterests();
-        shares = super.withdraw(assets, receiver, owner);
-        totalHoldings -= assets;
-
-        _updateInterestRate();
-    }
-
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address owner
-    ) public override returns (uint256 assets) {
-        _syncInterests();
-        assets = super.redeem(shares, receiver, owner);
-        totalHoldings -= assets;
-
-        _updateInterestRate();
-    }
-
-    function depositViaTranche(uint256 assets, address from) external onlyTranche {
-        _syncInterests();
-
-        uint256 shares = previewDeposit(assets);
-        // Check for rounding error since we round down in previewDeposit.
-        require(shares != 0, "ZERO_SHARES");
+        asset.safeTransferFrom(from, address(this), assets);
 
         _mint(msg.sender, shares);
 
-        totalHoldings += assets;
+        emit Deposit(msg.sender, msg.sender, assets, shares);
 
-        asset.safeTransferFrom(from, address(this), assets);
+        totalHoldings += assets;
 
         _updateInterestRate();
     }
 
-    function withdrawViaTranche(uint256 assets, address receiver) external onlyTranche {
+    /**
+     * @notice Modification of the standard ERC-4626 mint implementation
+     * @dev Token not mintable
+     */
+    function mint(uint256, address) public pure override returns (uint256) {
+        revert("MINT_NOT_SUPPORTED");
+    }
+
+    /**
+     * @notice Modification of the standard ERC-4626 withdraw implementation
+     * @param assets the amount of assets of the underlying ERC-20 token being withdrawn
+     * @param receiver The address of the receiver of the underlying ERC-20 tokens
+     * @param owner_ The address of the owner of the assets being withdrawn
+     * @return shares The corresponding amount of shares redeemed
+     */
+    function withdraw(
+        uint256 assets,
+        address receiver,
+        address owner_
+    ) public override returns (uint256 shares) {
         _syncInterests();
-        
-        uint256 shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
-
-        _burn(msg.sender, shares);
-
+        shares = super.withdraw(assets, receiver, owner_);
         totalHoldings -= assets;
 
-        asset.safeTransfer(receiver, assets);
+        _updateInterestRate();
+    }
+
+    /**
+     * @notice Modification of the standard ERC-4626 redeem implementation
+     * @param shares the amount of shares being redeemed
+     * @param receiver The address of the receiver of the underlying ERC-20 tokens
+     * @param owner_ The address of the owner of the shares being redeemed
+     * @return assets The corresponding amount of assets withdrawn
+     */
+    function redeem(
+        uint256 shares,
+        address receiver,
+        address owner_
+    ) public override returns (uint256 assets) {
+        _syncInterests();
+        assets = super.redeem(shares, receiver, owner_);
+        totalHoldings -= assets;
 
         _updateInterestRate();
     }
@@ -299,13 +341,13 @@ contract LiquidityPool is ERC4626, Owned {
         }
 
         //Protocol fee
-        _mint(feeCollector, remainingShares);
+        _mint(treasury, remainingShares);
 
         totalHoldings += assets;
         
     }
 
-    function testsyncInterestsToLiquidityPool(uint256 assets) public onlyOwner {
+    function testSyncInterestsToLiquidityPool(uint256 assets) public onlyOwner {
         _syncInterestsToLiquidityPool(assets);
     }
 
