@@ -446,6 +446,7 @@ contract LoanTest is LiquidityPoolTest {
         vm.assume(collateralValue >= amountLoaned);
         vm.assume(liquidity < amountLoaned);
         vm.assume(liquidity > 0);
+        vm.assume(to != address(0));
 
         vm.prank(creator);
         pool.setDebtToken(address(debt));
@@ -456,7 +457,7 @@ contract LoanTest is LiquidityPoolTest {
         vault.setTotalValue(collateralValue);
 
         vm.startPrank(vaultOwner);
-        vm.expectRevert(stdError.arithmeticError);
+        vm.expectRevert("TRANSFER_FAILED");
         pool.takeLoan(amountLoaned, address(vault), to);
         vm.stopPrank();
     }
@@ -465,6 +466,8 @@ contract LoanTest is LiquidityPoolTest {
         vm.assume(collateralValue >= amountLoaned);
         vm.assume(liquidity >= amountLoaned);
         vm.assume(amountLoaned > 0);
+        vm.assume(to != address(0));
+        vm.assume(to != liquidityProvider);
 
         vm.prank(creator);
         pool.setDebtToken(address(debt));
@@ -477,8 +480,68 @@ contract LoanTest is LiquidityPoolTest {
         vm.startPrank(vaultOwner);
         pool.takeLoan(amountLoaned, address(vault), to);
         vm.stopPrank();
+
+        assertEq(asset.balanceOf(address(pool)), liquidity - amountLoaned);
+        assertEq(asset.balanceOf(to), amountLoaned);
+        assertEq(debt.balanceOf(address(vault)), amountLoaned);
     }
 
-    function testSucces_TakeLoanByAuthorisedAddress() public {}
+    function testSucces_TakeLoanByLimitedAuthorisedAddress(uint256 amountAllowed, uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address beneficiary, address to) public {
+        vm.assume(amountAllowed >= amountLoaned);
+        vm.assume(collateralValue >= amountLoaned);
+        vm.assume(liquidity >= amountLoaned);
+        vm.assume(amountLoaned > 0);
+        vm.assume(amountAllowed < type(uint256).max);
+        vm.assume(beneficiary != vaultOwner);
+        vm.assume(to != address(0));
+        vm.assume(to != liquidityProvider);
+
+        vm.prank(creator);
+        pool.setDebtToken(address(debt));
+        vault.setTotalValue(collateralValue);
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        vm.prank(address(srTranche));
+        pool.deposit(liquidity, liquidityProvider);
+        vm.prank(vaultOwner);
+        pool.approveBeneficiary(beneficiary, amountAllowed, address(vault));
+
+        vm.startPrank(beneficiary);
+        pool.takeLoan(amountLoaned, address(vault), to);
+        vm.stopPrank();
+
+        assertEq(asset.balanceOf(address(pool)), liquidity - amountLoaned);
+        assertEq(asset.balanceOf(to), amountLoaned);
+        assertEq(debt.balanceOf(address(vault)), amountLoaned);
+        assertEq(pool.creditAllowance(address(vault), beneficiary), amountAllowed - amountLoaned);
+    }
+
+    function testSucces_TakeLoanByMaxAuthorisedAddress(uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address beneficiary, address to) public {
+        vm.assume(collateralValue >= amountLoaned);
+        vm.assume(liquidity >= amountLoaned);
+        vm.assume(amountLoaned > 0);
+        vm.assume(beneficiary != vaultOwner);
+        vm.assume(to != address(0));
+        vm.assume(to != liquidityProvider);
+
+        vm.prank(creator);
+        pool.setDebtToken(address(debt));
+        vault.setTotalValue(collateralValue);
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        vm.prank(address(srTranche));
+        pool.deposit(liquidity, liquidityProvider);
+        vm.prank(vaultOwner);
+        pool.approveBeneficiary(beneficiary, type(uint256).max, address(vault));
+
+        vm.startPrank(beneficiary);
+        pool.takeLoan(amountLoaned, address(vault), to);
+        vm.stopPrank();
+
+        assertEq(asset.balanceOf(address(pool)), liquidity - amountLoaned);
+        assertEq(asset.balanceOf(to), amountLoaned);
+        assertEq(debt.balanceOf(address(vault)), amountLoaned);
+        assertEq(pool.creditAllowance(address(vault), beneficiary), type(uint256).max);
+    }
 
 }
