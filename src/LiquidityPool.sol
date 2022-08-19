@@ -270,21 +270,21 @@ contract LiquidityPool is ERC4626, Owned {
      * @notice Takes out a loan backed by collateral of an Arcadia Vault
      * @param amount The amount of underlying ERC-20 tokens to be lent out
      * @param vault The address of the Arcadia Vault backing the loan
-     * @param to The final beneficiary who receives the underlying tokens
+     * @param to The address who receives the lended out underlying tokens
      * @dev The sender might be different as the owner if they have the proper allowances
      */
     function takeLoan(uint256 amount, address vault, address to) public {
 
         require(IFactory(vaultFactory).isVault(vault), "LP_TL: Not a vault");
 
-        //Call vault to check if there is sufficient collateral
-        require(IVault(vault).lockCollateral(amount, address(asset)), 'LP_TL: Reverted');
-
         //Check allowances to send underlying to to
         if (IVault(vault).owner() != msg.sender) {
             uint256 allowed = creditAllowance[vault][msg.sender];
             if (allowed != type(uint256).max) creditAllowance[vault][msg.sender] = allowed - amount;
         }
+
+        //Call vault to check if there is sufficient collateral
+        require(IVault(vault).lockCollateral(amount, address(asset)), 'LP_TL: Reverted');
 
         //Process interests since last update
         _syncInterests();

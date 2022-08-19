@@ -3,13 +3,15 @@ pragma solidity ^0.8.13;
 
 import "../lib/forge-std/src/Test.sol";
 import "../src/LiquidityPool.sol";
-import "../src/Asset.sol";
+import "../src/mocks/Asset.sol";
+import "../src/mocks/Factory.sol";
 import "../src/Tranche.sol";
 import "../src/DebtToken.sol";
 
 abstract contract LiquidityPoolTest is Test {
 
     Asset asset;
+    Factory factory;
     LiquidityPool pool;
     Tranche srTranche;
     Tranche jrTranche;
@@ -19,7 +21,7 @@ abstract contract LiquidityPoolTest is Test {
     address tokenCreator = address(2);
     address liquidator = address(3);
     address treasury = address(4);
-    address vaultFactory = address(5);
+    address vaultOwner = address(5);
     address liquidityProvider = address(6);
 
     //Before
@@ -28,12 +30,16 @@ abstract contract LiquidityPoolTest is Test {
         asset = new Asset("Asset", "ASSET", 18);
         asset.mint(liquidityProvider, type(uint256).max);
         vm.stopPrank();
+
+        vm.startPrank(creator);
+        factory = new Factory();
+        vm.stopPrank();
     }
 
     //Before Each
     function setUp() virtual public {
         vm.startPrank(creator);
-        pool = new LiquidityPool(asset, liquidator, treasury, vaultFactory);
+        pool = new LiquidityPool(asset, liquidator, treasury, address(factory));
         srTranche = new Tranche(pool, "Senior", "SR");
         jrTranche = new Tranche(pool, "Junior", "JR");
         vm.stopPrank();
@@ -54,7 +60,7 @@ contract DeploymentTest is LiquidityPoolTest {
         assertEq(pool.name(), string("Arcadia Asset Pool"));
         assertEq(pool.symbol(), string("arcASSET"));
         assertEq(pool.decimals(), 18);
-        assertEq(pool.vaultFactory(), vaultFactory);
+        assertEq(pool.vaultFactory(), address(factory));
         assertEq(pool.liquidator(), liquidator);
         assertEq(pool.treasury(), treasury);
     }
@@ -333,6 +339,8 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
                     DEPOSIT/WITHDRAWAL LOGIC
 //////////////////////////////////////////////////////////////*/
 contract LoanTest is LiquidityPoolTest {
+    
+    Vault vault;
 
     function setUp() override public {
         super.setUp();
@@ -343,6 +351,9 @@ contract LoanTest is LiquidityPoolTest {
 
         debt = new DebtToken(pool);
         vm.stopPrank();
+
+        vm.prank(vaultOwner);
+        vault = Vault(factory.createVault(1));
     }
 
     //setDebtToken
@@ -363,11 +374,54 @@ contract LoanTest is LiquidityPoolTest {
         assertEq(pool.debtToken(), address(debt));
     }
 
-    function testRevert_TakeLoanAgainstNonVault() public {}
+    //approveBeneficiary
+    function testRevert_approveBeneficiaryForNonVault(address beneficiary, uint256 amount, address nonVault) public {
+        vm.assume(nonVault != address(vault));
+
+        vm.expectRevert("LP_AB: Not a vault");
+        pool.approveBeneficiary(beneficiary, amount, nonVault);
+    }
+
+    function testRevert_approveBeneficiaryUnauthorised(address beneficiary, uint256 amount, address unprivilegedAddress) public {
+        vm.assume(unprivilegedAddress != vaultOwner);
+
+        vm.startPrank(unprivilegedAddress);
+        vm.expectRevert("LP_AB: UNAUTHORIZED");
+        pool.approveBeneficiary(beneficiary, amount, address(vault));
+        vm.stopPrank();
+    }
+
+    function testSucces_approveBeneficiary(address beneficiary, uint256 amount) public {
+        vm.prank(vaultOwner);
+        pool.approveBeneficiary(beneficiary, amount, address(vault));
+
+        assertEq(pool.creditAllowance(address(vault), beneficiary), amount);
+    }
+
+    //takeLoan
+    function testRevert_TakeLoanAgainstNonVault(uint256 amount, address nonVault, address to) public {
+        vm.assume(nonVault != address(vault));
+
+        vm.expectRevert("LP_TL: Not a vault");
+        pool.takeLoan(amount, nonVault, to);
+    }
+
+    function testRevert_TakeLoanUnauthorised(uint256 amountAllowed, uint256 amountLoaned, address beneficiary, address to) public {
+        vm.assume(amountAllowed < amountLoaned);
+
+        vm.prank(vaultOwner);
+        pool.approveBeneficiary(beneficiary, amountAllowed, address(vault));
+
+        vm.startPrank(beneficiary);
+        //Arithmetic overflow.
+        vm.expectRevert(stdError.arithmeticError);
+        pool.takeLoan(amountLoaned, address(vault), to);
+        vm.stopPrank();
+    }
+
+    function testRevert_TakeLoanInsufficientApproval() public {}
 
     function testRevert_TakeLoanInsufficientCollateral() public {}
-
-    function testRevert_TakeLoanUnauthorised() public {}
 
     function testRevert_TakeLoanInsufficientLiquidity() public {}
 
