@@ -290,7 +290,89 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
     }
 
     //withdraw
+    function testSucces_withdraw(uint128 amount0, uint128 amount1) public {
+        vm.assume(amount1 > 0);
+        vm.assume(amount0 >= amount1);
+
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+
+        vm.startPrank(address(srTranche));
+        pool.deposit(amount0, liquidityProvider);
+        pool.withdraw(amount1, address(srTranche), address(srTranche));
+
+        uint256 totalAmount = uint256(amount0) - uint256(amount1);
+        assertEq(pool.maxWithdraw(address(srTranche)), totalAmount);
+        assertEq(pool.maxRedeem(address(srTranche)), totalAmount);
+        assertEq(pool.totalAssets(), totalAmount);
+        assertEq(asset.balanceOf(address(pool)), totalAmount);
+    }
 
     //redeem
+    function testSucces_redeem(uint128 amount0, uint128 amount1) public {
+        vm.assume(amount1 > 0);
+        vm.assume(amount0 >= amount1);
+
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+
+        vm.startPrank(address(srTranche));
+        pool.deposit(amount0, liquidityProvider);
+        pool.redeem(amount1, address(srTranche), address(srTranche));
+
+        uint256 totalAmount = uint256(amount0) - uint256(amount1);
+        assertEq(pool.maxWithdraw(address(srTranche)), totalAmount);
+        assertEq(pool.maxRedeem(address(srTranche)), totalAmount);
+        assertEq(pool.totalAssets(), totalAmount);
+        assertEq(asset.balanceOf(address(pool)), totalAmount);
+    }
+
+}
+
+/*//////////////////////////////////////////////////////////////
+                    DEPOSIT/WITHDRAWAL LOGIC
+//////////////////////////////////////////////////////////////*/
+contract LoanTest is LiquidityPoolTest {
+
+    function setUp() override public {
+        super.setUp();
+
+        vm.startPrank(creator);
+        pool.addTranche(address(srTranche), 50);
+        pool.addTranche(address(jrTranche), 40);
+
+        debt = new DebtToken(pool);
+        vm.stopPrank();
+    }
+
+    //setDebtToken
+    function testRevert_SetDebtTokenInvalidOwner(address unprivilegedAddress) public {
+        vm.assume(unprivilegedAddress != creator);
+
+        vm.startPrank(unprivilegedAddress);
+        vm.expectRevert("UNAUTHORIZED");
+        pool.setDebtToken(address(debt));
+        vm.stopPrank();
+    }
+
+    function testSucces_SetDebtToken() public {
+        vm.startPrank(creator);
+        pool.setDebtToken(address(debt));
+        vm.stopPrank();
+
+        assertEq(pool.debtToken(), address(debt));
+    }
+
+    function testRevert_TakeLoanAgainstNonVault() public {}
+
+    function testRevert_TakeLoanInsufficientCollateral() public {}
+
+    function testRevert_TakeLoanUnauthorised() public {}
+
+    function testRevert_TakeLoanInsufficientLiquidity() public {}
+
+    function testSucces_TakeLoanByVaultOwner() public {}
+
+    function testSucces_TakeLoanByAuthorisedAddress() public {}
 
 }
