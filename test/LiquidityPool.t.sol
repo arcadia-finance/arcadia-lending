@@ -352,8 +352,9 @@ contract LoanTest is LiquidityPoolTest {
         debt = new DebtToken(pool);
         vm.stopPrank();
 
-        vm.prank(vaultOwner);
+        vm.startPrank(vaultOwner);
         vault = Vault(factory.createVault(1));
+        vm.stopPrank();
     }
 
     //setDebtToken
@@ -406,26 +407,77 @@ contract LoanTest is LiquidityPoolTest {
         pool.takeLoan(amount, nonVault, to);
     }
 
-    function testRevert_TakeLoanUnauthorised(uint256 amountAllowed, uint256 amountLoaned, address beneficiary, address to) public {
+    function testRevert_TakeLoanUnauthorised(uint256 amount, address beneficiary, address to) public {
+        vm.assume(beneficiary != vaultOwner);
+        emit log_named_uint("amountAllowed", pool.creditAllowance(address(vault), beneficiary));
+
+        vm.assume(amount > 0);
+        vm.startPrank(beneficiary);
+        vm.expectRevert(stdError.arithmeticError);
+        pool.takeLoan(amount, address(vault), to);
+        vm.stopPrank();
+    }
+
+    function testRevert_TakeLoanInsufficientApproval(uint256 amountAllowed, uint256 amountLoaned, address beneficiary, address to) public {
+        vm.assume(beneficiary != vaultOwner);
         vm.assume(amountAllowed < amountLoaned);
 
         vm.prank(vaultOwner);
         pool.approveBeneficiary(beneficiary, amountAllowed, address(vault));
 
         vm.startPrank(beneficiary);
-        //Arithmetic overflow.
         vm.expectRevert(stdError.arithmeticError);
         pool.takeLoan(amountLoaned, address(vault), to);
         vm.stopPrank();
     }
 
-    function testRevert_TakeLoanInsufficientApproval() public {}
+    function testRevert_TakeLoanInsufficientCollateral(uint256 amountLoaned, uint256 collateralValue, address to) public {
+        vm.assume(collateralValue < amountLoaned);
 
-    function testRevert_TakeLoanInsufficientCollateral() public {}
+        vault.setTotalValue(collateralValue);
 
-    function testRevert_TakeLoanInsufficientLiquidity() public {}
+        vm.startPrank(vaultOwner);
+        vm.expectRevert("LP_TL: Reverted");
+        pool.takeLoan(amountLoaned, address(vault), to);
+        vm.stopPrank();
+    }
 
-    function testSucces_TakeLoanByVaultOwner() public {}
+    function testRevert_TakeLoanInsufficientLiquidity(uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address to) public {
+        vm.assume(collateralValue >= amountLoaned);
+        vm.assume(liquidity < amountLoaned);
+        vm.assume(liquidity > 0);
+
+        vm.prank(creator);
+        pool.setDebtToken(address(debt));
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        vm.prank(address(srTranche));
+        pool.deposit(liquidity, liquidityProvider);
+        vault.setTotalValue(collateralValue);
+
+        vm.startPrank(vaultOwner);
+        vm.expectRevert(stdError.arithmeticError);
+        pool.takeLoan(amountLoaned, address(vault), to);
+        vm.stopPrank();
+    }
+
+    function testSucces_TakeLoanByVaultOwner(uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address to) public {
+        vm.assume(collateralValue >= amountLoaned);
+        vm.assume(liquidity >= amountLoaned);
+        vm.assume(amountLoaned > 0);
+
+        vm.prank(creator);
+        pool.setDebtToken(address(debt));
+        vault.setTotalValue(collateralValue);
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        vm.prank(address(srTranche));
+        pool.deposit(liquidity, liquidityProvider);
+
+        vm.startPrank(vaultOwner);
+        pool.takeLoan(amountLoaned, address(vault), to);
+        vm.stopPrank();
+    }
 
     function testSucces_TakeLoanByAuthorisedAddress() public {}
 
