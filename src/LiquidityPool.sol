@@ -312,11 +312,15 @@ contract LiquidityPool is ERC4626, Owned {
         //Process interests since last update
         _syncInterests();
 
-        asset.safeTransferFrom(msg.sender, address(this), amount);
+        uint256 totalDebt = ERC4626(debtToken).maxWithdraw(vault);
+        uint256 transferAmount = totalDebt > amount ? amount : totalDebt;
 
-        ERC4626(debtToken).withdraw(amount, vault, vault);
+        asset.safeTransferFrom(msg.sender, address(this), transferAmount);
+
+        ERC4626(debtToken).withdraw(transferAmount, vault, vault);
 
         //Call vault to unlock collateral
+        require(IVault(vault).unlockCollateral(transferAmount, address(asset)), 'LP_RL: Reverted');
 
         //Update interest rates
         _updateInterestRate();

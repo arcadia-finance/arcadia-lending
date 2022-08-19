@@ -544,4 +544,13 @@ contract LoanTest is LiquidityPoolTest {
         assertEq(pool.creditAllowance(address(vault), beneficiary), type(uint256).max);
     }
 
+    //repayLoan
+    function testRevert_RepayLoanForNonVault() public {}
+
+    function testRevert_RepayLoanInsufficientFunds() public {}
+
+    function testSucces_RepayLoanExactAmount() public {}
+
+    function testSucces_RepayLoanAmountExceedingLoan() public {}
+
 }
