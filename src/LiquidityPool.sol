@@ -226,12 +226,48 @@ contract LiquidityPool is ERC4626, Owned {
                             LENDING LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    address public debtToken;
+    event CreditApproval(address indexed vault, address indexed beneficiary, uint256 amount);
 
+    address public debtToken;
+    mapping(address => mapping(address => uint256)) public creditAllowance;
+
+    /**
+     * @notice Set the Debt Token contract of the Liquidity Pool
+     * @param _debtToken The address of the Debt Token
+     * @dev Debt Token is an ERC-4626 contract
+     * @dev ToDo: For now manually add newly created tranche, do via factory in future?
+     * @dev ToDo: TBD of we want the debt token to be changeable
+     */
     function setDebtToken(address _debtToken) external onlyOwner {
         debtToken = _debtToken;
     }
 
+    /**
+     * @notice Approve a beneficiacy to take out a loan against an Arcadia Vault
+     * @param beneficiary The address of beneficiacy who can take out loan backed by an Arcadia Vault
+     * @param amount The amount of underlying ERC-20 tokens to be lent out
+     * @param vault The address of the Arcadia Vault backing the loan
+     * @dev todo also implement permit (EIP-2612)?
+     * @dev todo If we keep a mapping from vaultaddress to owner on factory, we can do two requires at once and avoid two call to vault
+     */
+    function approveBeneficiary(address beneficiary, uint256 amount, address vault) public returns (bool) {
+        require(IFactory(vaultFactory).isVault(vault), "LP_AB: Not a vault");
+        require(IVault(vault).owner() == msg.sender, "LP_AB: UNAUTHORIZED");
+
+        creditAllowance[vault][beneficiary] = amount;
+
+        emit CreditApproval(vault, beneficiary, amount);
+
+        return true;
+    }
+
+    /**
+     * @notice Takes out a loan backed by collateral of an Arcadia Vault
+     * @param amount The amount of underlying ERC-20 tokens to be lent out
+     * @param vault The address of the Arcadia Vault backing the loan
+     * @param to The final beneficiary who receives the underlying tokens
+     * @dev The sender might be different as the owner if they have the proper allowances
+     */
     function takeLoan(uint256 amount, address vault, address to) public {
 
         require(IFactory(vaultFactory).isVault(vault), "LP_TL: Not a vault");
@@ -240,11 +276,15 @@ contract LiquidityPool is ERC4626, Owned {
         require(IVault(vault).lockCollateral(amount, address(asset)), 'LP_TL: Reverted');
 
         //Check allowances to send underlying to to
+        if (IVault(vault).owner() != msg.sender) {
+            uint256 allowed = creditAllowance[vault][msg.sender];
+            if (allowed != type(uint256).max) creditAllowance[vault][msg.sender] = allowed - amount;
+        }
 
         //Process interests since last update
         _syncInterests();
 
-        //Check if there is sufficient liquidity in pool? (check or let is fail on the transfer?)
+        //Check if there is sufficient liquidity in pool? (check or let it fail on the transfer?)
         //Update allowances
         asset.safeTransfer(to, amount);
 
@@ -254,16 +294,25 @@ contract LiquidityPool is ERC4626, Owned {
         _updateInterestRate();
     }
 
-    function repayLoan(uint256 amount, address vault, address from) public {
+    /**
+     * @notice repays a loan
+     * @param amount The amount of underlying ERC-20 tokens to be repaid
+     * @param vault The address of the Arcadia Vault backing the loan
+     * @dev ToDo: should it be possible to trigger a repay on behalf of an other account, 
+     *      If so, work with allowances
+     */
+    function repayLoan(uint256 amount, address vault) public {
 
         require(IFactory(vaultFactory).isVault(vault), "LP_RL: Not a vault");
 
         //Process interests since last update
         _syncInterests();
 
-        asset.safeTransferFrom(from, address(this), amount);
+        asset.safeTransferFrom(msg.sender, address(this), amount);
 
-        ERC4626(debtToken).withdraw(amount, from, vault);
+        ERC4626(debtToken).withdraw(amount, vault, vault);
+
+        //Call vault to unlock collateral
 
         //Update interest rates
         _updateInterestRate();
