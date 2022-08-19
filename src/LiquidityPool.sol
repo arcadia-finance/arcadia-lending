@@ -289,8 +289,7 @@ contract LiquidityPool is ERC4626, Owned {
         //Process interests since last update
         _syncInterests();
 
-        //Check if there is sufficient liquidity in pool? (check or let it fail on the transfer?)
-        //Update allowances
+        //Transfer fails if there is insufficient liquidity in pool
         asset.safeTransfer(to, amount);
 
         ERC4626(debtToken).deposit(amount, vault);
