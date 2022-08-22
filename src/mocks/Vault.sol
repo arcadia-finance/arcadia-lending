@@ -31,7 +31,7 @@
     }
 
     function unlockCollateral(uint256 amount, address) external returns (bool) {
-        if (lockedValue <= amount) {
+        if (lockedValue >= amount) {
             lockedValue -= amount;
             return true;
         } else {

@@ -290,13 +290,13 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
     }
 
     //mint
-    function testRevert(uint256 shares, address receiver) public {
+    function testRevert_MintNotSupported(uint256 shares, address receiver) public {
         vm.expectRevert("MINT_NOT_SUPPORTED");
         pool.mint(shares, receiver);
     }
 
     //withdraw
-    function testSucces_withdraw(uint128 amount0, uint128 amount1) public {
+    function testSucces_Withdraw(uint128 amount0, uint128 amount1) public {
         vm.assume(amount1 > 0);
         vm.assume(amount0 >= amount1);
 
@@ -315,7 +315,7 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
     }
 
     //redeem
-    function testSucces_redeem(uint128 amount0, uint128 amount1) public {
+    function testSucces_Redeem(uint128 amount0, uint128 amount1) public {
         vm.assume(amount1 > 0);
         vm.assume(amount0 >= amount1);
 
@@ -376,14 +376,14 @@ contract LoanTest is LiquidityPoolTest {
     }
 
     //approveBeneficiary
-    function testRevert_approveBeneficiaryForNonVault(address beneficiary, uint256 amount, address nonVault) public {
+    function testRevert_ApproveBeneficiaryForNonVault(address beneficiary, uint256 amount, address nonVault) public {
         vm.assume(nonVault != address(vault));
 
         vm.expectRevert("LP_AB: Not a vault");
         pool.approveBeneficiary(beneficiary, amount, nonVault);
     }
 
-    function testRevert_approveBeneficiaryUnauthorised(address beneficiary, uint256 amount, address unprivilegedAddress) public {
+    function testRevert_ApproveBeneficiaryUnauthorised(address beneficiary, uint256 amount, address unprivilegedAddress) public {
         vm.assume(unprivilegedAddress != vaultOwner);
 
         vm.startPrank(unprivilegedAddress);
@@ -392,7 +392,7 @@ contract LoanTest is LiquidityPoolTest {
         vm.stopPrank();
     }
 
-    function testSucces_approveBeneficiary(address beneficiary, uint256 amount) public {
+    function testSucces_ApproveBeneficiary(address beneficiary, uint256 amount) public {
         vm.prank(vaultOwner);
         pool.approveBeneficiary(beneficiary, amount, address(vault));
 
@@ -545,12 +545,123 @@ contract LoanTest is LiquidityPoolTest {
     }
 
     //repayLoan
-    function testRevert_RepayLoanForNonVault() public {}
+    function testRevert_RepayLoanForNonVault(uint256 amount, address nonVault) public {
+        vm.assume(nonVault != address(vault));
 
-    function testRevert_RepayLoanInsufficientFunds() public {}
+        vm.expectRevert("LP_RL: Not a vault");
+        pool.repayLoan(amount, nonVault);
+    }
 
-    function testSucces_RepayLoanExactAmount() public {}
+    function testRevert_RepayLoanInsufficientFunds(uint128 amountLoaned, uint256 availablefunds, address sender) public {
+        vm.assume(amountLoaned > availablefunds);
+        vm.assume(availablefunds > 0);
+        vm.assume(sender != address(0));
+        vm.assume(sender != liquidityProvider);
+        vm.assume(sender != vaultOwner);
 
-    function testSucces_RepayLoanAmountExceedingLoan() public {}
+        vm.prank(creator);
+        pool.setDebtToken(address(debt));
+        vault.setTotalValue(amountLoaned);
+        vm.startPrank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        asset.transfer(sender, availablefunds);
+        vm.stopPrank();
+        vm.prank(address(srTranche));
+        pool.deposit(amountLoaned, liquidityProvider);
+        vm.prank(vaultOwner);
+        pool.takeLoan(amountLoaned, address(vault), vaultOwner);
+
+        vm.startPrank(sender);
+        asset.approve(address(pool), type(uint256).max);
+        vm.expectRevert("TRANSFER_FROM_FAILED");
+        pool.repayLoan(amountLoaned, address(vault));
+        vm.stopPrank();
+    }
+
+    function testSucces_RepayLoanAmountInferiorLoan(uint128 amountLoaned, uint256 amountRepaid, address sender) public {
+        vm.assume(amountLoaned > amountRepaid);
+        vm.assume(amountRepaid > 0);
+        vm.assume(sender != address(0));
+        vm.assume(sender != liquidityProvider);
+        vm.assume(sender != vaultOwner);
+
+        vm.prank(creator);
+        pool.setDebtToken(address(debt));
+        vault.setTotalValue(amountLoaned);
+        vm.startPrank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        asset.transfer(sender, amountRepaid);
+        vm.stopPrank();
+        vm.prank(address(srTranche));
+        pool.deposit(amountLoaned, liquidityProvider);
+        vm.prank(vaultOwner);
+        pool.takeLoan(amountLoaned, address(vault), vaultOwner);
+
+        vm.startPrank(sender);
+        asset.approve(address(pool), type(uint256).max);
+        pool.repayLoan(amountRepaid, address(vault));
+        vm.stopPrank();
+
+        assertEq(asset.balanceOf(address(pool)), amountRepaid);
+        assertEq(asset.balanceOf(sender), 0);
+        assertEq(debt.balanceOf(address(vault)), amountLoaned - amountRepaid);
+    }
+
+    function testSucces_RepayLoanExactAmount(uint128 amountLoaned, address sender) public {
+        vm.assume(amountLoaned > 0);
+        vm.assume(sender != address(0));
+        vm.assume(sender != liquidityProvider);
+        vm.assume(sender != vaultOwner);
+
+        vm.prank(creator);
+        pool.setDebtToken(address(debt));
+        vault.setTotalValue(amountLoaned);
+        vm.startPrank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        asset.transfer(sender, amountLoaned);
+        vm.stopPrank();
+        vm.prank(address(srTranche));
+        pool.deposit(amountLoaned, liquidityProvider);
+        vm.prank(vaultOwner);
+        pool.takeLoan(amountLoaned, address(vault), vaultOwner);
+
+        vm.startPrank(sender);
+        asset.approve(address(pool), type(uint256).max);
+        pool.repayLoan(amountLoaned, address(vault));
+        vm.stopPrank();
+
+        assertEq(asset.balanceOf(address(pool)), amountLoaned);
+        assertEq(asset.balanceOf(sender), 0);
+        assertEq(debt.balanceOf(address(vault)), 0);
+    }
+
+    function testSucces_RepayLoanAmountExceedingLoan(uint128 amountLoaned, uint128 availablefunds, address sender) public {
+        vm.assume(availablefunds > amountLoaned);
+        vm.assume(amountLoaned > 0);
+        vm.assume(sender != address(0));
+        vm.assume(sender != liquidityProvider);
+        vm.assume(sender != vaultOwner);
+
+        vm.prank(creator);
+        pool.setDebtToken(address(debt));
+        vault.setTotalValue(amountLoaned);
+        vm.startPrank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        asset.transfer(sender, availablefunds);
+        vm.stopPrank();
+        vm.prank(address(srTranche));
+        pool.deposit(amountLoaned, liquidityProvider);
+        vm.prank(vaultOwner);
+        pool.takeLoan(amountLoaned, address(vault), vaultOwner);
+
+        vm.startPrank(sender);
+        asset.approve(address(pool), type(uint256).max);
+        pool.repayLoan(availablefunds, address(vault));
+        vm.stopPrank();
+
+        assertEq(asset.balanceOf(address(pool)), amountLoaned);
+        assertEq(asset.balanceOf(sender), availablefunds - amountLoaned);
+        assertEq(debt.balanceOf(address(vault)), 0);
+    }
 
 }

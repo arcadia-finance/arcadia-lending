@@ -355,7 +355,7 @@ contract LiquidityPool is ERC4626, Owned {
         _syncInterestsToLiquidityPool(unrealisedDebt);
     }
 
-    function _calcUnrealisedDebt() internal view returns (uint128 unrealisedDebt) {
+    function _calcUnrealisedDebt() internal returns (uint128 unrealisedDebt) {
         uint128 realisedDebt = uint128(ERC4626(debtToken).totalAssets());
 
         uint128 base;
@@ -382,6 +382,8 @@ contract LiquidityPool is ERC4626, Owned {
                     1e18
             );
         }
+
+        lastSyncedBlock = uint32(block.number);
     }
 
     function _syncInterestsToLiquidityPool(uint256 assets) internal {
@@ -407,6 +409,10 @@ contract LiquidityPool is ERC4626, Owned {
     function testSyncInterestsToLiquidityPool(uint256 assets) public onlyOwner {
         _syncInterestsToLiquidityPool(assets);
     }
+
+    /*//////////////////////////////////////////////////////////////
+                        INTEREST RATE LOGIC
+    //////////////////////////////////////////////////////////////*/
 
     function _updateInterestRate() internal {
         //ToDo
