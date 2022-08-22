@@ -145,7 +145,7 @@ contract TranchesTest is LiquidityPoolTest {
     }
 
     //removeLastTranche
-    function testSucces_removeLastTranche() public {
+    function testSuccess_removeLastTranche() public {
         vm.startPrank(creator);
         pool.addTranche(address(srTranche), 50);
         pool.addTranche(address(jrTranche), 40);
@@ -253,7 +253,7 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
         vm.stopPrank();
     }
 
-    function testSucces_FirstDepositByTranche(uint128 amount) public {
+    function testSuccess_FirstDepositByTranche(uint128 amount) public {
         vm.assume(amount > 0);
 
         vm.prank(liquidityProvider);
@@ -268,7 +268,7 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
         assertEq(asset.balanceOf(address(pool)), amount);
     }
 
-    function testSucces_MultipleDepositsByTranches(uint128 amount0, uint128 amount1) public {
+    function testSuccess_MultipleDepositsByTranches(uint128 amount0, uint128 amount1) public {
         vm.assume(amount0 > 0);
         vm.assume(amount1 > 0);
         uint256 totalAmount = uint256(amount0) + uint256(amount1);
@@ -296,7 +296,7 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
     }
 
     //withdraw
-    function testSucces_Withdraw(uint128 amount0, uint128 amount1) public {
+    function testSuccess_Withdraw(uint128 amount0, uint128 amount1) public {
         vm.assume(amount1 > 0);
         vm.assume(amount0 >= amount1);
 
@@ -315,7 +315,7 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
     }
 
     //redeem
-    function testSucces_Redeem(uint128 amount0, uint128 amount1) public {
+    function testSuccess_Redeem(uint128 amount0, uint128 amount1) public {
         vm.assume(amount1 > 0);
         vm.assume(amount0 >= amount1);
 
@@ -367,7 +367,7 @@ contract LoanTest is LiquidityPoolTest {
         vm.stopPrank();
     }
 
-    function testSucces_SetDebtToken() public {
+    function testSuccess_SetDebtToken() public {
         vm.startPrank(creator);
         pool.setDebtToken(address(debt));
         vm.stopPrank();
@@ -392,7 +392,7 @@ contract LoanTest is LiquidityPoolTest {
         vm.stopPrank();
     }
 
-    function testSucces_ApproveBeneficiary(address beneficiary, uint256 amount) public {
+    function testSuccess_ApproveBeneficiary(address beneficiary, uint256 amount) public {
         vm.prank(vaultOwner);
         pool.approveBeneficiary(beneficiary, amount, address(vault));
 
@@ -462,7 +462,7 @@ contract LoanTest is LiquidityPoolTest {
         vm.stopPrank();
     }
 
-    function testSucces_TakeLoanByVaultOwner(uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address to) public {
+    function testSuccess_TakeLoanByVaultOwner(uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address to) public {
         vm.assume(collateralValue >= amountLoaned);
         vm.assume(liquidity >= amountLoaned);
         vm.assume(amountLoaned > 0);
@@ -486,7 +486,7 @@ contract LoanTest is LiquidityPoolTest {
         assertEq(debt.balanceOf(address(vault)), amountLoaned);
     }
 
-    function testSucces_TakeLoanByLimitedAuthorisedAddress(uint256 amountAllowed, uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address beneficiary, address to) public {
+    function testSuccess_TakeLoanByLimitedAuthorisedAddress(uint256 amountAllowed, uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address beneficiary, address to) public {
         vm.assume(amountAllowed >= amountLoaned);
         vm.assume(collateralValue >= amountLoaned);
         vm.assume(liquidity >= amountLoaned);
@@ -516,7 +516,7 @@ contract LoanTest is LiquidityPoolTest {
         assertEq(pool.creditAllowance(address(vault), beneficiary), amountAllowed - amountLoaned);
     }
 
-    function testSucces_TakeLoanByMaxAuthorisedAddress(uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address beneficiary, address to) public {
+    function testSuccess_TakeLoanByMaxAuthorisedAddress(uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address beneficiary, address to) public {
         vm.assume(collateralValue >= amountLoaned);
         vm.assume(liquidity >= amountLoaned);
         vm.assume(amountLoaned > 0);
@@ -578,7 +578,7 @@ contract LoanTest is LiquidityPoolTest {
         vm.stopPrank();
     }
 
-    function testSucces_RepayLoanAmountInferiorLoan(uint128 amountLoaned, uint256 amountRepaid, address sender) public {
+    function testSuccess_RepayLoanAmountInferiorLoan(uint128 amountLoaned, uint256 amountRepaid, address sender) public {
         vm.assume(amountLoaned > amountRepaid);
         vm.assume(amountRepaid > 0);
         vm.assume(sender != address(0));
@@ -607,7 +607,7 @@ contract LoanTest is LiquidityPoolTest {
         assertEq(debt.balanceOf(address(vault)), amountLoaned - amountRepaid);
     }
 
-    function testSucces_RepayLoanExactAmount(uint128 amountLoaned, address sender) public {
+    function testSuccess_RepayLoanExactAmount(uint128 amountLoaned, address sender) public {
         vm.assume(amountLoaned > 0);
         vm.assume(sender != address(0));
         vm.assume(sender != liquidityProvider);
@@ -635,7 +635,7 @@ contract LoanTest is LiquidityPoolTest {
         assertEq(debt.balanceOf(address(vault)), 0);
     }
 
-    function testSucces_RepayLoanAmountExceedingLoan(uint128 amountLoaned, uint128 availablefunds, address sender) public {
+    function testSuccess_RepayLoanAmountExceedingLoan(uint128 amountLoaned, uint128 availablefunds, address sender) public {
         vm.assume(availablefunds > amountLoaned);
         vm.assume(amountLoaned > 0);
         vm.assume(sender != address(0));
@@ -666,9 +666,9 @@ contract LoanTest is LiquidityPoolTest {
 
 }
 
-    /*//////////////////////////////////////////////////////////////
+/*//////////////////////////////////////////////////////////////
                             INTERESTS LOGIC
-    //////////////////////////////////////////////////////////////*/
+//////////////////////////////////////////////////////////////*/
 contract InterestsTest is LiquidityPoolTest {
     using stdStorage for StdStorage;
 
@@ -692,7 +692,7 @@ contract InterestsTest is LiquidityPoolTest {
     }
 
     //_syncInterestsToLiquidityPool
-    function testSucces_SyncInterestsToLiquidityPoolExact() public {
+    function testSuccess_SyncInterestsToLiquidityPoolExact() public {
         vm.prank(creator);
         pool.testSyncInterestsToLiquidityPool(100);
 
@@ -705,7 +705,7 @@ contract InterestsTest is LiquidityPoolTest {
         assertEq(pool.totalAssets(), 100);
     }
 
-    function testSucces_SyncInterestsToLiquidityPoolRounded() public {
+    function testSuccess_SyncInterestsToLiquidityPoolRounded() public {
         vm.prank(creator);
         pool.testSyncInterestsToLiquidityPool(99);
 
@@ -719,7 +719,7 @@ contract InterestsTest is LiquidityPoolTest {
     }
 
     //_calcUnrealisedDebt
-    function testSucces_CalcUnrealisedDebtUnchecked(uint64 interestRate, uint24 deltaBlocks, uint128 realisedDebt) public {
+    function testSuccess_CalcUnrealisedDebtUnchecked(uint64 interestRate, uint24 deltaBlocks, uint128 realisedDebt) public {
         vm.assume(interestRate <= 10 * 10**18); //1000%
         vm.assume(deltaBlocks <= 13140000); //5 year
         vm.assume(realisedDebt <= type(uint128).max / (10**5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
@@ -750,13 +750,135 @@ contract InterestsTest is LiquidityPoolTest {
         assertEq(expectedValue, actualValue);
     }
     //Helper functions
-    function calcUnrealisedDebtChecked(uint64 interestRate, uint24 deltaBlocks, uint128 realisedDebt) internal returns (uint256 unrealisedDebt) {
+    function calcUnrealisedDebtChecked(uint64 interestRate, uint24 deltaBlocks, uint128 realisedDebt) internal view returns (uint256 unrealisedDebt) {
         uint256 base = 1e18 + uint256(interestRate);
         uint256 exponent = uint256(deltaBlocks) * 1e18 / pool.YEARLY_BLOCKS();
         unrealisedDebt = 
                 (uint256(realisedDebt) * (LogExpMath.pow(base, exponent) - 1e18)) /
                     1e18
             ;
+    }
+
+}
+
+/*//////////////////////////////////////////////////////////////
+                            LOAN DEFAULT LOGIC
+//////////////////////////////////////////////////////////////*/
+contract DefaultTest is LiquidityPoolTest {
+    using stdStorage for StdStorage;
+
+    function setUp() override public {
+        super.setUp();
+
+        vm.startPrank(creator);
+        pool.setFeeWeight(10);
+        //Set Tranche weight on 0 so that all yield goes to treasury
+        pool.addTranche(address(srTranche), 0);
+        pool.addTranche(address(jrTranche), 0);
+
+        debt = new DebtToken(pool);
+        pool.setDebtToken(address(debt));
+        vm.stopPrank();
+
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+    }
+
+    function testSuccess_ProcessDefaultOneTranche(uint128 liquiditySenior, uint128 liquidityJunior, uint128 defaultAmount) public {
+        vm.assume(liquiditySenior > 0);
+        vm.assume(liquidityJunior > 0);
+        uint256 totalAmount = uint256(liquiditySenior) + uint256(liquidityJunior);
+        vm.assume(liquiditySenior <= type(uint256).max / totalAmount); //Overflow on maxWithdraw()
+        vm.assume(liquidityJunior <= type(uint256).max / totalAmount); //Overflow on maxWithdraw()
+        vm.assume(defaultAmount < liquidityJunior);
+
+        vm.prank(address(srTranche));
+        pool.deposit(liquiditySenior, liquidityProvider);
+        vm.prank(address(jrTranche));
+        pool.deposit(liquidityJunior, liquidityProvider);
+
+        vm.prank(creator);
+        pool.testProcessDefault(defaultAmount);
+
+        assertEq(pool.maxWithdraw(address(srTranche)), liquiditySenior);
+        assertEq(pool.maxRedeem(address(srTranche)), liquiditySenior);
+        assertEq(pool.maxWithdraw(address(jrTranche)), liquidityJunior - defaultAmount);
+        assertEq(pool.maxRedeem(address(jrTranche)), liquidityJunior - defaultAmount);
+        assertEq(pool.totalAssets(), totalAmount - defaultAmount);
+    }
+
+    function testSuccess_ProcessDefaultTwoTranches(uint128 liquiditySenior, uint128 liquidityJunior, uint128 defaultAmount) public {
+        vm.assume(liquiditySenior > 0);
+        vm.assume(liquidityJunior > 0);
+        uint256 totalAmount = uint256(liquiditySenior) + uint256(liquidityJunior);
+        vm.assume(liquiditySenior <= type(uint256).max / totalAmount); //Overflow on maxWithdraw()
+        vm.assume(liquidityJunior <= type(uint256).max / totalAmount); //Overflow on maxWithdraw()
+        vm.assume(defaultAmount < totalAmount);
+        vm.assume(defaultAmount >= liquidityJunior);
+
+        vm.prank(address(srTranche));
+        pool.deposit(liquiditySenior, liquidityProvider);
+        vm.prank(address(jrTranche));
+        pool.deposit(liquidityJunior, liquidityProvider);
+
+        vm.prank(creator);
+        pool.testProcessDefault(defaultAmount);
+
+        assertEq(pool.maxWithdraw(address(srTranche)), totalAmount - defaultAmount);
+        assertEq(pool.maxRedeem(address(srTranche)), totalAmount - defaultAmount);
+        assertEq(pool.maxWithdraw(address(jrTranche)), 0);
+        assertEq(pool.maxRedeem(address(jrTranche)), 0);
+        assertEq(pool.totalAssets(), totalAmount - defaultAmount);
+        assertFalse(pool.isTranche(address(jrTranche)));
+    }
+
+    function testSuccess_ProcessDefaultTwoTranches2() public {
+        uint128 liquiditySenior = 276028230810889340408348013749270860077;
+        uint128 liquidityJunior = 3;
+        uint128 defaultAmount = 190274892176533599548131589686714072708;
+        uint256 totalAmount = uint256(liquiditySenior) + uint256(liquidityJunior);
+
+        vm.prank(address(srTranche));
+        pool.deposit(liquiditySenior, liquidityProvider);
+        vm.prank(address(jrTranche));
+        pool.deposit(liquidityJunior, liquidityProvider);
+
+        vm.prank(creator);
+        pool.testProcessDefault(defaultAmount);
+
+        assertEq(pool.maxWithdraw(address(srTranche)), totalAmount - defaultAmount);
+        assertEq(pool.maxRedeem(address(srTranche)), totalAmount - defaultAmount);
+        assertEq(pool.maxWithdraw(address(jrTranche)), 0);
+        assertEq(pool.maxRedeem(address(jrTranche)), 0);
+        assertEq(pool.totalAssets(), totalAmount - defaultAmount);
+        assertFalse(pool.isTranche(address(jrTranche)));
+    }
+
+    function testSuccess_ProcessDefaultAllTranches(uint128 liquiditySenior, uint128 liquidityJunior, uint128 defaultAmount) public {
+        vm.assume(liquiditySenior > 0);
+        vm.assume(liquidityJunior > 0);
+        uint256 totalAmount = uint256(liquiditySenior) + uint256(liquidityJunior);
+        vm.assume(liquiditySenior <= type(uint256).max / totalAmount); //Overflow on maxWithdraw()
+        vm.assume(liquidityJunior <= type(uint256).max / totalAmount); //Overflow on maxWithdraw()
+        vm.assume(defaultAmount >= totalAmount);
+
+        vm.prank(address(srTranche));
+        pool.deposit(liquiditySenior, liquidityProvider);
+        vm.prank(address(jrTranche));
+        pool.deposit(liquidityJunior, liquidityProvider);
+
+        vm.prank(creator);
+        pool.testProcessDefault(defaultAmount);
+
+        assertEq(pool.maxWithdraw(address(srTranche)), 0);
+        assertEq(pool.maxRedeem(address(srTranche)), 0);
+        assertEq(pool.maxWithdraw(address(jrTranche)), 0);
+        assertEq(pool.maxRedeem(address(jrTranche)), 0);
+        assertEq(pool.totalAssets(), 0);
+        assertFalse(pool.isTranche(address(jrTranche)));
+        assertFalse(pool.isTranche(address(srTranche)));
+
+        //ToDo Remaining Liquidity stuck in pool now, emergency procedure?
     }
 
 }

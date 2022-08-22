@@ -351,10 +351,10 @@ contract LiquidityPool is ERC4626, Owned {
     uint256 public constant YEARLY_BLOCKS = 2628000;
 
     /** 
-    @notice Syncs all unrealised debt (= interest for LP and treasury).
-    @dev Calculates the unrealised debt since last sync, and realises it by minting an aqual amount of
-         debt tokens to all debt holders and interests to LPs and the treasury
-  */
+     * @notice Syncs all unrealised debt (= interest for LP and treasury).
+     * @dev Calculates the unrealised debt since last sync, and realises it by minting an aqual amount of
+     *      debt tokens to all debt holders and interests to LPs and the treasury
+    */
     function _syncInterests() internal {
         uint256 unrealisedDebt = uint256(_calcUnrealisedDebt());
 
@@ -366,15 +366,15 @@ contract LiquidityPool is ERC4626, Owned {
     }
 
     /** 
-    @notice Calculates the unrealised debt.
-    @dev To Find the unrealised debt over an amount of time, you need to calculate D[(1+r)^x-1].
-         The base of the exponential: 1 + r, is a 18 decimals fixed point number
-         with r the yearly interest rate.
-         The exponent of the exponential: x, is a 18 decimals fixed point number.
-         The exponent x is calculated as: the amount of blocks since last sync divided by the average of 
-         blocks produced over a year (using a 12s average block time).
-         _yearlyInterestRate = 1 + r expressed as 18 decimals fixed point number
-  */
+     * @notice Calculates the unrealised debt.
+     * @dev To Find the unrealised debt over an amount of time, you need to calculate D[(1+r)^x-1].
+     *      The base of the exponential: 1 + r, is a 18 decimals fixed point number
+     *      with r the yearly interest rate.
+     *      The exponent of the exponential: x, is a 18 decimals fixed point number.
+     *      The exponent x is calculated as: the amount of blocks since last sync divided by the average of 
+     *      blocks produced over a year (using a 12s average block time).
+     *      _yearlyInterestRate = 1 + r expressed as 18 decimals fixed point number
+     */
     function _calcUnrealisedDebt() internal returns (uint256 unrealisedDebt) {
         uint256 realisedDebt = ERC4626(debtToken).totalAssets();
 
@@ -410,11 +410,12 @@ contract LiquidityPool is ERC4626, Owned {
     }
 
     /** 
-    @notice Syncs interest payments to the Liquidity providers and the treasury.
-    @dev The weight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
-    @dev The Shares for each Tranche are rounded up, if the treasury receives the remaining shares and will hence loose
-         part of their yield due to rounding errors (neglectable small).
-  */
+     * @notice Syncs interest payments to the Liquidity providers and the treasury.
+     * @param assets The total amount of underlying assets to be paid out as interests.
+     * @dev The weight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
+     * @dev The Shares for each Tranche are rounded up, if the treasury receives the remaining shares and will hence loose
+     *      part of their yield due to rounding errors (neglectable small).
+     */
     function _syncInterestsToLiquidityPool(uint256 assets) internal {
         uint256 shares = previewDeposit(assets);
         uint256 remainingShares = shares;
@@ -453,17 +454,24 @@ contract LiquidityPool is ERC4626, Owned {
                             LOAN DEFAULT LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /** 
+     * @notice Handles the bookkeeping in case of bad debt (Vault became undercollateralised).
+     * @param assets The total amount of underlying assets that need to be written off as bad debt.
+     * @dev The order of the tranches is important, the most senior tranche is at index 0, the most junior at the last index.
+     * @dev The most junior tranche will loose its underlying capital first. If all liquidty of a certain Tranche is written off,
+     *      the complete tranche is locked and removed. If there is still remaining bad debt, the next Tranche starts losing capital.
+     */
     function _processDefault(uint256 assets) internal {
         if (totalHoldings < assets) {
-            //Should never be possible
+            //Should never be possible, this means the total protocol has more debt than claimable liquidity.
             assets = totalHoldings;
         }
 
+        uint256 shares = convertToShares(assets);
         totalHoldings -= assets;
 
-        uint256 shares = convertToShares(assets);
-
-        for (uint256 i = tranches.length-1; i >= 0; ) {
+        for (uint256 i = tranches.length; i > 0; ) {
+            unchecked {--i;}
             address tranche = tranches[i];
             uint256 maxShares = maxRedeem(tranche);
             if (shares < maxShares) {
@@ -477,14 +485,14 @@ contract LiquidityPool is ERC4626, Owned {
                     shares -= maxShares;
                 }
             }
-
-            unchecked {
-                --i;
-            }
         }
+
+        //ToDo Although it should be an impossible state if the protocol functions as it should,
+        //What if there is still more liquidity in the pool than totalHoldings, start an emergency procedure?
 
     }
 
+    //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
     function testProcessDefault(uint256 assets) public onlyOwner {
         _processDefault(assets);
     }
