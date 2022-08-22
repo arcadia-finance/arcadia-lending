@@ -332,6 +332,11 @@ contract LiquidityPool is ERC4626, Owned {
 
     uint256 public totalHoldings;
 
+    /**
+     * @notice Returns the total amount of underlying assets, to which liquidity providers have a claim
+     * @return totalHoldings The total amount of underlying assets, to which liquidity providers have a claim
+     * @dev Equal to the sum of the total oustanding debt and the liquidty in the pool
+     */
     function totalAssets() public view override returns (uint256) {
         return totalHoldings;
     }
@@ -341,10 +346,15 @@ contract LiquidityPool is ERC4626, Owned {
     //////////////////////////////////////////////////////////////*/
 
     //ToDo: optimise storage allocations
-    uint64 public interstRate; //18 decimals precision
+    uint64 public interestRate; //18 decimals precision
     uint32 public lastSyncedBlock;
     uint256 public constant YEARLY_BLOCKS = 2628000;
 
+    /** 
+    @notice Syncs all unrealised debt (= interest for LP and treasury).
+    @dev Calculates the unrealised debt since last sync, and realises it by minting an aqual amount of
+         debt tokens to all debt holders and interests to LPs and the treasury
+  */
     function _syncInterests() internal {
         uint256 unrealisedDebt = uint256(_calcUnrealisedDebt());
 
@@ -355,37 +365,56 @@ contract LiquidityPool is ERC4626, Owned {
         _syncInterestsToLiquidityPool(unrealisedDebt);
     }
 
-    function _calcUnrealisedDebt() internal returns (uint128 unrealisedDebt) {
-        uint128 realisedDebt = uint128(ERC4626(debtToken).totalAssets());
+    /** 
+    @notice Calculates the unrealised debt.
+    @dev To Find the unrealised debt over an amount of time, you need to calculate D[(1+r)^x-1].
+         The base of the exponential: 1 + r, is a 18 decimals fixed point number
+         with r the yearly interest rate.
+         The exponent of the exponential: x, is a 18 decimals fixed point number.
+         The exponent x is calculated as: the amount of blocks since last sync divided by the average of 
+         blocks produced over a year (using a 12s average block time).
+         _yearlyInterestRate = 1 + r expressed as 18 decimals fixed point number
+  */
+    function _calcUnrealisedDebt() internal returns (uint256 unrealisedDebt) {
+        uint256 realisedDebt = ERC4626(debtToken).totalAssets();
 
-        uint128 base;
-        uint128 exponent;
+        uint256 base;
+        uint256 exponent;
 
         unchecked {
-            //gas: can't overflow: 1e18 + uint64 <<< uint128
-            base = uint128(1e18) + interstRate;
+            //gas: can't overflow for reasonable interest rates
+            base = 1e18 + interestRate;
 
             //gas: only overflows when blocks.number > 894262060268226281981748468
             //in practice: assumption that delta of blocks < 341640000 (150 years)
             //as foreseen in LogExpMath lib
-            exponent = uint128(
-                ((block.number - lastSyncedBlock) * 1e18) / YEARLY_BLOCKS
-            );
+            exponent = ((block.number - lastSyncedBlock) * 1e18) / YEARLY_BLOCKS;
 
-            //gas: taking an imaginary worst-case D- tier assets with max interest of 1000%
+            //gas: taking an imaginary worst-case scenario with max interest of 1000%
             //over a period of 5 years
             //this won't overflow as long as opendebt < 3402823669209384912995114146594816
             //which is 3.4 million billion *10**18 decimals
 
-            unrealisedDebt = uint128(
+            unrealisedDebt = 
                 (realisedDebt * (LogExpMath.pow(base, exponent) - 1e18)) /
                     1e18
-            );
+            ;
         }
 
         lastSyncedBlock = uint32(block.number);
     }
 
+    //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
+    function testCalcUnrealisedDebt() public returns (uint256 unrealisedDebt) {
+        unrealisedDebt = _calcUnrealisedDebt();
+    }
+
+    /** 
+    @notice Syncs interest payments to the Liquidity providers and the treasury.
+    @dev The weight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
+    @dev The Shares for each Tranche are rounded up, if the treasury receives the remaining shares and will hence loose
+         part of their yield due to rounding errors (neglectable small).
+  */
     function _syncInterestsToLiquidityPool(uint256 assets) internal {
         uint256 shares = previewDeposit(assets);
         uint256 remainingShares = shares;
@@ -394,7 +423,7 @@ contract LiquidityPool is ERC4626, Owned {
             uint256 trancheShare = shares.mulDivUp(weights[i], totalWeight);
             _mint(tranches[i], trancheShare);
             unchecked {
-                remainingShares -= remainingShares;
+                remainingShares -= trancheShare;
                 ++i;
             }
         }
@@ -406,6 +435,7 @@ contract LiquidityPool is ERC4626, Owned {
         
     }
 
+    //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
     function testSyncInterestsToLiquidityPool(uint256 assets) public onlyOwner {
         _syncInterestsToLiquidityPool(assets);
     }
@@ -416,7 +446,7 @@ contract LiquidityPool is ERC4626, Owned {
 
     function _updateInterestRate() internal {
         //ToDo
-        interstRate = 200000000000000000;
+        interestRate = 20000000000000000; //2% with 18 decimals precision
     }
 
     /*//////////////////////////////////////////////////////////////

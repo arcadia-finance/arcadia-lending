@@ -665,3 +665,98 @@ contract LoanTest is LiquidityPoolTest {
     }
 
 }
+
+    /*//////////////////////////////////////////////////////////////
+                            INTERESTS LOGIC
+    //////////////////////////////////////////////////////////////*/
+contract InterestsTest is LiquidityPoolTest {
+    using stdStorage for StdStorage;
+
+    Vault vault;
+
+    function setUp() override public {
+        super.setUp();
+
+        vm.startPrank(creator);
+        pool.setFeeWeight(10);
+        pool.addTranche(address(srTranche), 50);
+        pool.addTranche(address(jrTranche), 40);
+
+        debt = new DebtToken(pool);
+        pool.setDebtToken(address(debt));
+        vm.stopPrank();
+
+        vm.startPrank(vaultOwner);
+        vault = Vault(factory.createVault(1));
+        vm.stopPrank();
+    }
+
+    //_syncInterestsToLiquidityPool
+    function testSucces_SyncInterestsToLiquidityPoolExact() public {
+        vm.prank(creator);
+        pool.testSyncInterestsToLiquidityPool(100);
+
+        assertEq(pool.maxWithdraw(address(srTranche)), 50);
+        assertEq(pool.maxRedeem(address(srTranche)), 50);
+        assertEq(pool.maxWithdraw(address(jrTranche)), 40);
+        assertEq(pool.maxRedeem(address(jrTranche)), 40);
+        assertEq(pool.maxWithdraw(treasury), 10);
+        assertEq(pool.maxRedeem(treasury), 10);
+        assertEq(pool.totalAssets(), 100);
+    }
+
+    function testSucces_SyncInterestsToLiquidityPoolRounded() public {
+        vm.prank(creator);
+        pool.testSyncInterestsToLiquidityPool(99);
+
+        assertEq(pool.maxWithdraw(address(srTranche)), 50);
+        assertEq(pool.maxRedeem(address(srTranche)), 50);
+        assertEq(pool.maxWithdraw(address(jrTranche)), 40);
+        assertEq(pool.maxRedeem(address(jrTranche)), 40);
+        assertEq(pool.maxWithdraw(treasury), 9);
+        assertEq(pool.maxRedeem(treasury), 9);
+        assertEq(pool.totalAssets(), 99);
+    }
+
+    //_calcUnrealisedDebt
+    function testSucces_CalcUnrealisedDebtUnchecked(uint64 interestRate, uint24 deltaBlocks, uint128 realisedDebt) public {
+        vm.assume(interestRate <= 10 * 10**18); //1000%
+        vm.assume(deltaBlocks <= 13140000); //5 year
+        vm.assume(realisedDebt <= type(uint128).max / (10**5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
+
+        uint256 loc = stdstore
+            .target(address(pool))
+            .sig(pool.interestRate.selector)
+            .find();
+        bytes32 slot = bytes32(loc);
+        //interestRate and lastSyncedBlock are packed in same slot -> encode packen and bitshift to the right
+        bytes32 value = bytes32(abi.encodePacked(uint24(block.number), interestRate));
+        value = value >> 168;
+        vm.store(address(pool), slot, value);
+
+        loc = stdstore
+            .target(address(debt))
+            .sig(debt.totalDebt.selector)
+            .find();
+        slot = bytes32(loc);
+        value = bytes32(abi.encode(realisedDebt));
+        vm.store(address(debt), slot, value);
+
+        vm.roll(block.number + deltaBlocks);
+
+        uint256 expectedValue = calcUnrealisedDebtChecked(interestRate, deltaBlocks, realisedDebt);
+        uint256 actualValue = pool.testCalcUnrealisedDebt();
+
+        assertEq(expectedValue, actualValue);
+    }
+    //Helper functions
+    function calcUnrealisedDebtChecked(uint64 interestRate, uint24 deltaBlocks, uint128 realisedDebt) internal returns (uint256 unrealisedDebt) {
+        uint256 base = 1e18 + uint256(interestRate);
+        uint256 exponent = uint256(deltaBlocks) * 1e18 / pool.YEARLY_BLOCKS();
+        unrealisedDebt = 
+                (uint256(realisedDebt) * (LogExpMath.pow(base, exponent) - 1e18)) /
+                    1e18
+            ;
+    }
+
+}
