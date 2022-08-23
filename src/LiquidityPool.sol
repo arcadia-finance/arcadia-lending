@@ -108,7 +108,7 @@ contract LiquidityPool is ERC4626, Owned {
      * @dev Passing the input parameters to the function saves gas compared to reading the address and index of the last tranche from memory.
      *      No need to be check if index and tranche are indeed of the last tranche since function is only called by _processDefault.
      */
-    function removeLastTranche(uint256 index, address tranche) internal {
+    function _popTranche(uint256 index, address tranche) internal {
         totalWeight -= weights[index];
         isTranche[tranche] = false;
         weights.pop();
@@ -121,8 +121,8 @@ contract LiquidityPool is ERC4626, Owned {
      * @param tranche The address of the last Tranche
      * @dev ToDo: Remove before deploying
      */
-    function testRemoveLastTranche(uint256 index, address tranche) public {
-        removeLastTranche( index, tranche);
+    function testPopTranche(uint256 index, address tranche) public {
+        _popTranche( index, tranche);
     }
 
     /*///////////////////////////////////////////////////////////////
@@ -273,7 +273,7 @@ contract LiquidityPool is ERC4626, Owned {
      * @param to The address who receives the lended out underlying tokens
      * @dev The sender might be different as the owner if they have the proper allowances
      */
-    function takeLoan(uint256 amount, address vault, address to) public {
+    function borrow(uint256 amount, address vault, address to) public {
 
         require(IFactory(vaultFactory).isVault(vault), "LP_TL: Not a vault");
 
@@ -305,7 +305,7 @@ contract LiquidityPool is ERC4626, Owned {
      * @dev ToDo: should it be possible to trigger a repay on behalf of an other account, 
      *      If so, work with allowances
      */
-    function repayLoan(uint256 amount, address vault) public {
+    function repay(uint256 amount, address vault) public {
 
         require(IFactory(vaultFactory).isVault(vault), "LP_RL: Not a vault");
 
@@ -480,7 +480,7 @@ contract LiquidityPool is ERC4626, Owned {
             } else {
                 ITranche(tranche).lock();
                 _burn(tranche, maxShares);
-                removeLastTranche(i, tranche);
+                _popTranche(i, tranche);
                 unchecked {
                     shares -= maxShares;
                 }
