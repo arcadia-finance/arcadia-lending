@@ -64,15 +64,15 @@ contract DebtToken is ERC4626, Owned {
     function withdraw(
         uint256 assets,
         address receiver,
-        address _owner
+        address owner_
     ) public override onlyLiquidityPool returns (uint256 shares) {
         shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
 
-        _burn(_owner, shares);
+        _burn(owner_, shares);
 
         totalDebt -= assets;
 
-        emit Withdraw(msg.sender, receiver, _owner, assets, shares);
+        emit Withdraw(msg.sender, receiver, owner_, assets, shares);
 
     }
 
