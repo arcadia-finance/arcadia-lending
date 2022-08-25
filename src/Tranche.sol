@@ -9,6 +9,7 @@ pragma solidity ^0.8.13;
 import "../lib/solmate/src/auth/Owned.sol";
 import "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
+import "./interfaces/ILiquidityPool.sol";
 
 /**
  * @title tranche
@@ -19,7 +20,7 @@ import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
 contract Tranche is ERC4626, Owned {
     using SafeTransferLib for ERC20;
 
-    ERC4626 public liquidityPool;
+    ERC20 public liquidityPool;
     bool public locked = false;
 
     modifier notLocked() {
@@ -35,13 +36,13 @@ contract Tranche is ERC4626, Owned {
      * @dev The name and symbol of the tranche are automatically generated, based on the name and symbol of the underlying token
      */
     constructor(
-        ERC4626 _liquidityPool,
+        ERC20 _liquidityPool,
         string memory _prefix,
         string memory _prefixSymbol
     ) ERC4626(
-        _liquidityPool.asset(),
-        string(abi.encodePacked(_prefix, " Arcadia ", _liquidityPool.asset().name())),
-        string(abi.encodePacked(_prefixSymbol, "arc", _liquidityPool.asset().symbol()))
+        ILiquidityPool(address(_liquidityPool)).asset(),
+        string(abi.encodePacked(_prefix, " Arcadia ", ILiquidityPool(address(_liquidityPool)).asset().name())),
+        string(abi.encodePacked(_prefixSymbol, "arc", ILiquidityPool(address(_liquidityPool)).asset().symbol()))
     ) Owned(msg.sender) {
         liquidityPool = _liquidityPool;
     }
@@ -86,7 +87,7 @@ contract Tranche is ERC4626, Owned {
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
         // Need to transfer (via liquidityPool.deposit()) before minting or ERC777s could reenter.
-        liquidityPool.deposit(assets, msg.sender);
+        ILiquidityPool(address(liquidityPool)).deposit(assets, msg.sender);
 
         _mint(receiver, shares);
 
@@ -106,7 +107,7 @@ contract Tranche is ERC4626, Owned {
         assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
 
         // Need to transfer (via liquidityPool.deposit()) before minting or ERC777s could reenter.
-        liquidityPool.deposit(assets, msg.sender);
+        ILiquidityPool(address(liquidityPool)).deposit(assets, msg.sender);
 
         _mint(receiver, shares);
 
@@ -133,7 +134,7 @@ contract Tranche is ERC4626, Owned {
             if (allowed != type(uint256).max) allowance[owner_][msg.sender] = allowed - shares;
         }
 
-        liquidityPool.withdraw(assets, receiver, address(this));
+        ILiquidityPool(address(liquidityPool)).withdraw(assets, receiver, address(this));
 
         _burn(owner_, shares);
 
@@ -165,7 +166,7 @@ contract Tranche is ERC4626, Owned {
 
         emit Withdraw(msg.sender, receiver, owner_, assets, shares);
 
-        liquidityPool.withdraw(assets, receiver, address(this));
+        ILiquidityPool(address(liquidityPool)).withdraw(assets, receiver, address(this));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -178,7 +179,7 @@ contract Tranche is ERC4626, Owned {
      * @dev The Liquidity Pool does the accounting of the outstanding claim on liquidity per tranche.
      */
     function totalAssets() public view override returns (uint256 assets) {
-        assets =  liquidityPool.maxWithdraw(address(this));
+        assets =  liquidityPool.balanceOf(address(this));
     }
 
     /*//////////////////////////////////////////////////////////////

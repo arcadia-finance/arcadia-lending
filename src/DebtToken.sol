@@ -9,18 +9,19 @@ pragma solidity ^0.8.13;
 import "../lib/solmate/src/auth/Owned.sol";
 import "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
+import "./interfaces/ILiquidityPool.sol";
 
 contract DebtToken is ERC4626, Owned {
     using SafeTransferLib for ERC20;
 
-    ERC4626 liquidityPool;
+    ERC20 liquidityPool;
 
     constructor(
-        ERC4626 _liquidityPool
+        ERC20 _liquidityPool
     ) ERC4626(
-        _liquidityPool.asset(),
-        string(abi.encodePacked("Arcadia ", _liquidityPool.asset().name(), " Debt")),
-        string(abi.encodePacked("darc", _liquidityPool.asset().symbol()))
+        ILiquidityPool(address(_liquidityPool)).asset(),
+        string(abi.encodePacked("Arcadia ", ILiquidityPool(address(_liquidityPool)).asset().name(), " Debt")),
+        string(abi.encodePacked("darc", ILiquidityPool(address(_liquidityPool)).asset().symbol()))
     ) Owned(msg.sender) {
         liquidityPool = _liquidityPool;
     }
