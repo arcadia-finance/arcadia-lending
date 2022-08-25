@@ -1,7 +1,6 @@
 /** 
     Created by Arcadia Finance
     https://www.arcadia.finance
-
     SPDX-License-Identifier: BUSL-1.1
  */
 pragma solidity ^0.8.13;
@@ -9,18 +8,19 @@ pragma solidity ^0.8.13;
 import "../lib/solmate/src/auth/Owned.sol";
 import "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
+import "./interfaces/ILiquidityPool.sol";
 
 contract DebtToken is ERC4626, Owned {
     using SafeTransferLib for ERC20;
 
-    ERC4626 liquidityPool;
+    ERC20 liquidityPool;
 
     constructor(
-        ERC4626 _liquidityPool
+        ERC20 _liquidityPool
     ) ERC4626(
-        _liquidityPool.asset(),
-        string(abi.encodePacked("Arcadia ", _liquidityPool.asset().name(), " Debt")),
-        string(abi.encodePacked("darc", _liquidityPool.asset().symbol()))
+        ILiquidityPool(address(_liquidityPool)).asset(),
+        string(abi.encodePacked("Arcadia ", ILiquidityPool(address(_liquidityPool)).asset().name(), " Debt")),
+        string(abi.encodePacked("darc", ILiquidityPool(address(_liquidityPool)).asset().symbol()))
     ) Owned(msg.sender) {
         liquidityPool = _liquidityPool;
     }
@@ -64,15 +64,15 @@ contract DebtToken is ERC4626, Owned {
     function withdraw(
         uint256 assets,
         address receiver,
-        address owner_
+        address _owner
     ) public override onlyLiquidityPool returns (uint256 shares) {
         shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
 
-        _burn(owner_, shares);
+        _burn(_owner, shares);
 
         totalDebt -= assets;
 
-        emit Withdraw(msg.sender, receiver, owner_, assets, shares);
+        emit Withdraw(msg.sender, receiver, _owner, assets, shares);
 
     }
 
