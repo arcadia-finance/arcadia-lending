@@ -13,7 +13,7 @@ import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
 contract Tranche is ERC4626, Owned {
     using SafeTransferLib for ERC20;
 
-    ERC4626 liquidityPool;
+    ERC4626 public liquidityPool;
     bool public locked = false;
 
     modifier notLocked() {
