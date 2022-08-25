@@ -8,6 +8,7 @@ pragma solidity ^0.8.13;
 
 import "../lib/solmate/src/auth/Owned.sol";
 import {Auth} from "../lib/solmate/src/auth/Auth.sol";
+import "../lib/solmate/src/tokens/ERC20.sol";
 import "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "../lib/solmate/src/utils/FixedPointMathLib.sol";
@@ -21,13 +22,14 @@ import "./interfaces/IVault.sol";
  * @title Liquidity Pool
  * @author Arcadia Finance
  * @notice The Lending pool contains the main logic to provide liquidity and take or repay loans for a certain asset
- * @dev Protocol is according the ERC4626 standard, with a certain ERC20 as underlying
+ * @dev Protocol is a modification of the ERC20 standard, with a certain ERC20 as underlying
  */
-contract LiquidityPool is ERC4626, Owned {
+contract LiquidityPool is ERC20, Owned {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
     address public vaultFactory;
+    ERC20 public immutable asset;
 
     /**
      * @notice The constructor for a liquidity pool
@@ -42,11 +44,12 @@ contract LiquidityPool is ERC4626, Owned {
         address _liquidator,
         address _treasury,
         address _vaultFactory
-    ) ERC4626(
-        _asset,
+    ) ERC20(
         string(abi.encodePacked("Arcadia ", _asset.name(), " Pool")),
-        string(abi.encodePacked("arc", _asset.symbol()))
+        string(abi.encodePacked("arc", _asset.symbol())),
+        _asset.decimals()
     ) Owned(msg.sender) {
+        asset = _asset;
         liquidator = _liquidator;
         treasury = _treasury;
         vaultFactory = _vaultFactory;
@@ -156,73 +159,42 @@ contract LiquidityPool is ERC4626, Owned {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Modification of the standard ERC-4626 deposit implementation
+     * @notice Deposit assets in the Liquidity Pool
      * @param assets the amount of assets of the underlying ERC-20 token being deposited
      * @param from The address of the origin of the underlying ERC-20 token, who deposits assets via a Tranche
-     * @return shares The corresponding amount of shares minted
      * @dev This function can only be called by Tranches.
      * @dev IMPORTANT, this function deviates from the standard, instead of the parameter 'receiver':
      *      (this is always msg.sender, a tranche), the second parameter is 'from':
      *      (the origin of the underlying ERC-20 token, who deposits assets via a Tranche)
      */
-    function deposit(uint256 assets, address from) public override onlyTranche returns (uint256 shares) {
+    function deposit(uint256 assets, address from) public onlyTranche {
         _syncInterests();
-        // Check for rounding error since we round down in previewDeposit.
-        require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
         asset.safeTransferFrom(from, address(this), assets);
 
-        _mint(msg.sender, shares);
-
-        emit Deposit(msg.sender, msg.sender, assets, shares);
-
-        totalHoldings += assets;
+        _mint(msg.sender, assets);
 
         _updateInterestRate();
     }
 
     /**
-     * @notice Modification of the standard ERC-4626 mint implementation
-     * @dev Token not mintable
-     */
-    function mint(uint256, address) public pure override returns (uint256) {
-        revert("MINT_NOT_SUPPORTED");
-    }
-
-    /**
-     * @notice Modification of the standard ERC-4626 withdraw implementation
+     * @notice Withdraw assets from the Liquidity Pool
      * @param assets the amount of assets of the underlying ERC-20 token being withdrawn
      * @param receiver The address of the receiver of the underlying ERC-20 tokens
      * @param owner_ The address of the owner of the assets being withdrawn
-     * @return shares The corresponding amount of shares redeemed
      */
     function withdraw(
         uint256 assets,
         address receiver,
         address owner_
-    ) public override returns (uint256 shares) {
+    ) public {
         _syncInterests();
-        shares = super.withdraw(assets, receiver, owner_);
-        totalHoldings -= assets;
 
-        _updateInterestRate();
-    }
+        require(msg.sender == owner_, "LP_W: UNAUTHORIZED");
 
-    /**
-     * @notice Modification of the standard ERC-4626 redeem implementation
-     * @param shares the amount of shares being redeemed
-     * @param receiver The address of the receiver of the underlying ERC-20 tokens
-     * @param owner_ The address of the owner of the shares being redeemed
-     * @return assets The corresponding amount of assets withdrawn
-     */
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address owner_
-    ) public override returns (uint256 assets) {
-        _syncInterests();
-        assets = super.redeem(shares, receiver, owner_);
-        totalHoldings -= assets;
+        _burn(owner_, assets);
+
+        asset.safeTransfer(receiver, assets);
 
         _updateInterestRate();
     }
@@ -327,21 +299,6 @@ contract LiquidityPool is ERC4626, Owned {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            ACCOUNTING LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    uint256 public totalHoldings;
-
-    /**
-     * @notice Returns the total amount of underlying assets, to which liquidity providers have a claim
-     * @return totalHoldings The total amount of underlying assets, to which liquidity providers have a claim
-     * @dev Equal to the sum of the total oustanding debt and the liquidty in the pool
-     */
-    function totalAssets() public view override returns (uint256) {
-        return totalHoldings;
-    }
-
-    /*//////////////////////////////////////////////////////////////
                             INTERESTS LOGIC
     //////////////////////////////////////////////////////////////*/
 
@@ -417,22 +374,19 @@ contract LiquidityPool is ERC4626, Owned {
      *      part of their yield due to rounding errors (neglectable small).
      */
     function _syncInterestsToLiquidityPool(uint256 assets) internal {
-        uint256 shares = previewDeposit(assets);
-        uint256 remainingShares = shares;
+        uint256 remainingAssets = assets;
 
         for (uint256 i; i < tranches.length; ) {
-            uint256 trancheShare = shares.mulDivUp(weights[i], totalWeight);
+            uint256 trancheShare = assets.mulDivUp(weights[i], totalWeight);
             _mint(tranches[i], trancheShare);
             unchecked {
-                remainingShares -= trancheShare;
+                remainingAssets -= trancheShare;
                 ++i;
             }
         }
 
         //Protocol fee
-        _mint(treasury, remainingShares);
-
-        totalHoldings += assets;
+        _mint(treasury, remainingAssets);
         
     }
 
@@ -462,33 +416,30 @@ contract LiquidityPool is ERC4626, Owned {
      *      the complete tranche is locked and removed. If there is still remaining bad debt, the next Tranche starts losing capital.
      */
     function _processDefault(uint256 assets) internal {
-        if (totalHoldings < assets) {
+        if (totalSupply < assets) {
             //Should never be possible, this means the total protocol has more debt than claimable liquidity.
-            assets = totalHoldings;
+            assets = totalSupply;
         }
-
-        uint256 shares = convertToShares(assets);
-        totalHoldings -= assets;
 
         for (uint256 i = tranches.length; i > 0; ) {
             unchecked {--i;}
             address tranche = tranches[i];
-            uint256 maxShares = maxRedeem(tranche);
-            if (shares < maxShares) {
-                _burn(tranche, shares);
+            uint256 maxBurned = balanceOf[tranche];
+            if (assets < maxBurned) {
+                _burn(tranche, assets);
                 break;
             } else {
                 ITranche(tranche).lock();
-                _burn(tranche, maxShares);
+                _burn(tranche, maxBurned);
                 _popTranche(i, tranche);
                 unchecked {
-                    shares -= maxShares;
+                    assets -= maxBurned;
                 }
             }
         }
 
         //ToDo Although it should be an impossible state if the protocol functions as it should,
-        //What if there is still more liquidity in the pool than totalHoldings, start an emergency procedure?
+        //What if there is still more liquidity in the pool than totalSupply, start an emergency procedure?
 
     }
 
@@ -497,11 +448,4 @@ contract LiquidityPool is ERC4626, Owned {
         _processDefault(assets);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                          INTERNAL HOOKS LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    function beforeWithdraw(uint256 assets, uint256 shares) internal override {}
-
-    function afterDeposit(uint256 assets, uint256 shares) internal override {}
 }
