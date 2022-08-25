@@ -10,11 +10,21 @@ import "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
 import "./interfaces/ILiquidityPool.sol";
 
+/**
+ * @title Debt Token
+ * @author Arcadia Finance
+ * @notice The Logic to do the debt accounting for a lending pool for a certain ERC20 token
+ * @dev Protocol is according the ERC4626 standard, with a certain ERC20 as underlying
+ */
 contract DebtToken is ERC4626, Owned {
     using SafeTransferLib for ERC20;
 
     ERC20 liquidityPool;
 
+    /**
+     * @notice The constructor for the debt token
+     * @param _liquidityPool the Liquidity Pool of the underlying ERC-20 token, with the lending logic.
+     */
     constructor(
         ERC20 _liquidityPool
     ) ERC4626(
@@ -35,6 +45,10 @@ contract DebtToken is ERC4626, Owned {
     //////////////////////////////////////////////////////////////*/
     uint256 public totalDebt;
 
+    /**
+     * @notice Returns the total amount of outstanding debt in the underlying asset
+     * @return totalDebt The total debt in underlying assets
+     */
     function totalAssets() public view override returns (uint256) {
         return totalDebt;
     }
@@ -43,6 +57,13 @@ contract DebtToken is ERC4626, Owned {
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /**
+     * @notice Modification of the standard ERC-4626 deposit implementation
+     * @param assets The amount of assets of the underlying ERC-20 token being loaned out
+     * @param receiver The Arcadia vault with collateral covering the loan
+     * @return shares The corresponding amount of debt shares minted
+     * @dev Only the Liquidity Pool can issue debt
+     */
     function deposit(uint256 assets, address receiver) public override onlyLiquidityPool returns (uint256 shares) {
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
@@ -52,27 +73,31 @@ contract DebtToken is ERC4626, Owned {
         totalDebt += assets;
 
         emit Deposit(msg.sender, receiver, assets, shares);
-
-        //afterDeposit(assets, shares);
-
     }
 
     function mint(uint256, address) public pure override returns (uint256) {
         revert('MINT_NOT_SUPPORTED');
     }
 
+    /**
+     * @notice Modification of the standard ERC-4626 withdraw implementation
+     * @param assets The amount of assets of the underlying ERC-20 token being paid back
+     * @param receiver Will always be the Liquidity Pool
+     * @param owner_ The Arcadia vault with collateral covering the loan
+     * @return shares The corresponding amount of debt shares redeemed
+     */
     function withdraw(
         uint256 assets,
         address receiver,
-        address _owner
+        address owner_
     ) public override onlyLiquidityPool returns (uint256 shares) {
         shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
 
-        _burn(_owner, shares);
+        _burn(owner_, shares);
 
         totalDebt -= assets;
 
-        emit Withdraw(msg.sender, receiver, _owner, assets, shares);
+        emit Withdraw(msg.sender, receiver, owner_, assets, shares);
 
     }
 
@@ -84,6 +109,13 @@ contract DebtToken is ERC4626, Owned {
                             INTERESTS LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /**
+     * @notice Realises interest for all open debt positions
+     * @param assets The total amount of assets of the underlying ERC-20 tokens that needs to be paid as interests
+     * @dev Calculation of the amount of interests since last sync is done in the Liquidity Pool.
+     *      After calculation, the Liquidity Pool pays out the interests to the Liquidity Providers,
+     *      and calls this Debt Token contract to add the intersts to the outstanding debt.
+     */
     function syncInterests(uint256 assets) public onlyLiquidityPool {
         totalDebt += assets;
     }
