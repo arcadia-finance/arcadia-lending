@@ -98,12 +98,13 @@ contract LockingTest is TrancheTest {
         assertTrue(tranche.locked());
     }
 
-    //unclock
+    //unlock
     function testRevert_UnlockUnauthorised(address unprivilegedAddress) public {
         vm.assume(unprivilegedAddress != creator);
 
         vm.prank(address(pool));
         tranche.lock();
+        assertTrue(tranche.locked());
 
         vm.startPrank(unprivilegedAddress);
         vm.expectRevert("UNAUTHORIZED");
@@ -114,6 +115,7 @@ contract LockingTest is TrancheTest {
     function testSuccess_Unlock() public {
         vm.prank(address(pool));
         tranche.lock();
+        assertTrue(tranche.locked());
 
         vm.prank(creator);
         tranche.unLock();
@@ -308,13 +310,13 @@ contract DepositAndWithdrawalTest is TrancheTest {
 
     //redeem
     function testRevert_RedeemLocked(uint128 shares, address receiver, address owner) public {
-    vm.prank(address(pool));
-    tranche.lock();
+        vm.prank(address(pool));
+        tranche.lock();
 
-    vm.startPrank(liquidityProvider);
-    vm.expectRevert("TRANCHE: LOCKED");
-    tranche.redeem(shares, receiver, owner);
-    vm.stopPrank();
+        vm.startPrank(liquidityProvider);
+        vm.expectRevert("TRANCHE: LOCKED");
+        tranche.redeem(shares, receiver, owner);
+        vm.stopPrank();
     }
 
     function testRevert_RedeemUnauthorised(uint128 shares, address receiver, address owner, address unprivilegedAddress) public {
