@@ -274,20 +274,53 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
     }
 
     //withdraw
-    function testSuccess_Withdraw(uint256 amount0, uint256 amount1) public {
-        vm.assume(amount0 >= amount1);
+    function testRevert_WithdrawUnauthorised(uint256 assetsWithdrawn, address receiver, address unprivilegedAddress) public {
+        vm.assume(unprivilegedAddress != address(srTranche));
+
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+
+        vm.prank(address(srTranche));
+        pool.deposit(assetsWithdrawn, liquidityProvider);
+
+        vm.startPrank(unprivilegedAddress);
+        vm.expectRevert("LP_W: UNAUTHORIZED");
+        pool.withdraw(assetsWithdrawn, receiver, address(srTranche));
+        vm.stopPrank();
+    }
+
+    function testRevert_WithdrawInsufficientAssets(uint256 assetsDeposited, uint256 assetsWithdrawn, address receiver) public {
+        vm.assume(assetsDeposited < assetsWithdrawn);
 
         vm.prank(liquidityProvider);
         asset.approve(address(pool), type(uint256).max);
 
         vm.startPrank(address(srTranche));
-        pool.deposit(amount0, liquidityProvider);
-        pool.withdraw(amount1, address(srTranche), address(srTranche));
+        pool.deposit(assetsDeposited, liquidityProvider);
 
-        uint256 totalAmount = uint256(amount0) - uint256(amount1);
-        assertEq(pool.balanceOf(address(srTranche)), totalAmount);
-        assertEq(pool.totalSupply(), totalAmount);
-        assertEq(asset.balanceOf(address(pool)), totalAmount);
+        vm.expectRevert(stdError.arithmeticError);
+        pool.withdraw(assetsWithdrawn, receiver, address(srTranche));
+        vm.stopPrank();
+    }
+
+    function testSuccess_Withdraw(uint256 assetsDeposited, uint256 assetsWithdrawn, address receiver) public {
+        vm.assume(receiver != address(pool));
+        vm.assume(receiver != liquidityProvider);
+        vm.assume(assetsDeposited >= assetsWithdrawn);
+
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+
+        vm.startPrank(address(srTranche));
+        pool.deposit(assetsDeposited, liquidityProvider);
+
+        pool.withdraw(assetsWithdrawn, receiver, address(srTranche));
+        vm.stopPrank();
+
+        assertEq(pool.balanceOf(address(srTranche)), assetsDeposited - assetsWithdrawn);
+        assertEq(pool.totalSupply(), assetsDeposited - assetsWithdrawn);
+        assertEq(asset.balanceOf(address(pool)), assetsDeposited - assetsWithdrawn);
+        assertEq(asset.balanceOf(receiver), assetsWithdrawn);
     }
 }
 
@@ -540,6 +573,7 @@ contract LoanTest is LiquidityPoolTest {
         vm.assume(sender != address(0));
         vm.assume(sender != liquidityProvider);
         vm.assume(sender != vaultOwner);
+        vm.assume(sender != address(pool));
 
         vm.prank(creator);
         pool.setDebtToken(address(debt));
@@ -568,6 +602,7 @@ contract LoanTest is LiquidityPoolTest {
         vm.assume(sender != address(0));
         vm.assume(sender != liquidityProvider);
         vm.assume(sender != vaultOwner);
+        vm.assume(sender != address(pool));
 
         vm.prank(creator);
         pool.setDebtToken(address(debt));
@@ -597,6 +632,7 @@ contract LoanTest is LiquidityPoolTest {
         vm.assume(sender != address(0));
         vm.assume(sender != liquidityProvider);
         vm.assume(sender != vaultOwner);
+        vm.assume(sender != address(pool));
 
         vm.prank(creator);
         pool.setDebtToken(address(debt));
