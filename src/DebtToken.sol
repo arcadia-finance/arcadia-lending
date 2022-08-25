@@ -1,27 +1,32 @@
-// SPDX-License-Identifier: MIT
+/** 
+    Created by Arcadia Finance
+    https://www.arcadia.finance
+
+    SPDX-License-Identifier: BUSL-1.1
+ */
 pragma solidity ^0.8.13;
 
 import "../lib/solmate/src/auth/Owned.sol";
 import "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
-import "./interfaces/ILiquidityPool.sol";
 
 contract DebtToken is ERC4626, Owned {
     using SafeTransferLib for ERC20;
 
+    ERC4626 liquidityPool;
+
     constructor(
-        ERC20 _asset,
-        string memory _name,
-        string memory _symbol,
-        address _liquidityPool
-    ) ERC4626(_asset, _name, _symbol) Owned(msg.sender) {
+        ERC4626 _liquidityPool
+    ) ERC4626(
+        _liquidityPool.asset(),
+        string(abi.encodePacked("Arcadia ", _liquidityPool.asset().name(), " Debt")),
+        string(abi.encodePacked("darc", _liquidityPool.asset().symbol()))
+    ) Owned(msg.sender) {
         liquidityPool = _liquidityPool;
     }
 
-    address liquidityPool;
-
     modifier onlyLiquidityPool() {
-        require(liquidityPool == msg.sender, "UNAUTHORIZED");
+        require(address(liquidityPool) == msg.sender, "UNAUTHORIZED");
         _;
     }
 
