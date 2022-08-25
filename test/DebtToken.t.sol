@@ -175,11 +175,77 @@ contract InterestTest is DebtTokenTest {
     }
 
     //syncInterests
-    function testRevert_SyncInterestsUnauthorised() public {
+    function testRevert_SyncInterestsUnauthorised(uint128 assetsDeposited, uint128 interests, address owner, address unprivilegedAddress) public {
+        vm.assume(assetsDeposited <= type(uint128).max);
+        vm.assume(assetsDeposited > 0);
 
+        vm.prank(address(pool));
+        debt.deposit(assetsDeposited, owner);
+
+        vm.startPrank(unprivilegedAddress);
+        vm.expectRevert("UNAUTHORIZED");
+        debt.syncInterests(interests);
+        vm.stopPrank();
     }
 
-    function testSucces_SyncInterests() public {
+    function testSucces_SyncInterests(uint128 assetsDeposited, uint128 interests, address owner) public {
+        vm.assume(assetsDeposited > 0);
+        uint256 totalAssets = uint256(assetsDeposited) + uint256(interests);
+        vm.assume(assetsDeposited <= type(uint256).max / totalAssets);
+        vm.assume(interests <= type(uint256).max / totalAssets);
 
+        vm.startPrank(address(pool));
+        debt.deposit(assetsDeposited, owner);
+
+        debt.syncInterests(interests);
+        vm.stopPrank();
+
+        assertEq(debt.maxWithdraw(owner), totalAssets);
+        assertEq(debt.maxRedeem(owner), assetsDeposited);
+        assertEq(debt.totalAssets(), totalAssets);
     }
+}
+
+/*//////////////////////////////////////////////////////////////
+                        TRANSFER LOGIC
+//////////////////////////////////////////////////////////////*/
+
+contract TransferTest is DebtTokenTest {
+
+    function setUp() override public {
+        super.setUp();
+    }
+
+    //approve
+    function testRevert_Approve(address spender, uint256 amount, address sender) public {
+        vm.startPrank(sender);
+        vm.expectRevert("APPROVE_NOT_SUPPORTED");
+        debt.approve(spender, amount);
+        vm.stopPrank();
+    }
+
+    //transfer
+    function testRevert_Transfer(address to, uint256 amount, address sender) public {
+        vm.startPrank(sender);
+        vm.expectRevert("TRANSFER_NOT_SUPPORTED");
+        debt.transfer(to, amount);
+        vm.stopPrank();
+    }
+
+    //transferFrom
+    function testRevert_TransferFrom(address from, address to, uint256 amount, address sender) public {
+        vm.startPrank(sender);
+        vm.expectRevert("TRANSFERFROM_NOT_SUPPORTED");
+        debt.transferFrom(from, to, amount);
+        vm.stopPrank();
+    }
+
+    //permit
+    function testRevert_Permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s, address sender) public {
+        vm.startPrank(sender);
+        vm.expectRevert("PERMIT_NOT_SUPPORTED");
+        debt.permit(owner, spender, value, deadline, v, r, s);
+        vm.stopPrank();
+    }
+
 }
