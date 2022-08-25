@@ -190,11 +190,7 @@ contract LiquidityPool is ERC20, Owned {
     ) public {
         _syncInterests();
 
-        if (msg.sender != owner_) {
-            uint256 allowed = allowance[owner_][msg.sender]; // Saves gas for limited approvals.
-
-            if (allowed != type(uint256).max) allowance[owner_][msg.sender] = allowed - assets;
-        }
+        require(msg.sender == owner_, "LP_W: UNAUTHORIZED");
 
         _burn(owner_, assets);
 
