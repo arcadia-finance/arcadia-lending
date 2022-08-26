@@ -123,7 +123,7 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
 
     //withdraw
     function testRevert_WithdrawUnauthorised(uint256 assets, address receiver, address owner, address sender) public {
-        vm.assume(sendeer != address(pool));
+        vm.assume(sender != address(pool));
 
         vm.startPrank(sender);
         vm.expectRevert("UNAUTHORIZED");
