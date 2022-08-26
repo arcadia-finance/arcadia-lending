@@ -123,6 +123,8 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
 
     //withdraw
     function testRevert_WithdrawUnauthorised(uint256 assets, address receiver, address owner, address sender) public {
+        vm.assume(sendeer != address(pool));
+
         vm.startPrank(sender);
         vm.expectRevert("UNAUTHORIZED");
         debt.withdraw(assets, receiver, owner);
@@ -176,6 +178,8 @@ contract InterestTest is DebtTokenTest {
 
     //syncInterests
     function testRevert_SyncInterestsUnauthorised(uint128 assetsDeposited, uint128 interests, address owner, address unprivilegedAddress) public {
+        vm.assume(unprivilegedAddress != address(pool));
+
         vm.assume(assetsDeposited <= type(uint128).max);
         vm.assume(assetsDeposited > 0);
 
