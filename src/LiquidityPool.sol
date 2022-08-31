@@ -312,6 +312,15 @@ contract LiquidityPool is ERC20, Owned {
      * @dev Calculates the unrealised debt since last sync, and realises it by minting an aqual amount of
      *      debt tokens to all debt holders and interests to LPs and the treasury
     */
+    function syncInterests() external {
+        _syncInterests();
+    }
+
+    /** 
+     * @notice Syncs all unrealised debt (= interest for LP and treasury).
+     * @dev Calculates the unrealised debt since last sync, and realises it by minting an aqual amount of
+     *      debt tokens to all debt holders and interests to LPs and the treasury
+    */
     function _syncInterests() internal {
         uint256 unrealisedDebt = uint256(_calcUnrealisedDebt());
 
