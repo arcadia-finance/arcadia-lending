@@ -412,7 +412,7 @@ contract LiquidityPool is ERC20, Owned {
 
     function _updateInterestRate() internal {
         //ToDo
-        interestRate = 20000000000000000; //2% with 18 decimals precision
+        interestRate = 5 * 10**16; //5% with 18 decimals precision
     }
 
     /*//////////////////////////////////////////////////////////////
