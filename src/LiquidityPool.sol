@@ -250,7 +250,7 @@ contract LiquidityPool is ERC20, Owned {
         require(IFactory(vaultFactory).isVault(vault), "LP_TL: Not a vault");
 
         //Check allowances to send underlying to to
-        if (IVault(vault).owner() != msg.sender || vault != msg.sender) {
+        if (IVault(vault).owner() != msg.sender && vault != msg.sender) {
             uint256 allowed = creditAllowance[vault][msg.sender];
             if (allowed != type(uint256).max) creditAllowance[vault][msg.sender] = allowed - amount;
         }
