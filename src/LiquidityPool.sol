@@ -30,6 +30,7 @@ contract LiquidityPool is ERC20, Owned {
 
     address public vaultFactory;
     ERC20 public immutable asset;
+    uint256 public immutable baseCurrency;
 
     /**
      * @notice The constructor for a liquidity pool
@@ -53,6 +54,7 @@ contract LiquidityPool is ERC20, Owned {
         liquidator = _liquidator;
         treasury = _treasury;
         vaultFactory = _vaultFactory;
+        baseCurrency = 0; //ToDo: should correspond to the underlying asset in the mainregistry
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -256,7 +258,7 @@ contract LiquidityPool is ERC20, Owned {
         }
 
         //Call vault to check if there is sufficient collateral
-        require(IVault(vault).lockCollateral(amount, address(asset)), 'LP_TL: Reverted');
+        require(IVault(vault).increaseMarginPosition(baseCurrency, amount), 'LP_TL: Reverted');
 
         //Process interests since last update
         _syncInterests();
@@ -292,7 +294,7 @@ contract LiquidityPool is ERC20, Owned {
         ERC4626(debtToken).withdraw(transferAmount, vault, vault);
 
         //Call vault to unlock collateral
-        require(IVault(vault).unlockCollateral(transferAmount, address(asset)), 'LP_RL: Reverted');
+        require(IVault(vault).decreaseMarginPosition(baseCurrency, transferAmount), 'LP_RL: Reverted');
 
         //Update interest rates
         _updateInterestRate();
