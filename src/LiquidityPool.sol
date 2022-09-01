@@ -418,11 +418,14 @@ contract LiquidityPool is ERC20, Owned {
         //ToDo
     }
 
-
-
     /*//////////////////////////////////////////////////////////////
                             LOAN DEFAULT LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    modifier onlyLiquidator() {
+        require(liquidator == msg.sender, "UNAUTHORIZED");
+        _;
+    }
 
     /** 
      * @notice Handles the bookkeeping in case of bad debt (Vault became undercollateralised).
@@ -431,7 +434,7 @@ contract LiquidityPool is ERC20, Owned {
      * @dev The most junior tranche will loose its underlying capital first. If all liquidty of a certain Tranche is written off,
      *      the complete tranche is locked and removed. If there is still remaining bad debt, the next Tranche starts losing capital.
      */
-    function _processDefault(uint256 assets) internal {
+    function processDefault(uint256 assets, uint256 deficit) public onlyLiquidator {
         if (totalSupply < assets) {
             //Should never be possible, this means the total protocol has more debt than claimable liquidity.
             assets = totalSupply;
@@ -454,6 +457,8 @@ contract LiquidityPool is ERC20, Owned {
             }
         }
 
+        asset.transfer(liquidator, deficit);
+
         //ToDo Although it should be an impossible state if the protocol functions as it should,
         //What if there is still more liquidity in the pool than totalSupply, start an emergency procedure?
 
@@ -461,7 +466,7 @@ contract LiquidityPool is ERC20, Owned {
 
     //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
     function testProcessDefault(uint256 assets) public onlyOwner {
-        _processDefault(assets);
+        processDefault(assets, 0);
     }
 
 }
