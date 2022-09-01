@@ -45,6 +45,7 @@ abstract contract DebtTokenTest is Test {
     function setUp() virtual public {
         vm.startPrank(creator);
         pool = new LiquidityPool(asset, liquidator, treasury, address(factory));
+        pool.updateInterestRate(5 * 10**16); //5% with 18 decimals precision
 
         debt = new DebtToken(pool);
         pool.setDebtToken(address(debt));

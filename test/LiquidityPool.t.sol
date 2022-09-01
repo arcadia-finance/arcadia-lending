@@ -226,6 +226,7 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
         vm.startPrank(creator);
         pool.addTranche(address(srTranche), 50);
         pool.addTranche(address(jrTranche), 40);
+        pool.updateInterestRate(5 * 10**16); //5% with 18 decimals precision
 
         debt = new DebtToken(pool);
         pool.setDebtToken(address(debt));
@@ -673,6 +674,7 @@ contract InterestsTest is LiquidityPoolTest {
         pool.setFeeWeight(10);
         pool.addTranche(address(srTranche), 50);
         pool.addTranche(address(jrTranche), 40);
+        pool.updateInterestRate(5 * 10**16); //5% with 18 decimals precision
 
         debt = new DebtToken(pool);
         pool.setDebtToken(address(debt));
@@ -761,6 +763,7 @@ contract DefaultTest is LiquidityPoolTest {
         //Set Tranche weight on 0 so that all yield goes to treasury
         pool.addTranche(address(srTranche), 0);
         pool.addTranche(address(jrTranche), 0);
+        pool.updateInterestRate(5 * 10**16); //5% with 18 decimals precision
 
         debt = new DebtToken(pool);
         pool.setDebtToken(address(debt));

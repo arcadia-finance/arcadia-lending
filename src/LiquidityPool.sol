@@ -410,14 +410,15 @@ contract LiquidityPool is ERC20, Owned {
                         INTEREST RATE LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function _updateInterestRate() internal {
-        //ToDo
-        //interestRate = 5 * 10**16; //5% with 18 decimals precision
+    function updateInterestRate(uint64 _interestRate) external onlyOwner {
+        interestRate = _interestRate; //with 18 decimals precision
     }
 
-    function updateInterestRate(uint64 _interestRate) public {
-        interestRate = _interestRate;
+    function _updateInterestRate() internal {
+        //ToDo
     }
+
+
 
     /*//////////////////////////////////////////////////////////////
                             LOAN DEFAULT LOGIC
