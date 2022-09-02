@@ -262,7 +262,7 @@ contract LiquidityPool is ERC20, Owned {
         //Transfer fails if there is insufficient liquidity in pool
         asset.safeTransfer(to, amount);
 
-        ERC4626(debtToken).deposit(amount, vault);
+        if (amount != 0) ERC4626(debtToken).deposit(amount, vault);
 
         //Update interest rates
         _updateInterestRate();
