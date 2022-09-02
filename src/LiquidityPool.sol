@@ -35,14 +35,12 @@ contract LiquidityPool is ERC20, Owned {
     /**
      * @notice The constructor for a liquidity pool
      * @param _asset The underlying ERC-20 token of the Liquidity Pool
-     * @param _liquidator The address of the liquidator
      * @param _treasury The address of the protocol treasury
      * @param _vaultFactory The address of the vault factory
      * @dev The name and symbol of the pool are automatically generated, based on the name and symbol of the underlying token
      */
     constructor(
         ERC20 _asset,
-        address _liquidator,
         address _treasury,
         address _vaultFactory
     ) ERC20(
@@ -51,7 +49,6 @@ contract LiquidityPool is ERC20, Owned {
         _asset.decimals()
     ) Owned(msg.sender) {
         asset = _asset;
-        liquidator = _liquidator;
         treasury = _treasury;
         vaultFactory = _vaultFactory;
         baseCurrency = 0; //ToDo: should correspond to the underlying asset in the mainregistry
@@ -62,7 +59,6 @@ contract LiquidityPool is ERC20, Owned {
     //////////////////////////////////////////////////////////////*/
 
     uint256 public totalWeight;
-    address public liquidator;
 
     uint256[] public weights;
     address[] public tranches;
@@ -419,12 +415,29 @@ contract LiquidityPool is ERC20, Owned {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            LOAN DEFAULT LOGIC
+                            LIQUIDATE LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    address public liquidator;
 
     modifier onlyLiquidator() {
         require(liquidator == msg.sender, "UNAUTHORIZED");
         _;
+    }
+
+    function setLiquidator(address _liquidator) public onlyOwner {
+        liquidator = _liquidator;
+    }
+
+    function liquidateVault(address vault, uint256 debt) public onlyLiquidator {
+        ERC4626(debtToken).withdraw(debt, vault, vault);
+    }
+
+    function settleLiquidation(uint256 default_, uint256 deficit) public onlyLiquidator {
+        if (deficit != 0) {
+            asset.transfer(liquidator, deficit);
+        }
+        _processDefault(default_);
     }
 
     /** 
@@ -434,7 +447,7 @@ contract LiquidityPool is ERC20, Owned {
      * @dev The most junior tranche will loose its underlying capital first. If all liquidty of a certain Tranche is written off,
      *      the complete tranche is locked and removed. If there is still remaining bad debt, the next Tranche starts losing capital.
      */
-    function processDefault(uint256 assets, uint256 deficit) public onlyLiquidator {
+    function _processDefault(uint256 assets) internal {
         if (totalSupply < assets) {
             //Should never be possible, this means the total protocol has more debt than claimable liquidity.
             assets = totalSupply;
@@ -457,8 +470,6 @@ contract LiquidityPool is ERC20, Owned {
             }
         }
 
-        asset.transfer(liquidator, deficit);
-
         //ToDo Although it should be an impossible state if the protocol functions as it should,
         //What if there is still more liquidity in the pool than totalSupply, start an emergency procedure?
 
@@ -466,7 +477,7 @@ contract LiquidityPool is ERC20, Owned {
 
     //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
     function testProcessDefault(uint256 assets) public onlyOwner {
-        processDefault(assets, 0);
+        _processDefault(assets);
     }
 
 }
