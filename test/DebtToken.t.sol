@@ -73,13 +73,11 @@ contract DeploymentTest is DebtTokenTest {
 
         // When: debt is DebtToken
 
-        // Then: debt's name should be Arcadia Asset Debt
+        // Then: debt's name should be Arcadia Asset Debt, symbol should be darcASSET, 
+        //       decimals should be 18, liquidityPool should return pool address
         assertEq(debt.name(), string("Arcadia Asset Debt"));
-        //And: debt's symbol should be darcASSET
         assertEq(debt.symbol(), string("darcASSET"));
-        //And: debt's decimals should be 18
         assertEq(debt.decimals(), 18);
-        //And: liquidityPool should return pool address
         assertEq(address(tranche.liquidityPool()), address(pool));
     }
 }
@@ -98,8 +96,8 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
         vm.assume(unprivilegedAddress != address(pool));
         // Given: all neccesary contracts are deployed on the setup
 
-        // When: unprivilegedAddress is pranked
         vm.startPrank(unprivilegedAddress);
+        // When: depositing with unprivilegedAddress
         // Then: deposit should revert with UNAUTHORIZED
         vm.expectRevert("UNAUTHORIZED");
         debt.deposit(assets, receiver);
@@ -110,9 +108,9 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
         // Given: all neccesary contracts are deployed on the setup
 
 
-        // When: pool is pranked
         vm.startPrank(address(pool));
-        // Then: depositing zero shares should revert with ZERO_SHARES
+        // When: depositing zero shares
+        // Then: deposit should revert with ZERO_SHARES
         vm.expectRevert("ZERO_SHARES");
         debt.deposit(0, receiver);
         vm.stopPrank();
@@ -122,15 +120,13 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
         vm.assume(assets > 0);
         // Given: all neccesary contracts are deployed on the setup
 
-        // When: pool is pranked and deposits to debt
         vm.prank(address(pool));
+        // When: pool deposits assets
         debt.deposit(assets, receiver);
 
-        // Then: receiver's maxWithdraw should be equal assets
+        // Then: receiver's maxWithdraw should be equal assets, maxRedeem should be equal assets, totalAssets should be equal assets
         assertEq(debt.maxWithdraw(receiver), assets);
-        // And: receiver's maxRedeem should be equal assets
         assertEq(debt.maxRedeem(receiver), assets);
-        // And: totalAssets should be equal assets
         assertEq(debt.totalAssets(), assets);
     }
 
@@ -138,8 +134,8 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
     function testRevert_Mint(uint256 shares, address receiver, address sender) public {
         // Given: all neccesary contracts are deployed on the setup
 
-        // When: sender is pranked
         vm.startPrank(sender);
+        // When: sender mint shares
         // Then: mint should revert with MINT_NOT_SUPPORTED
         vm.expectRevert("MINT_NOT_SUPPORTED");
         debt.mint(shares, receiver);
@@ -151,8 +147,8 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
         // Given: pool is not the sender
         vm.assume(sender != address(pool));
 
-        // When: sender is pranked
         vm.startPrank(sender);
+        // When: sender withdraw
         // Then: withdraw should revert with UNAUTHORIZED
         vm.expectRevert("UNAUTHORIZED");
         debt.withdraw(assets, receiver, owner);
@@ -164,8 +160,8 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
         vm.assume(assetsDeposited > 0);
         vm.assume(assetsDeposited < assetsWithdrawn);
 
-        // When: pool is pranked and deposit assetsDeposited
         vm.startPrank(address(pool));
+        // When: pool deposit assetsDeposited
         debt.deposit(assetsDeposited, owner);
 
         // Then: withdraw should revert
@@ -179,18 +175,17 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
         vm.assume(assetsDeposited > 0);
         vm.assume(assetsDeposited >= assetsWithdrawn);
 
-        // When: pool is pranked and deposit assetsDeposited, withdraw assetsWithdrawn
         vm.startPrank(address(pool));
+        // When: pool deposit assetsDeposited, withdraw assetsWithdrawn
         debt.deposit(assetsDeposited, owner);
 
         debt.withdraw(assetsWithdrawn, receiver, owner);
         vm.stopPrank();
 
-        // Then: maxWithdraw should be equal to assetsDeposited minus assetsWithdrawn
+        // Then: maxWithdraw should be equal to assetsDeposited minus assetsWithdrawn,
+        // maxRedeem should be equal to assetsDeposited minus assetsWithdrawn, totalAssets should be equal to assetsDeposited minus assetsWithdrawn
         assertEq(debt.maxWithdraw(owner), assetsDeposited - assetsWithdrawn);
-        // And: maxRedeem should be equal to assetsDeposited minus assetsWithdrawn
         assertEq(debt.maxRedeem(owner), assetsDeposited - assetsWithdrawn);
-        // And: totalAssets should be equal to assetsDeposited minus assetsWithdrawn
         assertEq(debt.totalAssets(), assetsDeposited - assetsWithdrawn);
     }
 
@@ -198,8 +193,8 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
     function testRevert_Redeem(uint256 shares, address receiver, address owner, address sender) public {
         // Given: all neccesary contracts are deployed on the setup
 
-        // When: sender is pranked     
         vm.startPrank(sender);
+        // When: sender redeem shares
         // Then: redeem should revert with REDEEM_NOT_SUPPORTED
         vm.expectRevert("REDEEM_NOT_SUPPORTED");
         debt.redeem(shares, receiver, owner);
@@ -224,13 +219,12 @@ contract InterestTest is DebtTokenTest {
         vm.assume(assetsDeposited <= type(uint128).max);
         vm.assume(assetsDeposited > 0);
 
-        // When: pool is pranked and deposit assetsDeposited
         vm.prank(address(pool));
+        // When: pool deposit assetsDeposited
         debt.deposit(assetsDeposited, owner);
 
-        // When: unprivilegedAddress is pranked
         vm.startPrank(unprivilegedAddress);
-        // Then: syncInterests should revert with UNAUTHORIZED
+        // Then: unprivilegedAddress syncInterests attempt should revert with UNAUTHORIZED
         vm.expectRevert("UNAUTHORIZED");
         debt.syncInterests(interests);
         vm.stopPrank();
@@ -244,18 +238,16 @@ contract InterestTest is DebtTokenTest {
         vm.assume(assetsDeposited <= type(uint256).max / totalAssets);
         vm.assume(interests <= type(uint256).max / totalAssets);
 
-        // When: pool is pranked and deposit assetsDeposited, syncInterests with interests
         vm.startPrank(address(pool));
+        // When: pool deposit assetsDeposited, syncInterests with interests
         debt.deposit(assetsDeposited, owner);
 
         debt.syncInterests(interests);
         vm.stopPrank();
 
-        // Then: debt's maxWithdraw should be equal to totalAssets
+        // Then: debt's maxWithdraw should be equal to totalAssets, debt's maxRedeem should be equal to assetsDeposited, debt's totalAssets should be equal to totalAssets
         assertEq(debt.maxWithdraw(owner), totalAssets);
-        // And: debt's maxRedeem should be equal to assetsDeposited
         assertEq(debt.maxRedeem(owner), assetsDeposited);
-        // And: debt's totalAssets should be equal to totalAssets
         assertEq(debt.totalAssets(), totalAssets);
     }
 }
@@ -274,8 +266,8 @@ contract TransferTest is DebtTokenTest {
     function testRevert_Approve(address spender, uint256 amount, address sender) public {
         // Given: all neccesary contracts are deployed on the setup
         
-        // When: sender is pranked
         vm.startPrank(sender);
+        // When: sender approve
         // Then: approve should revert with APPROVE_NOT_SUPPORTED
         vm.expectRevert("APPROVE_NOT_SUPPORTED");
         debt.approve(spender, amount);
@@ -286,9 +278,9 @@ contract TransferTest is DebtTokenTest {
     function testRevert_Transfer(address to, uint256 amount, address sender) public {
         // Given: all neccesary contracts are deployed on the setup
         
-        // When: sender is pranked
         vm.startPrank(sender);
-        // Then: approve should revert with TRANSFER_NOT_SUPPORTED
+        // When: sender transfer
+        // Then: transfer should revert with TRANSFER_NOT_SUPPORTED
         vm.expectRevert("TRANSFER_NOT_SUPPORTED");
         debt.transfer(to, amount);
         vm.stopPrank();
@@ -298,9 +290,9 @@ contract TransferTest is DebtTokenTest {
     function testRevert_TransferFrom(address from, address to, uint256 amount, address sender) public {
         // Given: all neccesary contracts are deployed on the setup
         
-        // When: sender is pranked
         vm.startPrank(sender);
-        // Then: approve should revert with TRANSFERFROM_NOT_SUPPORTED
+        // When: sender transferFrom
+        // Then: transferFrom should revert with TRANSFERFROM_NOT_SUPPORTED
         vm.expectRevert("TRANSFERFROM_NOT_SUPPORTED");
         debt.transferFrom(from, to, amount);
         vm.stopPrank();
@@ -310,9 +302,9 @@ contract TransferTest is DebtTokenTest {
     function testRevert_Permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s, address sender) public {
         // Given: all neccesary contracts are deployed on the setup
         
-        // When: sender is pranked
         vm.startPrank(sender);
-        // Then: approve should revert with PERMIT_NOT_SUPPORTED
+        // When: sender permit
+        // Then: permit should revert with PERMIT_NOT_SUPPORTED
         vm.expectRevert("PERMIT_NOT_SUPPORTED");
         debt.permit(owner, spender, value, deadline, v, r, s);
         vm.stopPrank();
