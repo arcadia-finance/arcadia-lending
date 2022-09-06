@@ -17,6 +17,7 @@ import "./interfaces/ITranche.sol";
 import "./interfaces/IDebtToken.sol";
 import "./interfaces/IFactory.sol";
 import "./interfaces/IVault.sol";
+import "./libraries/DataTypes.sol";
 
 /**
  * @title Liquidity Pool
@@ -29,6 +30,7 @@ contract LiquidityPool is ERC20, Owned {
     using FixedPointMathLib for uint256;
 
     address public vaultFactory;
+    DataTypes.InterestRateConfiguration internal interestRateConfig;
     ERC20 public immutable asset;
 
     /**
@@ -37,13 +39,15 @@ contract LiquidityPool is ERC20, Owned {
      * @param _liquidator The address of the liquidator
      * @param _treasury The address of the protocol treasury
      * @param _vaultFactory The address of the vault factory
+     * @param _vaultFactory The address of the vault factory
      * @dev The name and symbol of the pool are automatically generated, based on the name and symbol of the underlying token
      */
     constructor(
         ERC20 _asset,
         address _liquidator,
         address _treasury,
-        address _vaultFactory
+        address _vaultFactory,
+        DataTypes.InterestRateConfiguration memory _interestRateConfig
     ) ERC20(
         string(abi.encodePacked("Arcadia ", _asset.name(), " Pool")),
         string(abi.encodePacked("arc", _asset.symbol())),
@@ -53,6 +57,7 @@ contract LiquidityPool is ERC20, Owned {
         liquidator = _liquidator;
         treasury = _treasury;
         vaultFactory = _vaultFactory;
+        interestRateConfig = _interestRateConfig;
     }
 
     /*//////////////////////////////////////////////////////////////
