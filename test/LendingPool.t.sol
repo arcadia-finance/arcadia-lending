@@ -45,8 +45,8 @@ abstract contract LendingPoolTest is Test {
     function setUp() virtual public {
         vm.startPrank(creator);
         pool = new LendingPool(asset, liquidator, treasury, address(factory));
-        srTranche = new Tranche(pool, "Senior", "SR");
-        jrTranche = new Tranche(pool, "Junior", "JR");
+        srTranche = new Tranche(address(pool), "Senior", "SR");
+        jrTranche = new Tranche(address(pool), "Junior", "JR");
         vm.stopPrank();
     }
 }
@@ -279,7 +279,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         pool.addTranche(address(srTranche), 50);
         pool.addTranche(address(jrTranche), 40);
 
-        debt = new DebtToken(pool);
+        debt = new DebtToken(address(pool));
         pool.setDebtToken(address(debt));
         vm.stopPrank();
     }
@@ -348,8 +348,8 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
 
         vm.startPrank(unprivilegedAddress);
         // Then: withdraw by unprivilegedAddress should revert with LP_W: UNAUTHORIZED
-        vm.expectRevert("LP_W: UNAUTHORIZED");
-        pool.withdraw(assetsWithdrawn, receiver, address(srTranche));
+        vm.expectRevert("LP_W: Withdraw amount should be lower than the supplied balance");
+        pool.withdraw(assetsWithdrawn, receiver);
         vm.stopPrank();
     }
 
@@ -366,7 +366,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
 
         // Then: withdraw assetsWithdrawn should revert
         vm.expectRevert("LP_W: Withdraw amount should be lower than the supplied balance");
-        pool.withdraw(assetsWithdrawn, receiver, address(srTranche));
+        pool.withdraw(assetsWithdrawn, receiver);
         vm.stopPrank();
     }
 
@@ -384,7 +384,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         // When: srTranche deposit and withdraw
         pool.deposit(assetsDeposited, liquidityProvider);
 
-        pool.withdraw(assetsWithdrawn, receiver, address(srTranche));
+        pool.withdraw(assetsWithdrawn, receiver);
         vm.stopPrank();
 
         // Then: supplyBalances srTranche, pool and totalSupply should be assetsDeposited minus assetsWithdrawn,
@@ -410,7 +410,7 @@ contract LoanTest is LendingPoolTest {
         pool.addTranche(address(srTranche), 50);
         pool.addTranche(address(jrTranche), 40);
 
-        debt = new DebtToken(pool);
+        debt = new DebtToken(address(pool));
         vm.stopPrank();
 
         vm.startPrank(vaultOwner);
@@ -833,7 +833,7 @@ contract InterestsTest is LendingPoolTest {
         pool.addTranche(address(srTranche), 50);
         pool.addTranche(address(jrTranche), 40);
 
-        debt = new DebtToken(pool);
+        debt = new DebtToken(address(pool));
         pool.setDebtToken(address(debt));
         vm.stopPrank();
 
@@ -930,7 +930,7 @@ contract DefaultTest is LendingPoolTest {
         pool.addTranche(address(srTranche), 0);
         pool.addTranche(address(jrTranche), 0);
 
-        debt = new DebtToken(pool);
+        debt = new DebtToken(address(pool));
         pool.setDebtToken(address(debt));
         vm.stopPrank();
 

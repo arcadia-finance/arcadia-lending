@@ -10,7 +10,6 @@ import "../lib/solmate/src/auth/Owned.sol";
 import "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
 import "./interfaces/ILendingPool.sol";
-import "./LendingPool.sol";
 
 /**
  * @title tranche
@@ -21,7 +20,7 @@ import "./LendingPool.sol";
 contract Tranche is ERC4626, Owned {
     using SafeTransferLib for ERC20;
 
-    LendingPool public lendingPool;
+    ILendingPool public lendingPool;
     bool public locked = false;
 
     modifier notLocked() {
@@ -37,15 +36,15 @@ contract Tranche is ERC4626, Owned {
      * @dev The name and symbol of the tranche are automatically generated, based on the name and symbol of the underlying token
      */
     constructor(
-        LendingPool _lendingPool,
+        address _lendingPool,
         string memory _prefix,
         string memory _prefixSymbol
     ) ERC4626(
-        LendingPool(address(_lendingPool)).asset(),
-        string(abi.encodePacked(_prefix, " Arcadia ", LendingPool(address(_lendingPool)).asset().name())),
-        string(abi.encodePacked(_prefixSymbol, "arc", LendingPool(address(_lendingPool)).asset().symbol()))
+        ILendingPool(address(_lendingPool)).asset(),
+        string(abi.encodePacked(_prefix, " Arcadia ", ILendingPool(_lendingPool).asset().name())),
+        string(abi.encodePacked(_prefixSymbol, "arc", ILendingPool(_lendingPool).asset().symbol()))
     ) Owned(msg.sender) {
-        lendingPool = _lendingPool;
+        lendingPool = ILendingPool(_lendingPool);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -88,7 +87,7 @@ contract Tranche is ERC4626, Owned {
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
         // Need to transfer (via lendingPool.deposit()) before minting or ERC777s could reenter.
-        ILendingPool(address(lendingPool)).deposit(assets, msg.sender);
+        lendingPool.deposit(assets, msg.sender);
 
         _mint(receiver, shares);
 
@@ -135,7 +134,7 @@ contract Tranche is ERC4626, Owned {
             if (allowed != type(uint256).max) allowance[owner_][msg.sender] = allowed - shares;
         }
 
-        ILendingPool(address(lendingPool)).withdraw(assets, receiver, address(this));
+        ILendingPool(address(lendingPool)).withdraw(assets, receiver);
 
         _burn(owner_, shares);
 
@@ -167,7 +166,7 @@ contract Tranche is ERC4626, Owned {
 
         emit Withdraw(msg.sender, receiver, owner_, assets, shares);
 
-        ILendingPool(address(lendingPool)).withdraw(assets, receiver, address(this));
+        ILendingPool(address(lendingPool)).withdraw(assets, receiver);
     }
 
     /*//////////////////////////////////////////////////////////////

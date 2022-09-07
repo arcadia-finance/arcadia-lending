@@ -17,6 +17,7 @@ import "./interfaces/ITranche.sol";
 import "./interfaces/IDebtToken.sol";
 import "./interfaces/IFactory.sol";
 import "./interfaces/IVault.sol";
+import "./interfaces/ILendingPool.sol";
 
 /**
  * @title Lending Pool
@@ -194,16 +195,13 @@ contract LendingPool is Owned {
      * @notice Withdraw assets from the Lending Pool
      * @param assets the amount of assets of the underlying ERC-20 token being withdrawn
      * @param receiver The address of the receiver of the underlying ERC-20 tokens
-     * @param owner_ The address of the owner of the assets being withdrawn
      */
     function withdraw(
         uint256 assets,
-        address receiver,
-        address owner_
+        address receiver
     ) public {
         _syncInterests();
 
-        require(msg.sender == owner_, "LP_W: UNAUTHORIZED");
         require(supplyBalances[msg.sender] >= assets, "LP_W: Withdraw amount should be lower than the supplied balance");
 
         supplyBalances[msg.sender] -= assets;
@@ -403,12 +401,12 @@ contract LendingPool is Owned {
         for (uint256 i; i < tranches.length; ) {
             uint256 trancheShare = assets.mulDivUp(weights[i], totalWeight);
             supplyBalances[tranches[i]] += trancheShare;
-            totalSupply += trancheShare;
             unchecked {
                 remainingAssets -= trancheShare;
                 ++i;
             }
         }
+        totalSupply += assets;
 
         // Protocol fee, not added to the totalSupply because treasury fund are not used in lending.
         protocolFee += remainingAssets;

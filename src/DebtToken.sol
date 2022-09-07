@@ -9,7 +9,6 @@ import "../lib/solmate/src/auth/Owned.sol";
 import "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
 import "./interfaces/ILendingPool.sol";
-import "./LendingPool.sol";
 
 /**
  * @title Debt Token
@@ -20,20 +19,20 @@ import "./LendingPool.sol";
 contract DebtToken is ERC4626, Owned {
     using SafeTransferLib for ERC20;
 
-    LendingPool lendingPool;
+    ILendingPool lendingPool;
 
     /**
      * @notice The constructor for the debt token
      * @param _lendingPool the Lending Pool of the underlying ERC-20 token, with the lending logic.
      */
     constructor(
-        LendingPool _lendingPool
+        address _lendingPool
     ) ERC4626(
         ILendingPool(address(_lendingPool)).asset(),
-        string(abi.encodePacked("Arcadia ", ILendingPool(address(_lendingPool)).asset().name(), " Debt")),
-        string(abi.encodePacked("darc", ILendingPool(address(_lendingPool)).asset().symbol()))
+        string(abi.encodePacked("Arcadia ", ILendingPool(_lendingPool).asset().name(), " Debt")),
+        string(abi.encodePacked("darc", ILendingPool(_lendingPool).asset().symbol()))
     ) Owned(msg.sender) {
-        lendingPool = _lendingPool;
+        lendingPool = ILendingPool(_lendingPool);
     }
 
     modifier onlyLendingPool() {
