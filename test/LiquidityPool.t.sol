@@ -968,6 +968,9 @@ contract DefaultTest is LiquidityPoolTest {
     function testRevert_liquidateVault_Unauthorised(uint256 amountLoaned, address unprivilegedAddress) public {
         // Given: unprivilegedAddress is not the liquidator
         vm.assume(unprivilegedAddress != liquidator);
+        // And: The liquidator is set
+        vm.prank(creator);
+        pool.setLiquidator(liquidator);
 
         vm.startPrank(unprivilegedAddress);
 
