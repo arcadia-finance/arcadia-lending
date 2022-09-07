@@ -24,7 +24,7 @@ import "./interfaces/IVault.sol";
  * @notice The Lending pool contains the main logic to provide liquidity and take or repay loans for a certain asset
  * @dev Protocol is a modification of the ERC20 standard, with a certain ERC20 as underlying
  */
-contract LendingPool is ERC20, Owned {
+contract LendingPool is Owned {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
@@ -44,24 +44,34 @@ contract LendingPool is ERC20, Owned {
         address _liquidator,
         address _treasury,
         address _vaultFactory
-    ) ERC20(
-        string(abi.encodePacked("Arcadia ", _asset.name(), " Pool")),
-        string(abi.encodePacked("arc", _asset.symbol())),
-        _asset.decimals()
     ) Owned(msg.sender) {
         asset = _asset;
         liquidator = _liquidator;
         treasury = _treasury;
         vaultFactory = _vaultFactory;
+        name = string(abi.encodePacked("Arcadia ", _asset.name(), " Pool"));
+        symbol = string(abi.encodePacked("arc", _asset.symbol()));
+        decimals = _asset.decimals();
     }
+    // Lending Pool Metadata
+    string public name;
+    string public symbol;
+    uint8 public immutable decimals;
 
-    /*//////////////////////////////////////////////////////////////
+    uint256 public totalSupply;
+    mapping(address => uint256) public supplyBalances;
+
+    uint256 public protocolFee;
+
+
+    /* //////////////////////////////////////////////////////////////
                             TRANCHES LOGIC
-    //////////////////////////////////////////////////////////////*/
+    ////////////////////////////////////////////////////////////// */
 
-    uint256 public totalWeight;
     address public liquidator;
 
+    // Tranche
+    uint256 public totalWeight;
     uint256[] public weights;
     address[] public tranches;
 
@@ -71,6 +81,8 @@ contract LendingPool is ERC20, Owned {
         require(isTranche[msg.sender], "UNAUTHORIZED");
         _;
     }
+
+
 
     /**
      * @notice Adds a tranche to the Lending Pool
@@ -128,9 +140,9 @@ contract LendingPool is ERC20, Owned {
         _popTranche( index, tranche);
     }
 
-    /*///////////////////////////////////////////////////////////////
+    /* ///////////////////////////////////////////////////////////////
                     PROTOCOL FEE CONFIGURATION
-    //////////////////////////////////////////////////////////////*/
+    ////////////////////////////////////////////////////////////// */
 
     uint256 public feeWeight;
     address public treasury;
@@ -154,9 +166,9 @@ contract LendingPool is ERC20, Owned {
         treasury = _treasury;
     }
 
-    /*//////////////////////////////////////////////////////////////
+    /* //////////////////////////////////////////////////////////////
                         DEPOSIT/WITHDRAWAL LOGIC
-    //////////////////////////////////////////////////////////////*/
+    ////////////////////////////////////////////////////////////// */
 
     /**
      * @notice Deposit assets in the Lending Pool
@@ -172,7 +184,8 @@ contract LendingPool is ERC20, Owned {
 
         asset.safeTransferFrom(from, address(this), assets);
 
-        _mint(msg.sender, assets);
+        supplyBalances[msg.sender] += assets;
+        totalSupply += assets;
 
         _updateInterestRate();
     }
@@ -191,17 +204,19 @@ contract LendingPool is ERC20, Owned {
         _syncInterests();
 
         require(msg.sender == owner_, "LP_W: UNAUTHORIZED");
+        require(supplyBalances[msg.sender] >= assets, "LP_W: Withdraw amount should be lower than the supplied balance");
 
-        _burn(owner_, assets);
+        supplyBalances[msg.sender] -= assets;
+        totalSupply -= assets;
 
         asset.safeTransfer(receiver, assets);
 
         _updateInterestRate();
     }
 
-    /*//////////////////////////////////////////////////////////////
+    /* //////////////////////////////////////////////////////////////
                             LENDING LOGIC
-    //////////////////////////////////////////////////////////////*/
+    ////////////////////////////////////////////////////////////// */
 
     event CreditApproval(address indexed vault, address indexed beneficiary, uint256 amount);
 
@@ -298,9 +313,9 @@ contract LendingPool is ERC20, Owned {
         _updateInterestRate();
     }
 
-    /*//////////////////////////////////////////////////////////////
+    /* //////////////////////////////////////////////////////////////
                             INTERESTS LOGIC
-    //////////////////////////////////////////////////////////////*/
+    ////////////////////////////////////////////////////////////// */
 
     //ToDo: optimise storage allocations
     uint64 public interestRate; //18 decimals precision
@@ -387,15 +402,16 @@ contract LendingPool is ERC20, Owned {
 
         for (uint256 i; i < tranches.length; ) {
             uint256 trancheShare = assets.mulDivUp(weights[i], totalWeight);
-            _mint(tranches[i], trancheShare);
+            supplyBalances[tranches[i]] += trancheShare;
+            totalSupply += trancheShare;
             unchecked {
                 remainingAssets -= trancheShare;
                 ++i;
             }
         }
 
-        //Protocol fee
-        _mint(treasury, remainingAssets);
+        // Protocol fee, not added to the totalSupply because treasury fund are not used in lending.
+        protocolFee += remainingAssets;
         
     }
 
@@ -404,18 +420,18 @@ contract LendingPool is ERC20, Owned {
         _syncInterestsToLendingPool(assets);
     }
 
-    /*//////////////////////////////////////////////////////////////
+    /* //////////////////////////////////////////////////////////////
                         INTEREST RATE LOGIC
-    //////////////////////////////////////////////////////////////*/
+    ////////////////////////////////////////////////////////////// */
 
     function _updateInterestRate() internal {
         //ToDo
         interestRate = 20000000000000000; //2% with 18 decimals precision
     }
 
-    /*//////////////////////////////////////////////////////////////
+    /* //////////////////////////////////////////////////////////////
                             LOAN DEFAULT LOGIC
-    //////////////////////////////////////////////////////////////*/
+    ////////////////////////////////////////////////////////////// */
 
     /** 
      * @notice Handles the bookkeeping in case of bad debt (Vault became undercollateralised).
@@ -433,13 +449,17 @@ contract LendingPool is ERC20, Owned {
         for (uint256 i = tranches.length; i > 0; ) {
             unchecked {--i;}
             address tranche = tranches[i];
-            uint256 maxBurned = balanceOf[tranche];
+            uint256 maxBurned = supplyBalances[tranche];
             if (assets < maxBurned) {
-                _burn(tranche, assets);
+                // burn
+                supplyBalances[tranche] -= assets;
+                totalSupply -= assets;
                 break;
             } else {
                 ITranche(tranche).lock();
-                _burn(tranche, maxBurned);
+                // burn
+                supplyBalances[tranche] -= maxBurned;
+                totalSupply -= maxBurned;
                 _popTranche(i, tranche);
                 unchecked {
                     assets -= maxBurned;

@@ -10,6 +10,7 @@ import "../lib/solmate/src/auth/Owned.sol";
 import "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
 import "./interfaces/ILendingPool.sol";
+import "./LendingPool.sol";
 
 /**
  * @title tranche
@@ -20,7 +21,7 @@ import "./interfaces/ILendingPool.sol";
 contract Tranche is ERC4626, Owned {
     using SafeTransferLib for ERC20;
 
-    ERC20 public lendingPool;
+    LendingPool public lendingPool;
     bool public locked = false;
 
     modifier notLocked() {
@@ -36,13 +37,13 @@ contract Tranche is ERC4626, Owned {
      * @dev The name and symbol of the tranche are automatically generated, based on the name and symbol of the underlying token
      */
     constructor(
-        ERC20 _lendingPool,
+        LendingPool _lendingPool,
         string memory _prefix,
         string memory _prefixSymbol
     ) ERC4626(
-        ILendingPool(address(_lendingPool)).asset(),
-        string(abi.encodePacked(_prefix, " Arcadia ", ILendingPool(address(_lendingPool)).asset().name())),
-        string(abi.encodePacked(_prefixSymbol, "arc", ILendingPool(address(_lendingPool)).asset().symbol()))
+        LendingPool(address(_lendingPool)).asset(),
+        string(abi.encodePacked(_prefix, " Arcadia ", LendingPool(address(_lendingPool)).asset().name())),
+        string(abi.encodePacked(_prefixSymbol, "arc", LendingPool(address(_lendingPool)).asset().symbol()))
     ) Owned(msg.sender) {
         lendingPool = _lendingPool;
     }
@@ -179,7 +180,7 @@ contract Tranche is ERC4626, Owned {
      * @dev The Liquidity Pool does the accounting of the outstanding claim on liquidity per tranche.
      */
     function totalAssets() public view override returns (uint256 assets) {
-        assets =  lendingPool.balanceOf(address(this));
+        assets =  lendingPool.supplyBalances(address(this));
     }
 
     /*//////////////////////////////////////////////////////////////

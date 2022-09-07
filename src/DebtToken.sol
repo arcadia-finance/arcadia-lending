@@ -9,6 +9,7 @@ import "../lib/solmate/src/auth/Owned.sol";
 import "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
 import "./interfaces/ILendingPool.sol";
+import "./LendingPool.sol";
 
 /**
  * @title Debt Token
@@ -19,14 +20,14 @@ import "./interfaces/ILendingPool.sol";
 contract DebtToken is ERC4626, Owned {
     using SafeTransferLib for ERC20;
 
-    ERC20 lendingPool;
+    LendingPool lendingPool;
 
     /**
      * @notice The constructor for the debt token
      * @param _lendingPool the Lending Pool of the underlying ERC-20 token, with the lending logic.
      */
     constructor(
-        ERC20 _lendingPool
+        LendingPool _lendingPool
     ) ERC4626(
         ILendingPool(address(_lendingPool)).asset(),
         string(abi.encodePacked("Arcadia ", ILendingPool(address(_lendingPool)).asset().name(), " Debt")),
@@ -148,9 +149,9 @@ contract DebtToken is ERC4626, Owned {
         revert('PERMIT_NOT_SUPPORTED');
     }
 
-    /*//////////////////////////////////////////////////////////////
+    /* //////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
-    //////////////////////////////////////////////////////////////*/
+    ////////////////////////////////////////////////////////////// */
 
     function beforeWithdraw(uint256 assets, uint256 shares) internal override {}
 
