@@ -19,12 +19,12 @@ import "./interfaces/IFactory.sol";
 import "./interfaces/IVault.sol";
 
 /**
- * @title Liquidity Pool
+ * @title Lending Pool
  * @author Arcadia Finance
  * @notice The Lending pool contains the main logic to provide liquidity and take or repay loans for a certain asset
  * @dev Protocol is a modification of the ERC20 standard, with a certain ERC20 as underlying
  */
-contract LiquidityPool is ERC20, Owned {
+contract LendingPool is ERC20, Owned {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
@@ -32,8 +32,8 @@ contract LiquidityPool is ERC20, Owned {
     ERC20 public immutable asset;
 
     /**
-     * @notice The constructor for a liquidity pool
-     * @param _asset The underlying ERC-20 token of the Liquidity Pool
+     * @notice The constructor for a lending pool
+     * @param _asset The underlying ERC-20 token of the Lending Pool
      * @param _liquidator The address of the liquidator
      * @param _treasury The address of the protocol treasury
      * @param _vaultFactory The address of the vault factory
@@ -73,7 +73,7 @@ contract LiquidityPool is ERC20, Owned {
     }
 
     /**
-     * @notice Adds a tranche to the Liquidity Pool
+     * @notice Adds a tranche to the Lending Pool
      * @param tranche The address of the Tranche
      * @param weight The weight of the specific Tranche
      * @dev The order of the tranches is important, the most senior tranche is at index 0, the most junior at the last index.
@@ -159,7 +159,7 @@ contract LiquidityPool is ERC20, Owned {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Deposit assets in the Liquidity Pool
+     * @notice Deposit assets in the Lending Pool
      * @param assets the amount of assets of the underlying ERC-20 token being deposited
      * @param from The address of the origin of the underlying ERC-20 token, who deposits assets via a Tranche
      * @dev This function can only be called by Tranches.
@@ -178,7 +178,7 @@ contract LiquidityPool is ERC20, Owned {
     }
 
     /**
-     * @notice Withdraw assets from the Liquidity Pool
+     * @notice Withdraw assets from the Lending Pool
      * @param assets the amount of assets of the underlying ERC-20 token being withdrawn
      * @param receiver The address of the receiver of the underlying ERC-20 tokens
      * @param owner_ The address of the owner of the assets being withdrawn
@@ -209,7 +209,7 @@ contract LiquidityPool is ERC20, Owned {
     mapping(address => mapping(address => uint256)) public creditAllowance;
 
     /**
-     * @notice Set the Debt Token contract of the Liquidity Pool
+     * @notice Set the Debt Token contract of the Lending Pool
      * @param _debtToken The address of the Debt Token
      * @dev Debt Token is an ERC-4626 contract
      * @dev ToDo: For now manually add newly created tranche, do via factory in future?
@@ -328,7 +328,7 @@ contract LiquidityPool is ERC20, Owned {
         IDebtToken(debtToken).syncInterests(unrealisedDebt);
 
         //Sync interests for LPs and Protocol Treasury
-        _syncInterestsToLiquidityPool(unrealisedDebt);
+        _syncInterestsToLendingPool(unrealisedDebt);
     }
 
     /** 
@@ -376,13 +376,13 @@ contract LiquidityPool is ERC20, Owned {
     }
 
     /** 
-     * @notice Syncs interest payments to the Liquidity providers and the treasury.
+     * @notice Syncs interest payments to the Lending providers and the treasury.
      * @param assets The total amount of underlying assets to be paid out as interests.
      * @dev The weight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
      * @dev The Shares for each Tranche are rounded up, if the treasury receives the remaining shares and will hence loose
      *      part of their yield due to rounding errors (neglectable small).
      */
-    function _syncInterestsToLiquidityPool(uint256 assets) internal {
+    function _syncInterestsToLendingPool(uint256 assets) internal {
         uint256 remainingAssets = assets;
 
         for (uint256 i; i < tranches.length; ) {
@@ -400,8 +400,8 @@ contract LiquidityPool is ERC20, Owned {
     }
 
     //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
-    function testSyncInterestsToLiquidityPool(uint256 assets) public onlyOwner {
-        _syncInterestsToLiquidityPool(assets);
+    function testSyncInterestsToLendingPool(uint256 assets) public onlyOwner {
+        _syncInterestsToLendingPool(assets);
     }
 
     /*//////////////////////////////////////////////////////////////

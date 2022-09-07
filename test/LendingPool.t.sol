@@ -7,17 +7,17 @@
 pragma solidity ^0.8.13;
 
 import "../lib/forge-std/src/Test.sol";
-import "../src/LiquidityPool.sol";
+import "../src/LendingPool.sol";
 import "../src/mocks/Asset.sol";
 import "../src/mocks/Factory.sol";
 import "../src/Tranche.sol";
 import "../src/DebtToken.sol";
 
-abstract contract LiquidityPoolTest is Test {
+abstract contract LendingPoolTest is Test {
 
     Asset asset;
     Factory factory;
-    LiquidityPool pool;
+    LendingPool pool;
     Tranche srTranche;
     Tranche jrTranche;
     DebtToken debt;
@@ -44,7 +44,7 @@ abstract contract LiquidityPoolTest is Test {
     //Before Each
     function setUp() virtual public {
         vm.startPrank(creator);
-        pool = new LiquidityPool(asset, liquidator, treasury, address(factory));
+        pool = new LendingPool(asset, liquidator, treasury, address(factory));
         srTranche = new Tranche(pool, "Senior", "SR");
         jrTranche = new Tranche(pool, "Junior", "JR");
         vm.stopPrank();
@@ -54,7 +54,7 @@ abstract contract LiquidityPoolTest is Test {
 /*//////////////////////////////////////////////////////////////
                         DEPLOYMENT
 //////////////////////////////////////////////////////////////*/
-contract DeploymentTest is LiquidityPoolTest {
+contract DeploymentTest is LendingPoolTest {
 
     function setUp() override public {
         super.setUp();
@@ -74,7 +74,7 @@ contract DeploymentTest is LiquidityPoolTest {
 /*//////////////////////////////////////////////////////////////
                         TRANCHES LOGIC
 //////////////////////////////////////////////////////////////*/
-contract TranchesTest is LiquidityPoolTest {
+contract TranchesTest is LendingPoolTest {
 
     function setUp() override public {
         super.setUp();
@@ -200,7 +200,7 @@ contract TranchesTest is LiquidityPoolTest {
 /*//////////////////////////////////////////////////////////////
                 PROTOCOL FEE CONFIGURATION
 //////////////////////////////////////////////////////////////*/
-contract ProtocolFeeTest is LiquidityPoolTest {
+contract ProtocolFeeTest is LendingPoolTest {
 
     function setUp() override public {
         super.setUp();
@@ -270,7 +270,7 @@ contract ProtocolFeeTest is LiquidityPoolTest {
 /*//////////////////////////////////////////////////////////////
                     DEPOSIT/WITHDRAWAL LOGIC
 //////////////////////////////////////////////////////////////*/
-contract DepositAndWithdrawalTest is LiquidityPoolTest {
+contract DepositAndWithdrawalTest is LendingPoolTest {
 
     function setUp() override public {
         super.setUp();
@@ -399,7 +399,7 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
 /*//////////////////////////////////////////////////////////////
                     LENDING LOGIC
 //////////////////////////////////////////////////////////////*/
-contract LoanTest is LiquidityPoolTest {
+contract LoanTest is LendingPoolTest {
     
     Vault vault;
 
@@ -820,7 +820,7 @@ contract LoanTest is LiquidityPoolTest {
 /*//////////////////////////////////////////////////////////////
                             INTERESTS LOGIC
 //////////////////////////////////////////////////////////////*/
-contract InterestsTest is LiquidityPoolTest {
+contract InterestsTest is LendingPoolTest {
     using stdStorage for StdStorage;
 
     Vault vault;
@@ -847,7 +847,7 @@ contract InterestsTest is LiquidityPoolTest {
         // Given: all neccesary contracts are deployed on the setup
         vm.prank(creator);
         // When: creator testSyncInterestsToLiquidityPool with 100
-        pool.testSyncInterestsToLiquidityPool(100);
+        pool.testSyncInterestsToLendingPool(100);
 
         // Then: balanceOf srTranche should be equal to 50, balanceOf jrTranche should be equal to 40, 
         // balanceOf treasury should be equal to 10, totalSupply should be equal to 100 
@@ -861,7 +861,7 @@ contract InterestsTest is LiquidityPoolTest {
         // Given: all neccesary contracts are deployed on the setup
         vm.prank(creator);
         // When: creator testSyncInterestsToLiquidityPool with 99
-        pool.testSyncInterestsToLiquidityPool(99);
+        pool.testSyncInterestsToLendingPool(99);
 
         // Then: balanceOf srTranche should be equal to 50, balanceOf jrTranche should be equal to 40, 
         // balanceOf treasury should be equal to 9, totalSupply should be equal to 99
@@ -918,7 +918,7 @@ contract InterestsTest is LiquidityPoolTest {
 /*//////////////////////////////////////////////////////////////
                             LOAN DEFAULT LOGIC
 //////////////////////////////////////////////////////////////*/
-contract DefaultTest is LiquidityPoolTest {
+contract DefaultTest is LendingPoolTest {
     using stdStorage for StdStorage;
 
     function setUp() override public {

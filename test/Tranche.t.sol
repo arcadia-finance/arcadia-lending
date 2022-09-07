@@ -7,7 +7,7 @@
 pragma solidity ^0.8.13;
 
 import "../lib/forge-std/src/Test.sol";
-import "../src/LiquidityPool.sol";
+import "../src/LendingPool.sol";
 import "../src/mocks/Asset.sol";
 import "../src/mocks/Factory.sol";
 import "../src/Tranche.sol";
@@ -17,7 +17,7 @@ abstract contract TrancheTest is Test {
 
     Asset asset;
     Factory factory;
-    LiquidityPool pool;
+    LendingPool pool;
     Tranche tranche;
     Tranche jrTranche;
     DebtToken debt;
@@ -45,7 +45,7 @@ abstract contract TrancheTest is Test {
     //Before Each
     function setUp() virtual public {
         vm.startPrank(creator);
-        pool = new LiquidityPool(asset, liquidator, treasury, address(factory));
+        pool = new LendingPool(asset, liquidator, treasury, address(factory));
 
         debt = new DebtToken(pool);
         pool.setDebtToken(address(debt));
@@ -73,7 +73,7 @@ contract DeploymentTest is TrancheTest {
         assertEq(tranche.name(), string("Senior Arcadia Asset"));
         assertEq(tranche.symbol(), string("SRarcASSET"));
         assertEq(tranche.decimals(), 18);
-        assertEq(address(tranche.liquidityPool()), address(pool));
+        assertEq(address(tranche.lendingPool()), address(pool));
     }
 }
 

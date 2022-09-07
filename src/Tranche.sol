@@ -9,18 +9,18 @@ pragma solidity ^0.8.13;
 import "../lib/solmate/src/auth/Owned.sol";
 import "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
-import "./interfaces/ILiquidityPool.sol";
+import "./interfaces/ILendingPool.sol";
 
 /**
  * @title tranche
  * @author Arcadia Finance
- * @notice The Logic to provide Liquidity for a lending pool for a certain ERC20 token
+ * @notice The Logic to provide Lending for a lending pool for a certain ERC20 token
  * @dev Protocol is according the ERC4626 standard, with a certain ERC20 as underlying
  */
 contract Tranche is ERC4626, Owned {
     using SafeTransferLib for ERC20;
 
-    ERC20 public liquidityPool;
+    ERC20 public lendingPool;
     bool public locked = false;
 
     modifier notLocked() {
@@ -30,21 +30,21 @@ contract Tranche is ERC4626, Owned {
 
     /**
      * @notice The constructor for a tranche
-     * @param _liquidityPool the Liquidity Pool of the underlying ERC-20 token, with the lending logic.
+     * @param _lendingPool the Lending Pool of the underlying ERC-20 token, with the lending logic.
      * @param _prefix The prefix of the contract name (eg. Senior -> Mezzanine -> Junior)
      * @param _prefixSymbol The prefix of the contract symbol (eg. SR  -> MZ -> JR)
      * @dev The name and symbol of the tranche are automatically generated, based on the name and symbol of the underlying token
      */
     constructor(
-        ERC20 _liquidityPool,
+        ERC20 _lendingPool,
         string memory _prefix,
         string memory _prefixSymbol
     ) ERC4626(
-        ILiquidityPool(address(_liquidityPool)).asset(),
-        string(abi.encodePacked(_prefix, " Arcadia ", ILiquidityPool(address(_liquidityPool)).asset().name())),
-        string(abi.encodePacked(_prefixSymbol, "arc", ILiquidityPool(address(_liquidityPool)).asset().symbol()))
+        ILendingPool(address(_lendingPool)).asset(),
+        string(abi.encodePacked(_prefix, " Arcadia ", ILendingPool(address(_lendingPool)).asset().name())),
+        string(abi.encodePacked(_prefixSymbol, "arc", ILendingPool(address(_lendingPool)).asset().symbol()))
     ) Owned(msg.sender) {
-        liquidityPool = _liquidityPool;
+        lendingPool = _lendingPool;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -53,10 +53,10 @@ contract Tranche is ERC4626, Owned {
 
     /**
      * @notice Locks the tranche in case all liquidity of the tranche is written of due to bad debt
-     * @dev Only the Liquidity Pool can call this function, only trigger is a severe default event.
+     * @dev Only the Lending Pool can call this function, only trigger is a severe default event.
      */
     function lock() public {
-        require(msg.sender == address(liquidityPool), "UNAUTHORIZED");
+        require(msg.sender == address(lendingPool), "UNAUTHORIZED");
         locked = true;
     }
 
@@ -79,15 +79,15 @@ contract Tranche is ERC4626, Owned {
      * @param receiver The address that receives the minted shares.
      * @return shares The amount of shares minted
      * @dev This contract does not directly transfers the underlying assets from the sender to the receiver.
-     *      Instead it calls the deposit of the Liquidity Pool which calls the transferFrom of the underlying assets.
-     *      Hence the sender should not give this contract an allowance to transfer the underlying asset but the Liquidity Pool.
+     *      Instead it calls the deposit of the Lending Pool which calls the transferFrom of the underlying assets.
+     *      Hence the sender should not give this contract an allowance to transfer the underlying asset but the Lending Pool.
      */
     function deposit(uint256 assets, address receiver) public override notLocked returns (uint256 shares) {
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
-        // Need to transfer (via liquidityPool.deposit()) before minting or ERC777s could reenter.
-        ILiquidityPool(address(liquidityPool)).deposit(assets, msg.sender);
+        // Need to transfer (via lendingPool.deposit()) before minting or ERC777s could reenter.
+        ILendingPool(address(lendingPool)).deposit(assets, msg.sender);
 
         _mint(receiver, shares);
 
@@ -100,14 +100,14 @@ contract Tranche is ERC4626, Owned {
      * @param receiver The address that receives the minted shares.
      * @return assets The corresponding amount of assets of the underlying ERC-20 token being deposited
      * @dev This contract does not directly transfers the underlying assets from the sender to the receiver.
-     *      Instead it calls the deposit of the Liquidity Pool which calls the transferFrom of the underlying assets.
-     *      Hence the sender should not give this contract an allowance to transfer the underlying asset but the Liquidity Pool.
+     *      Instead it calls the deposit of the Lending Pool which calls the transferFrom of the underlying assets.
+     *      Hence the sender should not give this contract an allowance to transfer the underlying asset but the Lending Pool.
      */
     function mint(uint256 shares, address receiver) public override notLocked returns (uint256 assets) {
         assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
 
         // Need to transfer (via liquidityPool.deposit()) before minting or ERC777s could reenter.
-        ILiquidityPool(address(liquidityPool)).deposit(assets, msg.sender);
+        ILendingPool(address(lendingPool)).deposit(assets, msg.sender);
 
         _mint(receiver, shares);
 
@@ -134,7 +134,7 @@ contract Tranche is ERC4626, Owned {
             if (allowed != type(uint256).max) allowance[owner_][msg.sender] = allowed - shares;
         }
 
-        ILiquidityPool(address(liquidityPool)).withdraw(assets, receiver, address(this));
+        ILendingPool(address(lendingPool)).withdraw(assets, receiver, address(this));
 
         _burn(owner_, shares);
 
@@ -166,7 +166,7 @@ contract Tranche is ERC4626, Owned {
 
         emit Withdraw(msg.sender, receiver, owner_, assets, shares);
 
-        ILiquidityPool(address(liquidityPool)).withdraw(assets, receiver, address(this));
+        ILendingPool(address(lendingPool)).withdraw(assets, receiver, address(this));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -179,7 +179,7 @@ contract Tranche is ERC4626, Owned {
      * @dev The Liquidity Pool does the accounting of the outstanding claim on liquidity per tranche.
      */
     function totalAssets() public view override returns (uint256 assets) {
-        assets =  liquidityPool.balanceOf(address(this));
+        assets =  lendingPool.balanceOf(address(this));
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -8,7 +8,7 @@ pragma solidity ^0.8.13;
 
 import "../../lib/solmate/src/tokens/ERC20.sol";
 
-interface ILiquidityPool {
+interface ILendingPool {
     function asset() external returns (ERC20);
 
     function deposit(uint256 assets, address from) external;
