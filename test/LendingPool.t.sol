@@ -307,7 +307,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         // When: srTranche deposit
         pool.deposit(amount, liquidityProvider);
 
-        // Then: balanceOf srTranche should be amount, totatlSupply should be amount, balanceOf pool should be amount
+        // Then: supplyBalances srTranche should be amount, totatlSupply should be amount, supplyBalances pool should be amount
         assertEq(pool.supplyBalances(address(srTranche)), amount);
         assertEq(pool.totalSupply(), amount);
         assertEq(asset.balanceOf(address(pool)), amount);
@@ -328,7 +328,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         vm.prank(address(jrTranche));
         pool.deposit(amount1, liquidityProvider);
 
-        // Then: balanceOf jrTranche should be amount1, totalSupply should be totalAmount, balanceOf pool should be totalAmount 
+        // Then: supplyBalances jrTranche should be amount1, totalSupply should be totalAmount, supplyBalances pool should be totalAmount
         assertEq(pool.supplyBalances(address(jrTranche)), amount1);
         assertEq(pool.totalSupply(), totalAmount);
         assertEq(asset.balanceOf(address(pool)), totalAmount);
@@ -387,8 +387,8 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         pool.withdraw(assetsWithdrawn, receiver, address(srTranche));
         vm.stopPrank();
 
-        // Then: balanceOf srTranche, pool and totalSupply should be assetsDeposited minus assetsWithdrawn, 
-        // balanceOf receiver should be assetsWithdrawn
+        // Then: supplyBalances srTranche, pool and totalSupply should be assetsDeposited minus assetsWithdrawn,
+        // supplyBalances receiver should be assetsWithdrawn
         assertEq(pool.supplyBalances(address(srTranche)), assetsDeposited - assetsWithdrawn);
         assertEq(pool.totalSupply(), assetsDeposited - assetsWithdrawn);
         assertEq(asset.balanceOf(address(pool)), assetsDeposited - assetsWithdrawn);
@@ -953,7 +953,7 @@ contract DefaultTest is LendingPoolTest {
         // When: creator testProcessDefault defaultAmount
         pool.testProcessDefault(defaultAmount);
 
-        // Then: balanceOf srTranche should be liquiditySenior, balanceOf jrTranche should be liquidityJunior minus defaultAmount,
+        // Then: supplyBalances srTranche should be liquiditySenior, supplyBalances jrTranche should be liquidityJunior minus defaultAmount,
         // totalSupply should be equal to totalAmount minus defaultAmount
         assertEq(pool.supplyBalances(address(srTranche)), liquiditySenior);
         assertEq(pool.supplyBalances(address(jrTranche)), liquidityJunior - defaultAmount);
@@ -976,7 +976,7 @@ contract DefaultTest is LendingPoolTest {
         // When: creator testProcessDefault defaultAmount
         pool.testProcessDefault(defaultAmount);
 
-        // Then: balanceOf srTranche should be totalAmount minus defaultAmount, balanceOf jrTranche should be 0,
+        // Then: supplyBalances srTranche should be totalAmount minus defaultAmount, supplyBalances jrTranche should be 0,
         // totalSupply should be equal to totalAmount minus defaultAmount, isTranche for jrTranche should return false
         assertEq(pool.supplyBalances(address(srTranche)), totalAmount - defaultAmount);
         assertEq(pool.supplyBalances(address(jrTranche)), 0);
