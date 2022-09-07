@@ -248,7 +248,7 @@ contract LiquidityPool is ERC20, Owned {
         require(IFactory(vaultFactory).isVault(vault), "LP_TL: Not a vault");
 
         //Check allowances to send underlying to to
-        if (IVault(vault).owner() != msg.sender && vault != msg.sender) {
+        if (IVault(vault).owner() != msg.sender) {
             uint256 allowed = creditAllowance[vault][msg.sender];
             if (allowed != type(uint256).max) creditAllowance[vault][msg.sender] = allowed - amount;
         }
@@ -407,6 +407,7 @@ contract LiquidityPool is ERC20, Owned {
     //////////////////////////////////////////////////////////////*/
 
     function updateInterestRate(uint64 _interestRate) external onlyOwner {
+        //Todo: Remove function after _updateInterestRate() is implemented
         interestRate = _interestRate; //with 18 decimals precision
     }
 
@@ -415,7 +416,7 @@ contract LiquidityPool is ERC20, Owned {
     }
 
     /*//////////////////////////////////////////////////////////////
-                            LIQUIDATE LOGIC
+                        LIQUIDATION LOGIC
     //////////////////////////////////////////////////////////////*/
 
     address public liquidator;
@@ -425,16 +426,46 @@ contract LiquidityPool is ERC20, Owned {
         _;
     }
 
+    /**
+     * @notice Set's the contract address of the liquidator.
+     * @param _liquidator The contract address of the liquidator
+     */
     function setLiquidator(address _liquidator) public onlyOwner {
         liquidator = _liquidator;
     }
 
+    /**
+     * @notice Starts the liquidation of a vault.
+     * @param vault The contract address of the liquidator.
+     * @param debt The amount of debt that was issued.
+     * @dev At the start of the liquidation the debt tokens are already burned,
+     *      as such interests are not accrued during the liquidation.
+     * @dev After the liquidation is finished, there are two options: 
+     *        1) the collateral is auctioned for more than the debt position  
+     *           and liquidator reward In this case the liquidator will transfer an equal amount
+     *           as the debt position to the Lending Pool.
+     *        2) the collateral is auctioned for less than the debt position  
+     *           and keeper fee -> the vault became under-collateralised and we have a default event.
+     *           In this case the liquidator will call settleLiquidation() to settle the deficit.
+     *           the Liquidator will transfer any remaining funds to the Lending Pool.
+     */
     function liquidateVault(address vault, uint256 debt) public onlyLiquidator {
         ERC4626(debtToken).withdraw(debt, vault, vault);
     }
 
+    /**
+     * @notice Settles bad debt of liquidations.
+     * @param default_ The amount of debt.that was not recouped by the auction
+     * @param deficit The amount of debt that has to be repaid to the liquidator,
+     *                if the liquidation fee was bigger than the auction proceeds
+     * @dev This function is called by the Liquidator after a liquidation is finished,
+     *      but only if there is bad debt.
+     * @dev The liquidator will transfer the auction proceeds (the underlying asset)
+     *      Directly back to the liquidity pool after liquidation.
+     */
     function settleLiquidation(uint256 default_, uint256 deficit) public onlyLiquidator {
         if (deficit != 0) {
+            //ToDo: The unhappy flow when there is not enough liquidity in the pool
             asset.transfer(liquidator, deficit);
         }
         _processDefault(default_);
