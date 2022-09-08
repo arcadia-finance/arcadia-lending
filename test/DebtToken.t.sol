@@ -24,7 +24,6 @@ abstract contract DebtTokenTest is Test {
 
     address creator = address(1);
     address tokenCreator = address(2);
-    address liquidator = address(3);
     address treasury = address(4);
     address vaultOwner = address(5);
     address liquidityProvider = address(6);
@@ -44,7 +43,8 @@ abstract contract DebtTokenTest is Test {
     //Before Each
     function setUp() virtual public {
         vm.startPrank(creator);
-        pool = new LendingPool(asset, liquidator, treasury, address(factory));
+        pool = new LendingPool(asset, treasury, address(factory));
+        pool.updateInterestRate(5 * 10**16); //5% with 18 decimals precision
 
         debt = new DebtToken(address(pool));
         pool.setDebtToken(address(debt));

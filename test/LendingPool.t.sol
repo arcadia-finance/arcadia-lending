@@ -21,6 +21,7 @@ abstract contract LendingPoolTest is Test {
     Tranche srTranche;
     Tranche jrTranche;
     DebtToken debt;
+    Vault vault;
 
     address creator = address(1);
     address tokenCreator = address(2);
@@ -44,7 +45,7 @@ abstract contract LendingPoolTest is Test {
     //Before Each
     function setUp() virtual public {
         vm.startPrank(creator);
-        pool = new LendingPool(asset, liquidator, treasury, address(factory));
+        pool = new LendingPool(asset, treasury, address(factory));
         srTranche = new Tranche(address(pool), "Senior", "SR");
         jrTranche = new Tranche(address(pool), "Junior", "JR");
         vm.stopPrank();
@@ -61,12 +62,11 @@ contract DeploymentTest is LendingPoolTest {
     }
 
     //Deployment
-    function testDeployment() public {
+    function testSuccess_deployment() public {
         assertEq(pool.name(), string("Arcadia Asset Pool"));
         assertEq(pool.symbol(), string("arcASSET"));
         assertEq(pool.decimals(), 18);
         assertEq(pool.vaultFactory(), address(factory));
-        assertEq(pool.liquidator(), liquidator);
         assertEq(pool.treasury(), treasury);
     }
 }
@@ -81,7 +81,7 @@ contract TranchesTest is LendingPoolTest {
     }
 
     //addTranche
-    function testRevert_AddTrancheInvalidOwner(address unprivilegedAddress) public {
+    function testRevert_addTranche_InvalidOwner(address unprivilegedAddress) public {
         // Given: unprivilegedAddress is not the creator
         vm.assume(unprivilegedAddress != creator);
 
@@ -93,7 +93,7 @@ contract TranchesTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_AddSingleTranche() public {
+    function testSuccess_addTranche_SingleTranche() public {
         // Given: all neccesary contracts are deployed on the setup
         vm.prank(creator);
         // When: creator addTranche, srTranche as Tranche address, 50 as weight
@@ -107,7 +107,7 @@ contract TranchesTest is LendingPoolTest {
         assertTrue(pool.isTranche(address(srTranche)));
     }
 
-    function testRevert_AddSingleTrancheTwice()public {
+    function testRevert_addTranche_SingleTrancheTwice()public {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
         // When: creator addTranche srTranche two times
@@ -119,7 +119,7 @@ contract TranchesTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_AddMultipleTranches() public {
+    function testSuccess_addTranche_MultipleTranches() public {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
         // When: creator addTranche srTranche and jrTranche, with 50 and 40 weights
@@ -141,7 +141,7 @@ contract TranchesTest is LendingPoolTest {
     }
 
     //setWeight
-    function testRevert_SetWeightInvalidOwner(address unprivilegedAddress) public {
+    function testRevert_setWeight_InvalidOwner(address unprivilegedAddress) public {
         // Given: all neccesary contracts are deployed on the setup
         vm.assume(unprivilegedAddress != creator);
 
@@ -153,7 +153,7 @@ contract TranchesTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testRevert_SetWeightInexistingTranche() public {
+    function testRevert_setWeight_InexistingTranche() public {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
         // When: creator setWeight on index 0
@@ -163,7 +163,7 @@ contract TranchesTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_SetWeight() public {
+    function testSuccess_setWeight() public {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
         // When: creator addTranche with 50 weight, setWeight 40 on index 0
@@ -176,7 +176,7 @@ contract TranchesTest is LendingPoolTest {
     }
 
     //popTranche
-    function testSuccess_PopTranche() public {
+    function testSuccess_popTranche() public {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
         // When: creator addTranche with srTranche and jrTranche, testPopTranche with index 1
@@ -207,7 +207,7 @@ contract ProtocolFeeTest is LendingPoolTest {
     }
 
     //setFeeWeight
-    function testRevert_SetFeeWeightInvalidOwner(address unprivilegedAddress) public {
+    function testRevert_setFeeWeight_InvalidOwner(address unprivilegedAddress) public {
         // Given: all neccesary contracts are deployed on the setup
         vm.assume(unprivilegedAddress != creator);
 
@@ -220,7 +220,7 @@ contract ProtocolFeeTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_SetFeeWeight() public {
+    function testSuccess_setFeeWeight() public {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
         // When: creator addTranche with 50 weight, setFeeWeight 5
@@ -243,7 +243,7 @@ contract ProtocolFeeTest is LendingPoolTest {
     }
 
     //setTreasury
-    function testRevert_SetTreasuryInvalidOwner(address unprivilegedAddress) public {
+    function testRevert_setTreasury_InvalidOwner(address unprivilegedAddress) public {
         // Given: all neccesary contracts are deployed on the setup
         vm.assume(unprivilegedAddress != creator);
 
@@ -255,7 +255,7 @@ contract ProtocolFeeTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_SetTreasury() public {
+    function testSuccess_setTreasury() public {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
         // When: creator setTreasury with creator address input
@@ -278,6 +278,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         vm.startPrank(creator);
         pool.addTranche(address(srTranche), 50);
         pool.addTranche(address(jrTranche), 40);
+        pool.updateInterestRate(5 * 10**16); //5% with 18 decimals precision
 
         debt = new DebtToken(address(pool));
         pool.setDebtToken(address(debt));
@@ -285,7 +286,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
     }
 
     //deposit (without debt -> ignore _syncInterests() and _updateInterestRate())
-    function testRevert_DepositByNonTranche(address unprivilegedAddress, uint128 assets, address from) public {
+    function testRevert_deposit_ByNonTranche(address unprivilegedAddress, uint128 assets, address from) public {
         // Given: all neccesary contracts are deployed on the setup
         vm.assume(unprivilegedAddress != address(jrTranche));
         vm.assume(unprivilegedAddress != address(srTranche));
@@ -298,7 +299,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_FirstDepositByTranche(uint256 amount) public {
+    function testSuccess_deposit_FirstDepositByTranche(uint256 amount) public {
         // Given: liquidityProvider approve max value
         vm.prank(liquidityProvider);
         asset.approve(address(pool), type(uint256).max);
@@ -313,7 +314,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         assertEq(asset.balanceOf(address(pool)), amount);
     }
 
-    function testSuccess_MultipleDepositsByTranches(uint256 amount0, uint256 amount1) public {
+    function testSuccess_deposit_MultipleDepositsByTranches(uint256 amount0, uint256 amount1) public {
         // Given: totalAmount is amount0 added by amount1, liquidityProvider approve max value
         vm.assume(amount0 <= type(uint256).max - amount1);
 
@@ -335,7 +336,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
     }
 
     //withdraw
-    function testRevert_WithdrawUnauthorised(uint256 assetsWithdrawn, address receiver, address unprivilegedAddress) public {
+    function testRevert_withdraw_Unauthorised(uint256 assetsWithdrawn, address receiver, address unprivilegedAddress) public {
         // Given: unprivilegedAddress is not srTranche, liquidityProvider approve max value
         vm.assume(unprivilegedAddress != address(srTranche));
         vm.assume(assetsWithdrawn > 0);
@@ -354,7 +355,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testRevert_WithdrawInsufficientAssets(uint256 assetsDeposited, uint256 assetsWithdrawn, address receiver) public {
+    function testRevert_withdraw_InsufficientAssets(uint256 assetsDeposited, uint256 assetsWithdrawn, address receiver) public {
         // Given: assetsWithdrawn bigger than assetsDeposited, liquidityProvider approve max value
         vm.assume(assetsDeposited < assetsWithdrawn);
 
@@ -371,7 +372,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_Withdraw(uint256 assetsDeposited, uint256 assetsWithdrawn, address receiver) public {
+    function testSuccess_withdraw(uint256 assetsDeposited, uint256 assetsWithdrawn, address receiver) public {
         // Given: assetsWithdrawn less than equal assetsDeposited, receiver is not pool or liquidityProvider, 
         // liquidityProvider approve max value
         vm.assume(receiver != address(pool));
@@ -401,8 +402,6 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
                     LENDING LOGIC
 //////////////////////////////////////////////////////////////*/
 contract LoanTest is LendingPoolTest {
-    
-    Vault vault;
 
     function setUp() override public {
         super.setUp();
@@ -420,7 +419,7 @@ contract LoanTest is LendingPoolTest {
     }
 
     //setDebtToken
-    function testRevert_SetDebtTokenInvalidOwner(address unprivilegedAddress) public {
+    function testRevert_setDebtToken_InvalidOwner(address unprivilegedAddress) public {
         // Given: unprivilegedAddress is not creator
         vm.assume(unprivilegedAddress != creator);
         
@@ -433,7 +432,7 @@ contract LoanTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_SetDebtToken() public {
+    function testSuccess_setDebtToken() public {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
         // When: creator sets the debt as setDebtToken 
@@ -445,7 +444,7 @@ contract LoanTest is LendingPoolTest {
     }
 
     //approveBeneficiary
-    function testRevert_ApproveBeneficiaryForNonVault(address beneficiary, uint256 amount, address nonVault) public {
+    function testRevert_approveBeneficiary_NonVault(address beneficiary, uint256 amount, address nonVault) public {
         // Given: nonVault is not vault
         vm.assume(nonVault != address(vault));
         // When: approveBeneficiary with nonVault input on vault
@@ -455,7 +454,7 @@ contract LoanTest is LendingPoolTest {
         pool.approveBeneficiary(beneficiary, amount, nonVault);
     }
 
-    function testRevert_ApproveBeneficiaryUnauthorised(address beneficiary, uint256 amount, address unprivilegedAddress) public {
+    function testRevert_approveBeneficiary_Unauthorised(address beneficiary, uint256 amount, address unprivilegedAddress) public {
         // Given: unprivilegedAddress is not vaultOwner
         vm.assume(unprivilegedAddress != vaultOwner);
 
@@ -468,7 +467,7 @@ contract LoanTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_ApproveBeneficiary(address beneficiary, uint256 amount) public {
+    function testSuccess_approveBeneficiary(address beneficiary, uint256 amount) public {
         // Given: all neccesary contracts are deployed on the setup
         vm.prank(vaultOwner);
         // When: approveBeneficiary as vaultOwner
@@ -479,7 +478,7 @@ contract LoanTest is LendingPoolTest {
     }
 
     //borrow
-    function testRevert_BorrowAgainstNonVault(uint256 amount, address nonVault, address to) public {
+    function testRevert_borrow_NonVault(uint256 amount, address nonVault, address to) public {
         // Given: nonVault is not vault
         vm.assume(nonVault != address(vault));
         // When: borrow as nonVault
@@ -489,7 +488,7 @@ contract LoanTest is LendingPoolTest {
         pool.borrow(amount, nonVault, to);
     }
 
-    function testRevert_BorrowUnauthorised(uint256 amount, address beneficiary, address to) public {
+    function testRevert_borrow_Unauthorised(uint256 amount, address beneficiary, address to) public {
         // Given: beneficiary is not vaultOwner, amount is bigger than 0
         vm.assume(beneficiary != vaultOwner);
         
@@ -505,7 +504,7 @@ contract LoanTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testRevert_BorrowInsufficientApproval(uint256 amountAllowed, uint256 amountLoaned, address beneficiary, address to) public {
+    function testRevert_borrow_InsufficientApproval(uint256 amountAllowed, uint256 amountLoaned, address beneficiary, address to) public {
         // Given: beneficiary is not vaultOwner, amountAllowed is less than amountLoaned, vaultOwner approveBeneficiary
         vm.assume(beneficiary != vaultOwner);
         vm.assume(amountAllowed < amountLoaned);
@@ -522,7 +521,7 @@ contract LoanTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testRevert_BorrowInsufficientCollateral(uint256 amountLoaned, uint256 collateralValue, address to) public {
+    function testRevert_borrow_InsufficientCollateral(uint256 amountLoaned, uint256 collateralValue, address to) public {
         // Given: collateralValue is less than amountLoaned, vault setTotalValue to colletrallValue
         vm.assume(collateralValue < amountLoaned);
 
@@ -537,7 +536,7 @@ contract LoanTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testRevert_BorrowInsufficientLiquidity(uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address to) public {
+    function testRevert_borrow_InsufficientLiquidity(uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address to) public {
         // Given: collateralValue less than equal to amountLoaned, liquidity is bigger than 0 but less than amountLoaned,
         // to is not address 0, creator setDebtToken to debt, liquidityProvider approve pool to max value,
         // srTranche deposit liquidity, setTotalValue to colletralValue
@@ -563,7 +562,7 @@ contract LoanTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_BorrowByVaultOwner(uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address to) public {
+    function testSuccess_borrow_ByVaultOwner(uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address to) public {
         // Given: collateralValue and liquidity bigger than equal to amountLoaned, amountLoaned is bigger than 0,
         // to is not address 0 and not liquidityProvider, creator setDebtToken to debt, setTotalValue to colletralValue, 
         // liquidityProvider approve pool to max value, srTranche deposit liquidity
@@ -593,7 +592,7 @@ contract LoanTest is LendingPoolTest {
         assertEq(debt.balanceOf(address(vault)), amountLoaned);
     }
 
-    function testSuccess_BorrowByLimitedAuthorisedAddress(uint256 amountAllowed, uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address beneficiary, address to) public {
+    function testSuccess_borrow_ByLimitedAuthorisedAddress(uint256 amountAllowed, uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address beneficiary, address to) public {
         // Given: amountAllowed, collateralValue and liquidity bigger than equal to amountLoaned, amountLoaned is bigger than 0,
         // amountAllowed is less than max value, beneficiary is not vaultOwner, to is not address 0 and not liquidityProvider, 
         // creator setDebtToken to debt, liquidityProvider approve pool to max value, srTranche deposit liquidity,
@@ -630,7 +629,7 @@ contract LoanTest is LendingPoolTest {
         assertEq(pool.creditAllowance(address(vault), beneficiary), amountAllowed - amountLoaned);
     }
 
-    function testSuccess_BorrowByMaxAuthorisedAddress(uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address beneficiary, address to) public {
+    function testSuccess_borrow_ByMaxAuthorisedAddress(uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address beneficiary, address to) public {
         // Given: collateralValue and liquidity bigger than equal to amountLoaned, amountLoaned is bigger than 0,
         // beneficiary is not vaultOwner, to is not address 0 and not liquidityProvider, 
         // creator setDebtToken to debt, setTotalValue to collateralValue, liquidityProvider approve pool to max value, 
@@ -666,7 +665,7 @@ contract LoanTest is LendingPoolTest {
     }
 
     //repay
-    function testRevert_RepayForNonVault(uint256 amount, address nonVault) public {
+    function testRevert_repay_NonVault(uint256 amount, address nonVault) public {
         // Given: nonVault is not vault
         vm.assume(nonVault != address(vault));
         // When: repay amount to nonVault
@@ -676,7 +675,7 @@ contract LoanTest is LendingPoolTest {
         pool.repay(amount, nonVault);
     }
 
-    function testRevert_RepayInsufficientFunds(uint128 amountLoaned, uint256 availablefunds, address sender) public {
+    function testRevert_repay_InsufficientFunds(uint128 amountLoaned, uint256 availablefunds, address sender) public {
         // Given: amountLoaned is bigger than availablefunds, availablefunds bigger than 0,
         // sender is not zero address, liquidityProvider or vaultOwner, creator setDebtToken to debt,
         // setTotalValue to amountLoaned, liquidityProvider approve max value, transfer availablefunds,
@@ -708,7 +707,7 @@ contract LoanTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_RepayAmountInferiorLoan(uint128 amountLoaned, uint256 amountRepaid, address sender) public {
+    function testSuccess_repay_AmountInferiorLoan(uint128 amountLoaned, uint256 amountRepaid, address sender) public {
         // Given: amountLoaned is bigger than amountRepaid, amountRepaid bigger than 0,
         // sender is not zero address, liquidityProvider, vaultOwner or pool, creator setDebtToken to debt,
         // setTotalValue to amountLoaned, liquidityProvider approve max value, transfer amountRepaid,
@@ -745,7 +744,7 @@ contract LoanTest is LendingPoolTest {
         assertEq(debt.balanceOf(address(vault)), amountLoaned - amountRepaid);
     }
 
-    function testSuccess_RepayExactAmount(uint128 amountLoaned, address sender) public {
+    function testSuccess_Repay_ExactAmount(uint128 amountLoaned, address sender) public {
         // Given: amountLoaned is bigger than 0, sender is not zero address, liquidityProvider, vaultOwner or pool, 
         // creator setDebtToken to debt, setTotalValue to amountLoaned, liquidityProvider approve max value, transfer amountRepaid,
         // srTranche deposit amountLoaned, vaultOwner borrow amountLoaned
@@ -779,7 +778,7 @@ contract LoanTest is LendingPoolTest {
         assertEq(debt.balanceOf(address(vault)), 0);
     }
 
-    function testSuccess_RepayAmountExceedingLoan(uint128 amountLoaned, uint128 availablefunds, address sender) public {
+    function testSuccess_repay_AmountExceedingLoan(uint128 amountLoaned, uint128 availablefunds, address sender) public {
         // Given: availablefunds is bigger than amountLoaned, amountLoaned bigger than 0,
         // sender is not zero address, liquidityProvider, vaultOwner or pool, creator setDebtToken to debt,
         // setTotalValue to amountLoaned, liquidityProvider approve max value, transfer availablefunds,
@@ -824,8 +823,6 @@ contract LoanTest is LendingPoolTest {
 contract InterestsTest is LendingPoolTest {
     using stdStorage for StdStorage;
 
-    Vault vault;
-
     function setUp() override public {
         super.setUp();
 
@@ -833,6 +830,7 @@ contract InterestsTest is LendingPoolTest {
         pool.setFeeWeight(10);
         pool.addTranche(address(srTranche), 50);
         pool.addTranche(address(jrTranche), 40);
+        pool.updateInterestRate(5 * 10**16); //5% with 18 decimals precision
 
         debt = new DebtToken(address(pool));
         pool.setDebtToken(address(debt));
@@ -844,7 +842,7 @@ contract InterestsTest is LendingPoolTest {
     }
 
     //_syncInterestsToLiquidityPool
-    function testSuccess_SyncInterestsToLiquidityPoolExact() public {
+    function testSuccess_syncInterests_ToLiquidityPoolExact() public {
         // Given: all necessary contracts are deployed on the setup
         vm.prank(creator);
         // When: creator testSyncInterestsToLiquidityPool with 100
@@ -858,7 +856,7 @@ contract InterestsTest is LendingPoolTest {
         assertEq(pool.totalSupply(), 100);
     }
 
-    function testSuccess_SyncInterestsToLiquidityPoolRounded() public {
+    function testSuccess_syncInterests_ToLiquidityPoolRounded() public {
         // Given: all necessary contracts are deployed on the setup
         vm.prank(creator);
         // When: creator testSyncInterestsToLiquidityPool with 99
@@ -873,7 +871,7 @@ contract InterestsTest is LendingPoolTest {
     }
 
     //_calcUnrealisedDebt
-    function testSuccess_CalcUnrealisedDebtUnchecked(uint64 interestRate, uint24 deltaBlocks, uint128 realisedDebt) public {
+    function testSuccess_calcUnrealisedDebt_Unchecked(uint64 interestRate, uint24 deltaBlocks, uint128 realisedDebt) public {
         // Given: interestRate is %1000, deltaBlocks is 5 years, realisedDebt is 3402823669209384912995114146594816
         vm.assume(interestRate <= 10 * 10**18); //1000%
         vm.assume(deltaBlocks <= 13140000); //5 year
@@ -917,7 +915,7 @@ contract InterestsTest is LendingPoolTest {
 }
 
 /*//////////////////////////////////////////////////////////////
-                            LOAN DEFAULT LOGIC
+                    LIQUIDATION LOGIC
 //////////////////////////////////////////////////////////////*/
 contract DefaultTest is LendingPoolTest {
     using stdStorage for StdStorage;
@@ -930,6 +928,7 @@ contract DefaultTest is LendingPoolTest {
         //Set Tranche weight on 0 so that all yield goes to treasury
         pool.addTranche(address(srTranche), 0);
         pool.addTranche(address(jrTranche), 0);
+        pool.updateInterestRate(5 * 10**16); //5% with 18 decimals precision
 
         debt = new DebtToken(address(pool));
         pool.setDebtToken(address(debt));
@@ -937,6 +936,127 @@ contract DefaultTest is LendingPoolTest {
 
         vm.prank(liquidityProvider);
         asset.approve(address(pool), type(uint256).max);
+
+        vm.startPrank(vaultOwner);
+        vault = Vault(factory.createVault(1));
+        vm.stopPrank();
+    }
+
+    function testRevert_setLiquidator_Unauthorised(address liquidator_, address unprivilegedAddress) public {
+        // Given: unprivilegedAddress is not the Owner
+        vm.assume(unprivilegedAddress != creator);
+
+        vm.startPrank(unprivilegedAddress);
+
+        // When: unprivilegedAddress sets the Liquidator
+        // Then: setLiquidator should revert with "UNAUTHORIZED"
+        vm.expectRevert("UNAUTHORIZED");
+        pool.setLiquidator(liquidator_);
+        vm.stopPrank();
+    }
+
+    function testSuccess_setLiquidator(address liquidator_) public {
+        // Given: all neccesary contracts are deployed on the setup
+
+        // When: The owner sets the Liquidator
+        vm.prank(creator);
+        pool.setLiquidator(liquidator_);
+
+        // Then: The liquidator should be equal to liquidator_
+        assertEq(liquidator_, pool.liquidator());
+    }
+
+    function testRevert_liquidateVault_Unauthorised(uint256 amountLoaned, address unprivilegedAddress) public {
+        // Given: unprivilegedAddress is not the liquidator
+        vm.assume(unprivilegedAddress != liquidator);
+        // And: The liquidator is set
+        vm.prank(creator);
+        pool.setLiquidator(liquidator);
+
+        vm.startPrank(unprivilegedAddress);
+
+        // When: unprivilegedAddress liquidates a vault
+        // Then: setLiquidator should revert with "UNAUTHORIZED"
+        vm.expectRevert("UNAUTHORIZED");
+        pool.liquidateVault(address(vault), amountLoaned);
+        vm.stopPrank();
+    }
+
+    function testSuccess_liquidateVault(uint128 amountLoaned) public {
+        // Given: all neccesary contracts are deployed on the setup
+        // And: A vault has debt
+        vm.prank(creator);
+        pool.setDebtToken(address(debt));
+        vault.setTotalValue(amountLoaned);
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        vm.prank(address(srTranche));
+        pool.deposit(amountLoaned, liquidityProvider);
+        vm.prank(vaultOwner);
+        pool.borrow(amountLoaned, address(vault), vaultOwner);
+        // And: The liquidator is set
+        vm.prank(creator);
+        pool.setLiquidator(liquidator);
+
+        // When: unprivilegedAddress liquidates a vault
+        vm.prank(liquidator);
+        pool.liquidateVault(address(vault), amountLoaned);
+
+        // Then: The debt of the vault should be zero
+        assertEq(debt.balanceOf(address(vault)), 0);
+        assertEq(debt.totalSupply(), 0);
+    }
+
+    function testRevert_settleLiquidation_Unauthorised(uint256 defaultAmount, uint256 deficitAmount, address unprivilegedAddress) public {
+        // Given: unprivilegedAddress is not the liquidator
+        vm.assume(unprivilegedAddress != liquidator);
+
+        vm.startPrank(unprivilegedAddress);
+
+        // When: unprivilegedAddress settles a liquidation
+        // Then: settleLiquidation should revert with "UNAUTHORIZED"
+        vm.expectRevert("UNAUTHORIZED");
+        pool.settleLiquidation(defaultAmount, deficitAmount);
+        vm.stopPrank();
+    }
+
+    function testSuccess_settleLiquidation_ProcessDefault(uint256 defaultAmount, uint256 liquidity) public {
+        // Given: provided liquidity is bigger than the default amount (Sould always be true)
+        vm.assume(liquidity >= defaultAmount);
+        // And: Liquidity is deposited in Lending Pool
+        vm.prank(address(srTranche));
+        pool.deposit(liquidity, liquidityProvider);
+        // And: The liquidator is set
+        vm.prank(creator);
+        pool.setLiquidator(liquidator);
+
+        // When: Liquidator settles a liquidation
+        vm.prank(liquidator);
+        pool.settleLiquidation(defaultAmount, 0);
+
+        // Then: The default amount should be discounted from the most junior tranche
+        assertEq(pool.balanceOf(address(srTranche)), liquidity - defaultAmount);
+        assertEq(pool.totalSupply(), liquidity - defaultAmount);
+    }
+
+    function testSuccess_settleLiquidation_ProcessDeficit(uint256 defaultAmount, uint256 deficitAmount, uint256 liquidity) public {
+        // Given: Provided liquidity is bigger than the default amount (Sould always be true)
+        vm.assume(liquidity >= defaultAmount);
+        // And: Available liquidity is bigger than the deficit amount (ToDo: unhappy flow!!!)
+        vm.assume(liquidity >= deficitAmount);
+        // And: Liquidity is deposited in Lending Pool
+        vm.prank(address(srTranche));
+        pool.deposit(liquidity, liquidityProvider);
+        // And: The liquidator is set
+        vm.prank(creator);
+        pool.setLiquidator(liquidator);
+
+        // When: Liquidator settles a liquidation
+        vm.prank(liquidator);
+        pool.settleLiquidation(defaultAmount, deficitAmount);
+
+        // Then: The deficit amount should be transferred to the Liquidator
+        assertEq(asset.balanceOf(liquidator), deficitAmount);
     }
 
     function testSuccess_ProcessDefaultOneTranche(uint256 liquiditySenior, uint256 liquidityJunior, uint256 defaultAmount) public {
