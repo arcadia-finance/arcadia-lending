@@ -7,7 +7,7 @@
 pragma solidity ^0.8.13;
 
 import "../lib/forge-std/src/Test.sol";
-import "../src/LiquidityPool.sol";
+import "../src/LendingPool.sol";
 import "../src/mocks/Asset.sol";
 import "../src/mocks/Factory.sol";
 import "../src/Tranche.sol";
@@ -17,7 +17,7 @@ abstract contract DebtTokenTest is Test {
 
     Asset asset;
     Factory factory;
-    LiquidityPool pool;
+    LendingPool pool;
     Tranche tranche;
     DebtToken debt;
     Vault vault;
@@ -43,13 +43,13 @@ abstract contract DebtTokenTest is Test {
     //Before Each
     function setUp() virtual public {
         vm.startPrank(creator);
-        pool = new LiquidityPool(asset, treasury, address(factory));
+        pool = new LendingPool(asset, treasury, address(factory));
         pool.updateInterestRate(5 * 10**16); //5% with 18 decimals precision
 
-        debt = new DebtToken(pool);
+        debt = new DebtToken(address(pool));
         pool.setDebtToken(address(debt));
 
-        tranche = new Tranche(pool, "Senior", "SR");
+        tranche = new Tranche(address(pool), "Senior", "SR");
         pool.addTranche(address(tranche), 50);
         vm.stopPrank();
 
@@ -74,11 +74,11 @@ contract DeploymentTest is DebtTokenTest {
         // When: debt is DebtToken
 
         // Then: debt's name should be Arcadia Asset Debt, symbol should be darcASSET, 
-        //       decimals should be 18, liquidityPool should return pool address
+        //       decimals should be 18, lendingPool should return pool address
         assertEq(debt.name(), string("Arcadia Asset Debt"));
         assertEq(debt.symbol(), string("darcASSET"));
         assertEq(debt.decimals(), 18);
-        assertEq(address(tranche.liquidityPool()), address(pool));
+        assertEq(address(tranche.lendingPool()), address(pool));
     }
 }
 

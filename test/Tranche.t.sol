@@ -7,7 +7,7 @@
 pragma solidity ^0.8.13;
 
 import "../lib/forge-std/src/Test.sol";
-import "../src/LiquidityPool.sol";
+import "../src/LendingPool.sol";
 import "../src/mocks/Asset.sol";
 import "../src/mocks/Factory.sol";
 import "../src/Tranche.sol";
@@ -17,7 +17,7 @@ abstract contract TrancheTest is Test {
 
     Asset asset;
     Factory factory;
-    LiquidityPool pool;
+    LendingPool pool;
     Tranche tranche;
     Tranche jrTranche;
     DebtToken debt;
@@ -45,13 +45,13 @@ abstract contract TrancheTest is Test {
     //Before Each
     function setUp() virtual public {
         vm.startPrank(creator);
-        pool = new LiquidityPool(asset, treasury, address(factory));
+        pool = new LendingPool(asset, treasury, address(factory));
         pool.updateInterestRate(5 * 10**16); //5% with 18 decimals precision
 
-        debt = new DebtToken(pool);
+        debt = new DebtToken(address(pool));
         pool.setDebtToken(address(debt));
 
-        tranche = new Tranche(pool, "Senior", "SR");
+        tranche = new Tranche(address(pool), "Senior", "SR");
         pool.addTranche(address(tranche), 50);
         vm.stopPrank();
 
@@ -74,7 +74,7 @@ contract DeploymentTest is TrancheTest {
         assertEq(tranche.name(), string("Senior Arcadia Asset"));
         assertEq(tranche.symbol(), string("SRarcASSET"));
         assertEq(tranche.decimals(), 18);
-        assertEq(address(tranche.liquidityPool()), address(pool));
+        assertEq(address(tranche.lendingPool()), address(pool));
     }
 }
 
@@ -272,7 +272,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         // When: beneficiary withdraw
 
         // Then: withdraw should revert with stdError.arithmeticError
-        vm.expectRevert(stdError.arithmeticError);
+        vm.expectRevert("LP_W: Withdraw amount should be lower than the supplied balance");
         tranche.withdraw(sharesAllowed, receiver, owner);
         vm.stopPrank();
     }
@@ -289,7 +289,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         // When: owner withdraw
 
         // Then: withdraw should revert with stdError.arithmeticError
-        vm.expectRevert(stdError.arithmeticError);
+        vm.expectRevert("LP_W: Withdraw amount should be lower than the supplied balance");
         tranche.withdraw(assetsWithdrawn, receiver, owner);
         vm.stopPrank();
     }

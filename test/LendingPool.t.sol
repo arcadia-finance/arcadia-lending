@@ -7,17 +7,17 @@
 pragma solidity ^0.8.13;
 
 import "../lib/forge-std/src/Test.sol";
-import "../src/LiquidityPool.sol";
+import "../src/LendingPool.sol";
 import "../src/mocks/Asset.sol";
 import "../src/mocks/Factory.sol";
 import "../src/Tranche.sol";
 import "../src/DebtToken.sol";
 
-abstract contract LiquidityPoolTest is Test {
+abstract contract LendingPoolTest is Test {
 
     Asset asset;
     Factory factory;
-    LiquidityPool pool;
+    LendingPool pool;
     Tranche srTranche;
     Tranche jrTranche;
     DebtToken debt;
@@ -45,9 +45,9 @@ abstract contract LiquidityPoolTest is Test {
     //Before Each
     function setUp() virtual public {
         vm.startPrank(creator);
-        pool = new LiquidityPool(asset, treasury, address(factory));
-        srTranche = new Tranche(pool, "Senior", "SR");
-        jrTranche = new Tranche(pool, "Junior", "JR");
+        pool = new LendingPool(asset, treasury, address(factory));
+        srTranche = new Tranche(address(pool), "Senior", "SR");
+        jrTranche = new Tranche(address(pool), "Junior", "JR");
         vm.stopPrank();
     }
 }
@@ -55,7 +55,7 @@ abstract contract LiquidityPoolTest is Test {
 /*//////////////////////////////////////////////////////////////
                         DEPLOYMENT
 //////////////////////////////////////////////////////////////*/
-contract DeploymentTest is LiquidityPoolTest {
+contract DeploymentTest is LendingPoolTest {
 
     function setUp() override public {
         super.setUp();
@@ -74,7 +74,7 @@ contract DeploymentTest is LiquidityPoolTest {
 /*//////////////////////////////////////////////////////////////
                         TRANCHES LOGIC
 //////////////////////////////////////////////////////////////*/
-contract TranchesTest is LiquidityPoolTest {
+contract TranchesTest is LendingPoolTest {
 
     function setUp() override public {
         super.setUp();
@@ -200,7 +200,7 @@ contract TranchesTest is LiquidityPoolTest {
 /*//////////////////////////////////////////////////////////////
                 PROTOCOL FEE CONFIGURATION
 //////////////////////////////////////////////////////////////*/
-contract ProtocolFeeTest is LiquidityPoolTest {
+contract ProtocolFeeTest is LendingPoolTest {
 
     function setUp() override public {
         super.setUp();
@@ -270,7 +270,7 @@ contract ProtocolFeeTest is LiquidityPoolTest {
 /*//////////////////////////////////////////////////////////////
                     DEPOSIT/WITHDRAWAL LOGIC
 //////////////////////////////////////////////////////////////*/
-contract DepositAndWithdrawalTest is LiquidityPoolTest {
+contract DepositAndWithdrawalTest is LendingPoolTest {
 
     function setUp() override public {
         super.setUp();
@@ -280,7 +280,7 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
         pool.addTranche(address(jrTranche), 40);
         pool.updateInterestRate(5 * 10**16); //5% with 18 decimals precision
 
-        debt = new DebtToken(pool);
+        debt = new DebtToken(address(pool));
         pool.setDebtToken(address(debt));
         vm.stopPrank();
     }
@@ -308,8 +308,8 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
         // When: srTranche deposit
         pool.deposit(amount, liquidityProvider);
 
-        // Then: balanceOf srTranche should be amount, totatlSupply should be amount, balanceOf pool should be amount
-        assertEq(pool.balanceOf(address(srTranche)), amount);
+        // Then: supplyBalances srTranche should be amount, totatlSupply should be amount, supplyBalances pool should be amount
+        assertEq(pool.supplyBalances(address(srTranche)), amount);
         assertEq(pool.totalSupply(), amount);
         assertEq(asset.balanceOf(address(pool)), amount);
     }
@@ -329,8 +329,8 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
         vm.prank(address(jrTranche));
         pool.deposit(amount1, liquidityProvider);
 
-        // Then: balanceOf jrTranche should be amount1, totalSupply should be totalAmount, balanceOf pool should be totalAmount 
-        assertEq(pool.balanceOf(address(jrTranche)), amount1);
+        // Then: supplyBalances jrTranche should be amount1, totalSupply should be totalAmount, supplyBalances pool should be totalAmount
+        assertEq(pool.supplyBalances(address(jrTranche)), amount1);
         assertEq(pool.totalSupply(), totalAmount);
         assertEq(asset.balanceOf(address(pool)), totalAmount);
     }
@@ -339,6 +339,7 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
     function testRevert_withdraw_Unauthorised(uint256 assetsWithdrawn, address receiver, address unprivilegedAddress) public {
         // Given: unprivilegedAddress is not srTranche, liquidityProvider approve max value
         vm.assume(unprivilegedAddress != address(srTranche));
+        vm.assume(assetsWithdrawn > 0);
 
         vm.prank(liquidityProvider);
         asset.approve(address(pool), type(uint256).max);
@@ -349,8 +350,8 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
 
         vm.startPrank(unprivilegedAddress);
         // Then: withdraw by unprivilegedAddress should revert with LP_W: UNAUTHORIZED
-        vm.expectRevert("LP_W: UNAUTHORIZED");
-        pool.withdraw(assetsWithdrawn, receiver, address(srTranche));
+        vm.expectRevert("LP_W: Withdraw amount should be lower than the supplied balance");
+        pool.withdraw(assetsWithdrawn, receiver);
         vm.stopPrank();
     }
 
@@ -366,8 +367,8 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
         pool.deposit(assetsDeposited, liquidityProvider);
 
         // Then: withdraw assetsWithdrawn should revert
-        vm.expectRevert(stdError.arithmeticError);
-        pool.withdraw(assetsWithdrawn, receiver, address(srTranche));
+        vm.expectRevert("LP_W: Withdraw amount should be lower than the supplied balance");
+        pool.withdraw(assetsWithdrawn, receiver);
         vm.stopPrank();
     }
 
@@ -385,12 +386,12 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
         // When: srTranche deposit and withdraw
         pool.deposit(assetsDeposited, liquidityProvider);
 
-        pool.withdraw(assetsWithdrawn, receiver, address(srTranche));
+        pool.withdraw(assetsWithdrawn, receiver);
         vm.stopPrank();
 
-        // Then: balanceOf srTranche, pool and totalSupply should be assetsDeposited minus assetsWithdrawn, 
-        // balanceOf receiver should be assetsWithdrawn
-        assertEq(pool.balanceOf(address(srTranche)), assetsDeposited - assetsWithdrawn);
+        // Then: supplyBalances srTranche, pool and totalSupply should be assetsDeposited minus assetsWithdrawn,
+        // supplyBalances receiver should be assetsWithdrawn
+        assertEq(pool.supplyBalances(address(srTranche)), assetsDeposited - assetsWithdrawn);
         assertEq(pool.totalSupply(), assetsDeposited - assetsWithdrawn);
         assertEq(asset.balanceOf(address(pool)), assetsDeposited - assetsWithdrawn);
         assertEq(asset.balanceOf(receiver), assetsWithdrawn);
@@ -400,7 +401,7 @@ contract DepositAndWithdrawalTest is LiquidityPoolTest {
 /*//////////////////////////////////////////////////////////////
                     LENDING LOGIC
 //////////////////////////////////////////////////////////////*/
-contract LoanTest is LiquidityPoolTest {
+contract LoanTest is LendingPoolTest {
 
     function setUp() override public {
         super.setUp();
@@ -409,7 +410,7 @@ contract LoanTest is LiquidityPoolTest {
         pool.addTranche(address(srTranche), 50);
         pool.addTranche(address(jrTranche), 40);
 
-        debt = new DebtToken(pool);
+        debt = new DebtToken(address(pool));
         vm.stopPrank();
 
         vm.startPrank(vaultOwner);
@@ -819,7 +820,7 @@ contract LoanTest is LiquidityPoolTest {
 /*//////////////////////////////////////////////////////////////
                             INTERESTS LOGIC
 //////////////////////////////////////////////////////////////*/
-contract InterestsTest is LiquidityPoolTest {
+contract InterestsTest is LendingPoolTest {
     using stdStorage for StdStorage;
 
     function setUp() override public {
@@ -831,7 +832,7 @@ contract InterestsTest is LiquidityPoolTest {
         pool.addTranche(address(jrTranche), 40);
         pool.updateInterestRate(5 * 10**16); //5% with 18 decimals precision
 
-        debt = new DebtToken(pool);
+        debt = new DebtToken(address(pool));
         pool.setDebtToken(address(debt));
         vm.stopPrank();
 
@@ -842,30 +843,30 @@ contract InterestsTest is LiquidityPoolTest {
 
     //_syncInterestsToLiquidityPool
     function testSuccess_syncInterests_ToLiquidityPoolExact() public {
-        // Given: all neccesary contracts are deployed on the setup
+        // Given: all necessary contracts are deployed on the setup
         vm.prank(creator);
         // When: creator testSyncInterestsToLiquidityPool with 100
-        pool.testSyncInterestsToLiquidityPool(100);
+        pool.testSyncInterestsToLendingPool(100);
 
-        // Then: balanceOf srTranche should be equal to 50, balanceOf jrTranche should be equal to 40, 
-        // balanceOf treasury should be equal to 10, totalSupply should be equal to 100 
-        assertEq(pool.balanceOf(address(srTranche)), 50);
-        assertEq(pool.balanceOf(address(jrTranche)), 40);
-        assertEq(pool.balanceOf(treasury), 10);
+        // Then: supplyBalances srTranche should be equal to 50, supplyBalances jrTranche should be equal to 40,
+        // supplyBalances treasury should be equal to 10, totalSupply should be equal to 100
+        assertEq(pool.supplyBalances(address(srTranche)), 50);
+        assertEq(pool.supplyBalances(address(jrTranche)), 40);
+        assertEq(pool.supplyBalances(address(treasury)), 10);
         assertEq(pool.totalSupply(), 100);
     }
 
     function testSuccess_syncInterests_ToLiquidityPoolRounded() public {
-        // Given: all neccesary contracts are deployed on the setup
+        // Given: all necessary contracts are deployed on the setup
         vm.prank(creator);
         // When: creator testSyncInterestsToLiquidityPool with 99
-        pool.testSyncInterestsToLiquidityPool(99);
+        pool.testSyncInterestsToLendingPool(99);
 
-        // Then: balanceOf srTranche should be equal to 50, balanceOf jrTranche should be equal to 40, 
-        // balanceOf treasury should be equal to 9, totalSupply should be equal to 99
-        assertEq(pool.balanceOf(address(srTranche)), 50);
-        assertEq(pool.balanceOf(address(jrTranche)), 40);
-        assertEq(pool.balanceOf(treasury), 9);
+        // Then: supplyBalances srTranche should be equal to 50, supplyBalances jrTranche should be equal to 40,
+        // supplyBalances treasury should be equal to 9, totalSupply should be equal to 99
+        assertEq(pool.supplyBalances(address(srTranche)), 50);
+        assertEq(pool.supplyBalances(address(jrTranche)), 40);
+        assertEq(pool.supplyBalances(address(treasury)), 9);
         assertEq(pool.totalSupply(), 99);
     }
 
@@ -916,7 +917,7 @@ contract InterestsTest is LiquidityPoolTest {
 /*//////////////////////////////////////////////////////////////
                     LIQUIDATION LOGIC
 //////////////////////////////////////////////////////////////*/
-contract DefaultTest is LiquidityPoolTest {
+contract DefaultTest is LendingPoolTest {
     using stdStorage for StdStorage;
 
     function setUp() override public {
@@ -929,7 +930,7 @@ contract DefaultTest is LiquidityPoolTest {
         pool.addTranche(address(jrTranche), 0);
         pool.updateInterestRate(5 * 10**16); //5% with 18 decimals precision
 
-        debt = new DebtToken(pool);
+        debt = new DebtToken(address(pool));
         pool.setDebtToken(address(debt));
         vm.stopPrank();
 
@@ -1034,7 +1035,7 @@ contract DefaultTest is LiquidityPoolTest {
         pool.settleLiquidation(defaultAmount, 0);
 
         // Then: The default amount should be discounted from the most junior tranche
-        assertEq(pool.balanceOf(address(srTranche)), liquidity - defaultAmount);
+        assertEq(pool.supplyBalances(address(srTranche)), liquidity - defaultAmount);
         assertEq(pool.totalSupply(), liquidity - defaultAmount);
     }
 
@@ -1073,10 +1074,10 @@ contract DefaultTest is LiquidityPoolTest {
         // When: creator testProcessDefault defaultAmount
         pool.testProcessDefault(defaultAmount);
 
-        // Then: balanceOf srTranche should be liquiditySenior, balanceOf jrTranche should be liquidityJunior minus defaultAmount,
+        // Then: supplyBalances srTranche should be liquiditySenior, supplyBalances jrTranche should be liquidityJunior minus defaultAmount,
         // totalSupply should be equal to totalAmount minus defaultAmount
-        assertEq(pool.balanceOf(address(srTranche)), liquiditySenior);
-        assertEq(pool.balanceOf(address(jrTranche)), liquidityJunior - defaultAmount);
+        assertEq(pool.supplyBalances(address(srTranche)), liquiditySenior);
+        assertEq(pool.supplyBalances(address(jrTranche)), liquidityJunior - defaultAmount);
         assertEq(pool.totalSupply(), totalAmount - defaultAmount);
     }
 
@@ -1096,10 +1097,10 @@ contract DefaultTest is LiquidityPoolTest {
         // When: creator testProcessDefault defaultAmount
         pool.testProcessDefault(defaultAmount);
 
-        // Then: balanceOf srTranche should be totalAmount minus defaultAmount, balanceOf jrTranche should be 0,
+        // Then: supplyBalances srTranche should be totalAmount minus defaultAmount, supplyBalances jrTranche should be 0,
         // totalSupply should be equal to totalAmount minus defaultAmount, isTranche for jrTranche should return false
-        assertEq(pool.balanceOf(address(srTranche)), totalAmount - defaultAmount);
-        assertEq(pool.balanceOf(address(jrTranche)), 0);
+        assertEq(pool.supplyBalances(address(srTranche)), totalAmount - defaultAmount);
+        assertEq(pool.supplyBalances(address(jrTranche)), 0);
         assertEq(pool.totalSupply(), totalAmount - defaultAmount);
         assertFalse(pool.isTranche(address(jrTranche)));
     }
@@ -1121,8 +1122,8 @@ contract DefaultTest is LiquidityPoolTest {
 
         // Then: balanceOf srTranche should be 0, balanceOf jrTranche should be 0,
         // totalSupply should be equal to 0, isTranche for jrTranche and srTranche should return false
-        assertEq(pool.balanceOf(address(srTranche)), 0);
-        assertEq(pool.balanceOf(address(jrTranche)), 0);
+        assertEq(pool.supplyBalances(address(srTranche)), 0);
+        assertEq(pool.supplyBalances(address(jrTranche)), 0);
         assertEq(pool.totalSupply(), 0);
         assertFalse(pool.isTranche(address(jrTranche)));
         assertFalse(pool.isTranche(address(srTranche)));
