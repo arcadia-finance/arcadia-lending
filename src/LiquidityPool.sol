@@ -30,18 +30,17 @@ contract LiquidityPool is ERC20, Owned {
 
     address public vaultFactory;
     ERC20 public immutable asset;
+    uint256 public immutable baseCurrency;
 
     /**
      * @notice The constructor for a liquidity pool
      * @param _asset The underlying ERC-20 token of the Liquidity Pool
-     * @param _liquidator The address of the liquidator
      * @param _treasury The address of the protocol treasury
      * @param _vaultFactory The address of the vault factory
      * @dev The name and symbol of the pool are automatically generated, based on the name and symbol of the underlying token
      */
     constructor(
         ERC20 _asset,
-        address _liquidator,
         address _treasury,
         address _vaultFactory
     ) ERC20(
@@ -50,9 +49,9 @@ contract LiquidityPool is ERC20, Owned {
         _asset.decimals()
     ) Owned(msg.sender) {
         asset = _asset;
-        liquidator = _liquidator;
         treasury = _treasury;
         vaultFactory = _vaultFactory;
+        baseCurrency = 0; //ToDo: should correspond to the underlying asset in the mainregistry
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -60,7 +59,6 @@ contract LiquidityPool is ERC20, Owned {
     //////////////////////////////////////////////////////////////*/
 
     uint256 public totalWeight;
-    address public liquidator;
 
     uint256[] public weights;
     address[] public tranches;
@@ -256,7 +254,7 @@ contract LiquidityPool is ERC20, Owned {
         }
 
         //Call vault to check if there is sufficient collateral
-        require(IVault(vault).lockCollateral(amount, address(asset)), 'LP_TL: Reverted');
+        require(IVault(vault).increaseMarginPosition(baseCurrency, amount), 'LP_TL: Reverted');
 
         //Process interests since last update
         _syncInterests();
@@ -264,7 +262,7 @@ contract LiquidityPool is ERC20, Owned {
         //Transfer fails if there is insufficient liquidity in pool
         asset.safeTransfer(to, amount);
 
-        ERC4626(debtToken).deposit(amount, vault);
+        if (amount != 0) ERC4626(debtToken).deposit(amount, vault);
 
         //Update interest rates
         _updateInterestRate();
@@ -292,7 +290,7 @@ contract LiquidityPool is ERC20, Owned {
         ERC4626(debtToken).withdraw(transferAmount, vault, vault);
 
         //Call vault to unlock collateral
-        require(IVault(vault).unlockCollateral(transferAmount, address(asset)), 'LP_RL: Reverted');
+        require(IVault(vault).decreaseMarginPosition(baseCurrency, transferAmount), 'LP_RL: Reverted');
 
         //Update interest rates
         _updateInterestRate();
@@ -408,14 +406,70 @@ contract LiquidityPool is ERC20, Owned {
                         INTEREST RATE LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    function updateInterestRate(uint64 _interestRate) external onlyOwner {
+        //Todo: Remove function after _updateInterestRate() is implemented
+        interestRate = _interestRate; //with 18 decimals precision
+    }
+
     function _updateInterestRate() internal {
         //ToDo
-        interestRate = 20000000000000000; //2% with 18 decimals precision
     }
 
     /*//////////////////////////////////////////////////////////////
-                            LOAN DEFAULT LOGIC
+                        LIQUIDATION LOGIC
     //////////////////////////////////////////////////////////////*/
+
+    address public liquidator;
+
+    modifier onlyLiquidator() {
+        require(liquidator == msg.sender, "UNAUTHORIZED");
+        _;
+    }
+
+    /**
+     * @notice Set's the contract address of the liquidator.
+     * @param _liquidator The contract address of the liquidator
+     */
+    function setLiquidator(address _liquidator) public onlyOwner {
+        liquidator = _liquidator;
+    }
+
+    /**
+     * @notice Starts the liquidation of a vault.
+     * @param vault The contract address of the liquidator.
+     * @param debt The amount of debt that was issued.
+     * @dev At the start of the liquidation the debt tokens are already burned,
+     *      as such interests are not accrued during the liquidation.
+     * @dev After the liquidation is finished, there are two options: 
+     *        1) the collateral is auctioned for more than the debt position  
+     *           and liquidator reward In this case the liquidator will transfer an equal amount
+     *           as the debt position to the Lending Pool.
+     *        2) the collateral is auctioned for less than the debt position  
+     *           and keeper fee -> the vault became under-collateralised and we have a default event.
+     *           In this case the liquidator will call settleLiquidation() to settle the deficit.
+     *           the Liquidator will transfer any remaining funds to the Lending Pool.
+     */
+    function liquidateVault(address vault, uint256 debt) public onlyLiquidator {
+        ERC4626(debtToken).withdraw(debt, vault, vault);
+    }
+
+    /**
+     * @notice Settles bad debt of liquidations.
+     * @param default_ The amount of debt.that was not recouped by the auction
+     * @param deficit The amount of debt that has to be repaid to the liquidator,
+     *                if the liquidation fee was bigger than the auction proceeds
+     * @dev This function is called by the Liquidator after a liquidation is finished,
+     *      but only if there is bad debt.
+     * @dev The liquidator will transfer the auction proceeds (the underlying asset)
+     *      Directly back to the liquidity pool after liquidation.
+     */
+    function settleLiquidation(uint256 default_, uint256 deficit) public onlyLiquidator {
+        if (deficit != 0) {
+            //ToDo: The unhappy flow when there is not enough liquidity in the pool
+            asset.transfer(liquidator, deficit);
+        }
+        _processDefault(default_);
+    }
 
     /** 
      * @notice Handles the bookkeeping in case of bad debt (Vault became undercollateralised).

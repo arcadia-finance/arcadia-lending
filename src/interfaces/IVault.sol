@@ -9,7 +9,7 @@ pragma solidity ^0.8.13;
 interface IVault {
     function owner() external view returns (address);
 
-    function lockCollateral(uint256 amount, address baseCurrency) external returns (bool);
+    function increaseMarginPosition(uint256 baseCurrency, uint256 amount) external returns (bool);
 
-    function unlockCollateral(uint256 amount, address baseCurrency) external returns (bool);
+    function decreaseMarginPosition(uint256 baseCurrency, uint256 amount) external returns (bool);
 }

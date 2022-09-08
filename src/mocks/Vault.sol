@@ -21,7 +21,7 @@
         totalValue = _totalValue;
     }
 
-    function lockCollateral(uint256 amount, address) external returns (bool) {
+    function increaseMarginPosition(uint256, uint256 amount) external returns (bool) {
         if (totalValue - lockedValue >= amount) {
             lockedValue += amount;
             return true;
@@ -30,7 +30,7 @@
         }
     }
 
-    function unlockCollateral(uint256 amount, address) external returns (bool) {
+    function decreaseMarginPosition(uint256, uint256 amount) external returns (bool) {
         if (lockedValue >= amount) {
             lockedValue -= amount;
             return true;
