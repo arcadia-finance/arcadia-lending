@@ -406,7 +406,7 @@ contract LendingPool is Owned {
                 ++i;
             }
         }
-        totalSupply += assets;
+        totalSupply += assets - remainingAssets;
 
         // Protocol fee, not added to the totalSupply because treasury fund are not used in lending.
         protocolFee += remainingAssets;

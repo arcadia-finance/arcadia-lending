@@ -338,6 +338,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
     function testRevert_WithdrawUnauthorised(uint256 assetsWithdrawn, address receiver, address unprivilegedAddress) public {
         // Given: unprivilegedAddress is not srTranche, liquidityProvider approve max value
         vm.assume(unprivilegedAddress != address(srTranche));
+        vm.assume(assetsWithdrawn > 0);
 
         vm.prank(liquidityProvider);
         asset.approve(address(pool), type(uint256).max);
