@@ -67,10 +67,8 @@ contract LendingPool is Owned {
     ////////////////////////////////////////////////////////////// */
 
     uint256 public totalWeight;
-    address public liquidator;
 
     // Tranche
-    uint256 public totalWeight;
     uint256[] public weights;
     address[] public tranches;
 

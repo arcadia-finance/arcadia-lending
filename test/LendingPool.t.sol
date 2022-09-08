@@ -1035,7 +1035,7 @@ contract DefaultTest is LendingPoolTest {
         pool.settleLiquidation(defaultAmount, 0);
 
         // Then: The default amount should be discounted from the most junior tranche
-        assertEq(pool.balanceOf(address(srTranche)), liquidity - defaultAmount);
+        assertEq(pool.supplyBalances(address(srTranche)), liquidity - defaultAmount);
         assertEq(pool.totalSupply(), liquidity - defaultAmount);
     }
 
