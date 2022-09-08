@@ -62,8 +62,6 @@ contract LendingPool is Owned {
     uint256 public totalSupply;
     mapping(address => uint256) public supplyBalances;
 
-    uint256 public protocolFee;
-
 
     /* //////////////////////////////////////////////////////////////
                             TRANCHES LOGIC
@@ -408,8 +406,9 @@ contract LendingPool is Owned {
         }
         totalSupply += assets - remainingAssets;
 
-        // Protocol fee, not added to the totalSupply because treasury fund are not used in lending.
-        protocolFee += remainingAssets;
+        // Add the remainingAssets to the treasury balance
+        supplyBalances[treasury] += remainingAssets;
+        totalSupply += remainingAssets;
         
     }
 

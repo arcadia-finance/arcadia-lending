@@ -854,8 +854,8 @@ contract InterestsTest is LendingPoolTest {
         // supplyBalances treasury should be equal to 10, totalSupply should be equal to 100
         assertEq(pool.supplyBalances(address(srTranche)), 50);
         assertEq(pool.supplyBalances(address(jrTranche)), 40);
-        assertEq(pool.protocolFee(), 10);
-        assertEq(pool.totalSupply(), 90);
+        assertEq(pool.supplyBalances(address(treasury)), 10);
+        assertEq(pool.totalSupply(), 100);
     }
 
     function testSuccess_SyncInterestsToLiquidityPoolRounded() public {
@@ -868,8 +868,8 @@ contract InterestsTest is LendingPoolTest {
         // supplyBalances treasury should be equal to 9, totalSupply should be equal to 99
         assertEq(pool.supplyBalances(address(srTranche)), 50);
         assertEq(pool.supplyBalances(address(jrTranche)), 40);
-        assertEq(pool.protocolFee(), 9);
-        assertEq(pool.totalSupply(), 90);
+        assertEq(pool.supplyBalances(address(treasury)), 9);
+        assertEq(pool.totalSupply(), 99);
     }
 
     //_calcUnrealisedDebt
