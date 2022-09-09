@@ -18,6 +18,7 @@ import "./interfaces/IDebtToken.sol";
 import "./interfaces/IFactory.sol";
 import "./interfaces/IVault.sol";
 import "./interfaces/ILendingPool.sol";
+import "./TrustedProtocol.sol";
 
 /**
  * @title Lending Pool
@@ -25,7 +26,7 @@ import "./interfaces/ILendingPool.sol";
  * @notice The Lending pool contains the main logic to provide liquidity and take or repay loans for a certain asset
  * @dev Protocol is a modification of the ERC20 standard, with a certain ERC20 as underlying
  */
-contract LendingPool is Owned {
+contract LendingPool is Owned, TrustedProtocol {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
@@ -43,7 +44,7 @@ contract LendingPool is Owned {
         ERC20 _asset,
         address _treasury,
         address _vaultFactory
-    ) Owned(msg.sender) {
+    ) Owned(msg.sender) TrustedProtocol() {
         asset = _asset;
         treasury = _treasury;
         vaultFactory = _vaultFactory;
@@ -76,8 +77,6 @@ contract LendingPool is Owned {
         require(isTranche[msg.sender], "UNAUTHORIZED");
         _;
     }
-
-
 
     /**
      * @notice Adds a tranche to the Lending Pool
@@ -524,6 +523,23 @@ contract LendingPool is Owned {
     //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
     function testProcessDefault(uint256 assets) public onlyOwner {
         _processDefault(assets);
+    }
+
+    /* //////////////////////////////////////////////////////////////
+                        VAULT LOGIC
+    ////////////////////////////////////////////////////////////// */
+
+    function openMarginAccount() external override view returns (bool success, address baseCurrency, address liquidator_) {
+        //Todo: Check if vaultversion etc is ok
+        success = true;
+        baseCurrency = address(asset);
+        liquidator_ = liquidator;
+    }
+
+    function getOpenPosition(address vault) external override returns(uint128 openPosition) {
+        //ToDo: When ERC-4626 is correctly implemented, It should not be necessary to first sync interests.
+        _syncInterests();
+        openPosition = uint128(ERC4626(debtToken).maxWithdraw(vault));
     }
 
 }
