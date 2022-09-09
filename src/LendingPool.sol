@@ -18,55 +18,59 @@ import "./interfaces/IDebtToken.sol";
 import "./interfaces/IFactory.sol";
 import "./interfaces/IVault.sol";
 import "./libraries/DataTypes.sol";
+import "./interfaces/ILendingPool.sol";
 
 /**
- * @title Liquidity Pool
+ * @title Lending Pool
  * @author Arcadia Finance
  * @notice The Lending pool contains the main logic to provide liquidity and take or repay loans for a certain asset
  * @dev Protocol is a modification of the ERC20 standard, with a certain ERC20 as underlying
  */
-contract LiquidityPool is ERC20, Owned {
+contract LendingPool is Owned {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
     address public vaultFactory;
     DataTypes.InterestRateConfiguration internal interestRateConfig;
     ERC20 public immutable asset;
+    uint256 public immutable baseCurrency;
 
     /**
-     * @notice The constructor for a liquidity pool
-     * @param _asset The underlying ERC-20 token of the Liquidity Pool
-     * @param _liquidator The address of the liquidator
+     * @notice The constructor for a lending pool
+     * @param _asset The underlying ERC-20 token of the Lending Pool
      * @param _treasury The address of the protocol treasury
-     * @param _vaultFactory The address of the vault factory
      * @param _vaultFactory The address of the vault factory
      * @dev The name and symbol of the pool are automatically generated, based on the name and symbol of the underlying token
      */
     constructor(
         ERC20 _asset,
-        address _liquidator,
         address _treasury,
-        address _vaultFactory,
-        DataTypes.InterestRateConfiguration memory _interestRateConfig
-    ) ERC20(
-        string(abi.encodePacked("Arcadia ", _asset.name(), " Pool")),
-        string(abi.encodePacked("arc", _asset.symbol())),
-        _asset.decimals()
+        address _vaultFactory
     ) Owned(msg.sender) {
         asset = _asset;
-        liquidator = _liquidator;
         treasury = _treasury;
         vaultFactory = _vaultFactory;
-        interestRateConfig = _interestRateConfig;
+        name = string(abi.encodePacked("Arcadia ", _asset.name(), " Pool"));
+        symbol = string(abi.encodePacked("arc", _asset.symbol()));
+        decimals = _asset.decimals();
+        baseCurrency = 0; //ToDo: should correspond to the underlying asset in the mainregistry
     }
+    // Lending Pool Metadata
+    string public name;
+    string public symbol;
+    uint8 public immutable decimals;
 
-    /*//////////////////////////////////////////////////////////////
+    uint256 public totalSupply;
+    mapping(address => uint256) public supplyBalances;
+
+
+    /* //////////////////////////////////////////////////////////////
                             TRANCHES LOGIC
-    //////////////////////////////////////////////////////////////*/
+    ////////////////////////////////////////////////////////////// */
 
     uint256 public totalWeight;
-    address public liquidator;
 
+    // Tranche
     uint256[] public weights;
     address[] public tranches;
 
@@ -77,8 +81,10 @@ contract LiquidityPool is ERC20, Owned {
         _;
     }
 
+
+
     /**
-     * @notice Adds a tranche to the Liquidity Pool
+     * @notice Adds a tranche to the Lending Pool
      * @param tranche The address of the Tranche
      * @param weight The weight of the specific Tranche
      * @dev The order of the tranches is important, the most senior tranche is at index 0, the most junior at the last index.
@@ -133,9 +139,9 @@ contract LiquidityPool is ERC20, Owned {
         _popTranche( index, tranche);
     }
 
-    /*///////////////////////////////////////////////////////////////
+    /* ///////////////////////////////////////////////////////////////
                     PROTOCOL FEE CONFIGURATION
-    //////////////////////////////////////////////////////////////*/
+    ////////////////////////////////////////////////////////////// */
 
     uint256 public feeWeight;
     address public treasury;
@@ -159,12 +165,12 @@ contract LiquidityPool is ERC20, Owned {
         treasury = _treasury;
     }
 
-    /*//////////////////////////////////////////////////////////////
+    /* //////////////////////////////////////////////////////////////
                         DEPOSIT/WITHDRAWAL LOGIC
-    //////////////////////////////////////////////////////////////*/
+    ////////////////////////////////////////////////////////////// */
 
     /**
-     * @notice Deposit assets in the Liquidity Pool
+     * @notice Deposit assets in the Lending Pool
      * @param assets the amount of assets of the underlying ERC-20 token being deposited
      * @param from The address of the origin of the underlying ERC-20 token, who deposits assets via a Tranche
      * @dev This function can only be called by Tranches.
@@ -177,36 +183,36 @@ contract LiquidityPool is ERC20, Owned {
 
         asset.safeTransferFrom(from, address(this), assets);
 
-        _mint(msg.sender, assets);
+        supplyBalances[msg.sender] += assets;
+        totalSupply += assets;
 
         _updateInterestRate();
     }
 
     /**
-     * @notice Withdraw assets from the Liquidity Pool
+     * @notice Withdraw assets from the Lending Pool
      * @param assets the amount of assets of the underlying ERC-20 token being withdrawn
      * @param receiver The address of the receiver of the underlying ERC-20 tokens
-     * @param owner_ The address of the owner of the assets being withdrawn
      */
     function withdraw(
         uint256 assets,
-        address receiver,
-        address owner_
+        address receiver
     ) public {
         _syncInterests();
 
-        require(msg.sender == owner_, "LP_W: UNAUTHORIZED");
+        require(supplyBalances[msg.sender] >= assets, "LP_W: Withdraw amount should be lower than the supplied balance");
 
-        _burn(owner_, assets);
+        supplyBalances[msg.sender] -= assets;
+        totalSupply -= assets;
 
         asset.safeTransfer(receiver, assets);
 
         _updateInterestRate();
     }
 
-    /*//////////////////////////////////////////////////////////////
+    /* //////////////////////////////////////////////////////////////
                             LENDING LOGIC
-    //////////////////////////////////////////////////////////////*/
+    ////////////////////////////////////////////////////////////// */
 
     event CreditApproval(address indexed vault, address indexed beneficiary, uint256 amount);
 
@@ -214,7 +220,7 @@ contract LiquidityPool is ERC20, Owned {
     mapping(address => mapping(address => uint256)) public creditAllowance;
 
     /**
-     * @notice Set the Debt Token contract of the Liquidity Pool
+     * @notice Set the Debt Token contract of the Lending Pool
      * @param _debtToken The address of the Debt Token
      * @dev Debt Token is an ERC-4626 contract
      * @dev ToDo: For now manually add newly created tranche, do via factory in future?
@@ -261,7 +267,7 @@ contract LiquidityPool is ERC20, Owned {
         }
 
         //Call vault to check if there is sufficient collateral
-        require(IVault(vault).lockCollateral(amount, address(asset)), 'LP_TL: Reverted');
+        require(IVault(vault).increaseMarginPosition(baseCurrency, amount), 'LP_TL: Reverted');
 
         //Process interests since last update
         _syncInterests();
@@ -269,7 +275,7 @@ contract LiquidityPool is ERC20, Owned {
         //Transfer fails if there is insufficient liquidity in pool
         asset.safeTransfer(to, amount);
 
-        ERC4626(debtToken).deposit(amount, vault);
+        if (amount != 0) ERC4626(debtToken).deposit(amount, vault);
 
         //Update interest rates
         _updateInterestRate();
@@ -297,15 +303,15 @@ contract LiquidityPool is ERC20, Owned {
         ERC4626(debtToken).withdraw(transferAmount, vault, vault);
 
         //Call vault to unlock collateral
-        require(IVault(vault).unlockCollateral(transferAmount, address(asset)), 'LP_RL: Reverted');
+        require(IVault(vault).decreaseMarginPosition(baseCurrency, transferAmount), 'LP_RL: Reverted');
 
         //Update interest rates
         _updateInterestRate();
     }
 
-    /*//////////////////////////////////////////////////////////////
+    /* //////////////////////////////////////////////////////////////
                             INTERESTS LOGIC
-    //////////////////////////////////////////////////////////////*/
+    ////////////////////////////////////////////////////////////// */
 
     //ToDo: optimise storage allocations
     uint64 public interestRate; //18 decimals precision
@@ -333,7 +339,7 @@ contract LiquidityPool is ERC20, Owned {
         IDebtToken(debtToken).syncInterests(unrealisedDebt);
 
         //Sync interests for LPs and Protocol Treasury
-        _syncInterestsToLiquidityPool(unrealisedDebt);
+        _syncInterestsToLendingPool(unrealisedDebt);
     }
 
     /** 
@@ -381,48 +387,106 @@ contract LiquidityPool is ERC20, Owned {
     }
 
     /** 
-     * @notice Syncs interest payments to the Liquidity providers and the treasury.
+     * @notice Syncs interest payments to the Lending providers and the treasury.
      * @param assets The total amount of underlying assets to be paid out as interests.
      * @dev The weight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
      * @dev The Shares for each Tranche are rounded up, if the treasury receives the remaining shares and will hence loose
      *      part of their yield due to rounding errors (neglectable small).
      */
-    function _syncInterestsToLiquidityPool(uint256 assets) internal {
+    function _syncInterestsToLendingPool(uint256 assets) internal {
         uint256 remainingAssets = assets;
 
         for (uint256 i; i < tranches.length; ) {
             uint256 trancheShare = assets.mulDivUp(weights[i], totalWeight);
-            _mint(tranches[i], trancheShare);
+            supplyBalances[tranches[i]] += trancheShare;
             unchecked {
                 remainingAssets -= trancheShare;
                 ++i;
             }
         }
+        totalSupply += assets - remainingAssets;
 
-        //Protocol fee
-        _mint(treasury, remainingAssets);
+        // Add the remainingAssets to the treasury balance
+        supplyBalances[treasury] += remainingAssets;
+        totalSupply += remainingAssets;
         
     }
 
     //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
-    function testSyncInterestsToLiquidityPool(uint256 assets) public onlyOwner {
-        _syncInterestsToLiquidityPool(assets);
+    function testSyncInterestsToLendingPool(uint256 assets) public onlyOwner {
+        _syncInterestsToLendingPool(assets);
     }
 
-    /*//////////////////////////////////////////////////////////////
+    /* //////////////////////////////////////////////////////////////
                         INTEREST RATE LOGIC
-    //////////////////////////////////////////////////////////////*/
+    ////////////////////////////////////////////////////////////// */
+
+    function updateInterestRate(uint64 _interestRate) external onlyOwner {
+        //Todo: Remove function after _updateInterestRate() is implemented
+        interestRate = _interestRate; //with 18 decimals precision
+    }
 
     function _updateInterestRate() internal {
         //ToDo
-        interestRate = 20000000000000000; //2% with 18 decimals precision
     }
 
-    /*//////////////////////////////////////////////////////////////
-                            LOAN DEFAULT LOGIC
-    //////////////////////////////////////////////////////////////*/
+    /* //////////////////////////////////////////////////////////////
+                        LIQUIDATION LOGIC
+    ////////////////////////////////////////////////////////////// */
 
-    /** 
+    address public liquidator;
+
+    modifier onlyLiquidator() {
+        require(liquidator == msg.sender, "UNAUTHORIZED");
+        _;
+    }
+
+    /**
+     * @notice Set's the contract address of the liquidator.
+     * @param _liquidator The contract address of the liquidator
+     */
+    function setLiquidator(address _liquidator) public onlyOwner {
+        liquidator = _liquidator;
+    }
+
+    /**
+     * @notice Starts the liquidation of a vault.
+     * @param vault The contract address of the liquidator.
+     * @param debt The amount of debt that was issued.
+     * @dev At the start of the liquidation the debt tokens are already burned,
+     *      as such interests are not accrued during the liquidation.
+     * @dev After the liquidation is finished, there are two options:
+     *        1) the collateral is auctioned for more than the debt position
+     *           and liquidator reward In this case the liquidator will transfer an equal amount
+     *           as the debt position to the Lending Pool.
+     *        2) the collateral is auctioned for less than the debt position
+     *           and keeper fee -> the vault became under-collateralised and we have a default event.
+     *           In this case the liquidator will call settleLiquidation() to settle the deficit.
+     *           the Liquidator will transfer any remaining funds to the Lending Pool.
+     */
+    function liquidateVault(address vault, uint256 debt) public onlyLiquidator {
+        ERC4626(debtToken).withdraw(debt, vault, vault);
+    }
+
+    /**
+     * @notice Settles bad debt of liquidations.
+     * @param default_ The amount of debt.that was not recouped by the auction
+     * @param deficit The amount of debt that has to be repaid to the liquidator,
+     *                if the liquidation fee was bigger than the auction proceeds
+     * @dev This function is called by the Liquidator after a liquidation is finished,
+     *      but only if there is bad debt.
+     * @dev The liquidator will transfer the auction proceeds (the underlying asset)
+     *      Directly back to the liquidity pool after liquidation.
+     */
+    function settleLiquidation(uint256 default_, uint256 deficit) public onlyLiquidator {
+        if (deficit != 0) {
+            //ToDo: The unhappy flow when there is not enough liquidity in the pool
+            asset.transfer(liquidator, deficit);
+        }
+        _processDefault(default_);
+    }
+
+    /**
      * @notice Handles the bookkeeping in case of bad debt (Vault became undercollateralised).
      * @param assets The total amount of underlying assets that need to be written off as bad debt.
      * @dev The order of the tranches is important, the most senior tranche is at index 0, the most junior at the last index.
@@ -438,13 +502,17 @@ contract LiquidityPool is ERC20, Owned {
         for (uint256 i = tranches.length; i > 0; ) {
             unchecked {--i;}
             address tranche = tranches[i];
-            uint256 maxBurned = balanceOf[tranche];
+            uint256 maxBurned = supplyBalances[tranche];
             if (assets < maxBurned) {
-                _burn(tranche, assets);
+                // burn
+                supplyBalances[tranche] -= assets;
+                totalSupply -= assets;
                 break;
             } else {
                 ITranche(tranche).lock();
-                _burn(tranche, maxBurned);
+                // burn
+                supplyBalances[tranche] -= maxBurned;
+                totalSupply -= maxBurned;
                 _popTranche(i, tranche);
                 unchecked {
                     assets -= maxBurned;
