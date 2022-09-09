@@ -106,7 +106,7 @@ contract Tranche is ERC4626, Owned {
     function mint(uint256 shares, address receiver) public override notLocked returns (uint256 assets) {
         assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
 
-        // Need to transfer (via liquidityPool.deposit()) before minting or ERC777s could reenter.
+        // Need to transfer (via lendingPool.deposit()) before minting or ERC777s could reenter.
         ILendingPool(address(lendingPool)).deposit(assets, msg.sender);
 
         _mint(receiver, shares);
