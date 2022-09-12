@@ -1048,7 +1048,7 @@ contract DefaultTest is LendingPoolTest {
         assertEq(asset.balanceOf(liquidator), deficitAmount);
     }
 
-    function testSuccess_ProcessDefaultOneTranche(uint256 liquiditySenior, uint256 liquidityJunior, uint256 defaultAmount) public {
+    function testSuccess_processDefault_OneTranche(uint256 liquiditySenior, uint256 liquidityJunior, uint256 defaultAmount) public {
         // Given: srTranche deposit liquiditySenior, jrTranche deposit liquidityJunior
         vm.assume(liquiditySenior <= type(uint256).max - liquidityJunior);
         uint256 totalAmount = uint256(liquiditySenior) + uint256(liquidityJunior);
@@ -1070,7 +1070,7 @@ contract DefaultTest is LendingPoolTest {
         assertEq(pool.totalSupply(), totalAmount - defaultAmount);
     }
 
-    function testSuccess_ProcessDefaultTwoTranches(uint256 liquiditySenior, uint256 liquidityJunior, uint256 defaultAmount) public {
+    function testSuccess_processDefault_TwoTranches(uint256 liquiditySenior, uint256 liquidityJunior, uint256 defaultAmount) public {
         // Given: srTranche deposit liquiditySenior, jrTranche deposit liquidityJunior
         vm.assume(liquiditySenior <= type(uint256).max - liquidityJunior);
         uint256 totalAmount = uint256(liquiditySenior) + uint256(liquidityJunior);
@@ -1094,7 +1094,7 @@ contract DefaultTest is LendingPoolTest {
         assertFalse(pool.isTranche(address(jrTranche)));
     }
 
-    function testSuccess_ProcessDefaultAllTranches(uint256 liquiditySenior, uint256 liquidityJunior, uint256 defaultAmount) public {
+    function testSuccess_processDefault_AllTranches(uint256 liquiditySenior, uint256 liquidityJunior, uint256 defaultAmount) public {
         // Given: srTranche deposit liquiditySenior, jrTranche deposit liquidityJunior
         vm.assume(liquiditySenior <= type(uint256).max - liquidityJunior);
         uint256 totalAmount = uint256(liquiditySenior) + uint256(liquidityJunior);
@@ -1118,6 +1118,81 @@ contract DefaultTest is LendingPoolTest {
         assertFalse(pool.isTranche(address(srTranche)));
 
     //ToDo Remaining Liquidity stuck in pool now, emergency procedure?
+    }
+
+}
+
+/*//////////////////////////////////////////////////////////////
+                    LIQUIDATION LOGIC
+//////////////////////////////////////////////////////////////*/
+contract VaultTest is LendingPoolTest {
+    using stdStorage for StdStorage;
+
+    function setUp() override public {
+        super.setUp();
+
+        vm.startPrank(creator);
+        pool.setFeeWeight(10);
+        //Set Tranche weight on 0 so that all yield goes to treasury
+        pool.addTranche(address(srTranche), 50);
+        pool.addTranche(address(jrTranche), 40);
+        pool.updateInterestRate(5 * 10**16); //5% with 18 decimals precision
+
+        debt = new DebtToken(address(pool));
+        pool.setDebtToken(address(debt));
+        vm.stopPrank();
+
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+
+        vm.prank(address(srTranche));
+        pool.deposit(type(uint128).max, liquidityProvider);
+
+        vm.startPrank(vaultOwner);
+        vault = Vault(factory.createVault(1));
+        vm.stopPrank();
+
+        vm.prank(creator);
+        pool.setLiquidator(liquidator);
+    }
+
+    function testRevert_openMarginAccount_NonVault(address unprivilegedAddress) public {
+        // Given: sender is not a vault
+        vm.assume(unprivilegedAddress != address(vault));
+
+        // When: sender wants to open a margin account
+        // Then: openMarginAccount should revert with "LP_OMA: Not a vault"
+        vm.startPrank(unprivilegedAddress);
+        vm.expectRevert("LP_OMA: Not a vault");
+        pool.openMarginAccount();
+        vm.stopPrank();
+    }
+
+    function testSucces_openMarginAccount() public {
+        //Given: sender is a vault
+        vm.startPrank(address(vault));
+
+        //When: vault opens a margin account
+        (bool succes, address basecurrency, address liquidator_) = pool.openMarginAccount();
+
+        //Then: openMarginAccount should return succes and correct contract addresses
+        assertTrue(succes);
+        assertEq(address(asset), basecurrency);
+        assertEq(liquidator, liquidator_);
+    }
+
+    function testSucces_getOpenPosition(uint128 amountLoaned) public {
+        //Given a vault has taken out debt
+        vm.assume(amountLoaned > 0);
+        vault.setTotalValue(amountLoaned);
+        vm.prank(vaultOwner);
+        pool.borrow(amountLoaned, address(vault), vaultOwner);
+
+        //When: The vault fetches its open position
+        uint128 openPosition = pool.getOpenPosition(address(vault));
+
+        //Then: The open position should equal the amount loaned
+        assertEq(amountLoaned, openPosition);
     }
 
 }
