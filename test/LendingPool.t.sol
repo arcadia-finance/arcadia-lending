@@ -1168,20 +1168,20 @@ contract VaultTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSucces_openMarginAccount() public {
+    function testSuccess_openMarginAccount() public {
         //Given: sender is a vault
         vm.startPrank(address(vault));
 
         //When: vault opens a margin account
-        (bool succes, address basecurrency, address liquidator_) = pool.openMarginAccount();
+        (bool success, address basecurrency, address liquidator_) = pool.openMarginAccount();
 
         //Then: openMarginAccount should return succes and correct contract addresses
-        assertTrue(succes);
+        assertTrue(success);
         assertEq(address(asset), basecurrency);
         assertEq(liquidator, liquidator_);
     }
 
-    function testSucces_getOpenPosition(uint128 amountLoaned) public {
+    function testSuccess_getOpenPosition(uint128 amountLoaned) public {
         //Given a vault has taken out debt
         vm.assume(amountLoaned > 0);
         vault.setTotalValue(amountLoaned);
