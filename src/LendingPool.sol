@@ -31,7 +31,6 @@ contract LendingPool is Owned {
 
     address public vaultFactory;
     ERC20 public immutable asset;
-    uint256 public immutable baseCurrency;
 
     /**
      * @notice The constructor for a lending pool
@@ -51,7 +50,6 @@ contract LendingPool is Owned {
         name = string(abi.encodePacked("Arcadia ", _asset.name(), " Pool"));
         symbol = string(abi.encodePacked("arc", _asset.symbol()));
         decimals = _asset.decimals();
-        baseCurrency = 0; //ToDo: should correspond to the underlying asset in the mainregistry
     }
     // Lending Pool Metadata
     string public name;
@@ -265,7 +263,7 @@ contract LendingPool is Owned {
         }
 
         //Call vault to check if there is sufficient collateral
-        require(IVault(vault).increaseMarginPosition(baseCurrency, amount), 'LP_TL: Reverted');
+        require(IVault(vault).increaseMarginPosition(address(asset), amount), 'LP_TL: Reverted');
 
         //Process interests since last update
         _syncInterests();
@@ -301,7 +299,7 @@ contract LendingPool is Owned {
         ERC4626(debtToken).withdraw(transferAmount, vault, vault);
 
         //Call vault to unlock collateral
-        require(IVault(vault).decreaseMarginPosition(baseCurrency, transferAmount), 'LP_RL: Reverted');
+        require(IVault(vault).decreaseMarginPosition(address(asset), transferAmount), 'LP_RL: Reverted');
 
         //Update interest rates
         _updateInterestRate();
@@ -402,12 +400,10 @@ contract LendingPool is Owned {
                 ++i;
             }
         }
-        totalSupply += assets - remainingAssets;
+        totalSupply += assets;
 
         // Add the remainingAssets to the treasury balance
-        supplyBalances[treasury] += remainingAssets;
-        totalSupply += remainingAssets;
-        
+        supplyBalances[treasury] += remainingAssets;        
     }
 
     //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.

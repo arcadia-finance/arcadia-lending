@@ -61,7 +61,6 @@ contract DeploymentTest is LendingPoolTest {
         super.setUp();
     }
 
-    //Deployment
     function testSuccess_deployment() public {
         assertEq(pool.name(), string("Arcadia Asset Pool"));
         assertEq(pool.symbol(), string("arcASSET"));
@@ -80,7 +79,6 @@ contract TranchesTest is LendingPoolTest {
         super.setUp();
     }
 
-    //addTranche
     function testRevert_addTranche_InvalidOwner(address unprivilegedAddress) public {
         // Given: unprivilegedAddress is not the creator
         vm.assume(unprivilegedAddress != creator);
@@ -140,7 +138,6 @@ contract TranchesTest is LendingPoolTest {
         assertTrue(pool.isTranche(address(jrTranche)));
     }
 
-    //setWeight
     function testRevert_setWeight_InvalidOwner(address unprivilegedAddress) public {
         // Given: all neccesary contracts are deployed on the setup
         vm.assume(unprivilegedAddress != creator);
@@ -175,7 +172,6 @@ contract TranchesTest is LendingPoolTest {
         assertEq(pool.weights(0), 40);
     }
 
-    //popTranche
     function testSuccess_popTranche() public {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
@@ -206,7 +202,6 @@ contract ProtocolFeeTest is LendingPoolTest {
         super.setUp();
     }
 
-    //setFeeWeight
     function testRevert_setFeeWeight_InvalidOwner(address unprivilegedAddress) public {
         // Given: all neccesary contracts are deployed on the setup
         vm.assume(unprivilegedAddress != creator);
@@ -335,7 +330,6 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         assertEq(asset.balanceOf(address(pool)), totalAmount);
     }
 
-    //withdraw
     function testRevert_withdraw_Unauthorised(uint256 assetsWithdrawn, address receiver, address unprivilegedAddress) public {
         // Given: unprivilegedAddress is not srTranche, liquidityProvider approve max value
         vm.assume(unprivilegedAddress != address(srTranche));
@@ -418,7 +412,6 @@ contract LoanTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    //setDebtToken
     function testRevert_setDebtToken_InvalidOwner(address unprivilegedAddress) public {
         // Given: unprivilegedAddress is not creator
         vm.assume(unprivilegedAddress != creator);
@@ -477,7 +470,6 @@ contract LoanTest is LendingPoolTest {
         assertEq(pool.creditAllowance(address(vault), beneficiary), amount);
     }
 
-    //borrow
     function testRevert_borrow_NonVault(uint256 amount, address nonVault, address to) public {
         // Given: nonVault is not vault
         vm.assume(nonVault != address(vault));
@@ -664,7 +656,6 @@ contract LoanTest is LendingPoolTest {
         assertEq(pool.creditAllowance(address(vault), beneficiary), type(uint256).max);
     }
 
-    //repay
     function testRevert_repay_NonVault(uint256 amount, address nonVault) public {
         // Given: nonVault is not vault
         vm.assume(nonVault != address(vault));
@@ -841,11 +832,10 @@ contract InterestsTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    //_syncInterestsToLiquidityPool
-    function testSuccess_syncInterests_ToLiquidityPoolExact() public {
+    function testSuccess_syncInterestsToLendingPool_Exact() public {
         // Given: all necessary contracts are deployed on the setup
         vm.prank(creator);
-        // When: creator testSyncInterestsToLiquidityPool with 100
+        // When: creator testSyncInterestsToLendingPool with 100
         pool.testSyncInterestsToLendingPool(100);
 
         // Then: supplyBalances srTranche should be equal to 50, supplyBalances jrTranche should be equal to 40,
@@ -856,10 +846,10 @@ contract InterestsTest is LendingPoolTest {
         assertEq(pool.totalSupply(), 100);
     }
 
-    function testSuccess_syncInterests_ToLiquidityPoolRounded() public {
+    function testSuccess_syncInterestsToLendingPool_Rounded() public {
         // Given: all necessary contracts are deployed on the setup
         vm.prank(creator);
-        // When: creator testSyncInterestsToLiquidityPool with 99
+        // When: creator testSyncInterestsToLendingPool with 99
         pool.testSyncInterestsToLendingPool(99);
 
         // Then: supplyBalances srTranche should be equal to 50, supplyBalances jrTranche should be equal to 40,
@@ -870,7 +860,6 @@ contract InterestsTest is LendingPoolTest {
         assertEq(pool.totalSupply(), 99);
     }
 
-    //_calcUnrealisedDebt
     function testSuccess_calcUnrealisedDebt_Unchecked(uint64 interestRate, uint24 deltaBlocks, uint128 realisedDebt) public {
         // Given: interestRate is %1000, deltaBlocks is 5 years, realisedDebt is 3402823669209384912995114146594816
         vm.assume(interestRate <= 10 * 10**18); //1000%
