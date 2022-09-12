@@ -400,12 +400,10 @@ contract LendingPool is Owned {
                 ++i;
             }
         }
-        totalSupply += assets - remainingAssets;
+        totalSupply += assets;
 
         // Add the remainingAssets to the treasury balance
-        supplyBalances[treasury] += remainingAssets;
-        totalSupply += remainingAssets;
-        
+        supplyBalances[treasury] += remainingAssets;        
     }
 
     //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
