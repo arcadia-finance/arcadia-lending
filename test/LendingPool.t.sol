@@ -997,7 +997,10 @@ contract DefaultTest is LendingPoolTest {
     }
 
     function testRevert_settleLiquidation_Unauthorised(uint256 defaultAmount, uint256 deficitAmount, address unprivilegedAddress) public {
-        // Given: unprivilegedAddress is not the liquidator
+        // Given: The liquidator is set
+        vm.prank(creator);
+        pool.setLiquidator(liquidator);
+        // And: unprivilegedAddress is not the liquidator
         vm.assume(unprivilegedAddress != liquidator);
 
         vm.startPrank(unprivilegedAddress);
