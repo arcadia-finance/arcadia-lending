@@ -1,8 +1,8 @@
-/** 
-    Created by Arcadia Finance
-    https://www.arcadia.finance
-
-    SPDX-License-Identifier: BUSL-1.1
+/**
+ * Created by Arcadia Finance
+ * https://www.arcadia.finance
+ *
+ * SPDX-License-Identifier: BUSL-1.1
  */
 pragma solidity ^0.8.13;
 
@@ -14,7 +14,6 @@ import "../src/Tranche.sol";
 import "../src/DebtToken.sol";
 
 abstract contract DebtTokenTest is Test {
-
     Asset asset;
     Factory factory;
     LendingPool pool;
@@ -41,10 +40,10 @@ abstract contract DebtTokenTest is Test {
     }
 
     //Before Each
-    function setUp() virtual public {
+    function setUp() public virtual {
         vm.startPrank(creator);
         pool = new LendingPool(asset, treasury, address(factory));
-        pool.updateInterestRate(5 * 10**16); //5% with 18 decimals precision
+        pool.updateInterestRate(5 * 10 ** 16); //5% with 18 decimals precision
 
         debt = new DebtToken(address(pool));
         pool.setDebtToken(address(debt));
@@ -62,8 +61,7 @@ abstract contract DebtTokenTest is Test {
                         DEPLOYMENT
 //////////////////////////////////////////////////////////////*/
 contract DeploymentTest is DebtTokenTest {
-
-    function setUp() override public {
+    function setUp() public override {
         super.setUp();
     }
 
@@ -73,7 +71,7 @@ contract DeploymentTest is DebtTokenTest {
 
         // When: debt is DebtToken
 
-        // Then: debt's name should be Arcadia Asset Debt, symbol should be darcASSET, 
+        // Then: debt's name should be Arcadia Asset Debt, symbol should be darcASSET,
         //       decimals should be 18, lendingPool should return pool address
         assertEq(debt.name(), string("Arcadia Asset Debt"));
         assertEq(debt.symbol(), string("darcASSET"));
@@ -86,8 +84,7 @@ contract DeploymentTest is DebtTokenTest {
                     DEPOSIT/WITHDRAWAL LOGIC
 //////////////////////////////////////////////////////////////*/
 contract DepositAndWithdrawalTest is DebtTokenTest {
-
-    function setUp() override public {
+    function setUp() public override {
         super.setUp();
     }
 
@@ -105,7 +102,6 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
 
     function testRevert_deposit_ZeroShares(address receiver) public {
         // Given: all neccesary contracts are deployed on the setup
-
 
         vm.startPrank(address(pool));
         // When: depositing zero shares
@@ -152,7 +148,14 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
         vm.stopPrank();
     }
 
-    function testRevert_withdraw_InsufficientAssets(uint128 assetsDeposited, uint128 assetsWithdrawn, address receiver, address owner) public {
+    function testRevert_withdraw_InsufficientAssets(
+        uint128 assetsDeposited,
+        uint128 assetsWithdrawn,
+        address receiver,
+        address owner
+    )
+        public
+    {
         // Given: assetsDeposited are bigger than 0 but less than assetsWithdrawn
         vm.assume(assetsDeposited > 0);
         vm.assume(assetsDeposited < assetsWithdrawn);
@@ -167,7 +170,9 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
         vm.stopPrank();
     }
 
-    function testSuccess_withdraw(uint128 assetsDeposited, uint128 assetsWithdrawn, address receiver, address owner) public {
+    function testSuccess_withdraw(uint128 assetsDeposited, uint128 assetsWithdrawn, address receiver, address owner)
+        public
+    {
         // Given: assetsDeposited are bigger than 0 and bigger than or equal to assetsWithdrawn
         vm.assume(assetsDeposited > 0);
         vm.assume(assetsDeposited >= assetsWithdrawn);
@@ -202,12 +207,18 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
                         INTERESTS LOGIC
 //////////////////////////////////////////////////////////////*/
 contract InterestTest is DebtTokenTest {
-
-    function setUp() override public {
+    function setUp() public override {
         super.setUp();
     }
 
-    function testRevert_syncInterests_Unauthorised(uint128 assetsDeposited, uint128 interests, address owner, address unprivilegedAddress) public {
+    function testRevert_syncInterests_Unauthorised(
+        uint128 assetsDeposited,
+        uint128 interests,
+        address owner,
+        address unprivilegedAddress
+    )
+        public
+    {
         // Given: unprivilegedAddress is not pool, assetsDeposited are bigger than zero but less than maximum uint128 value
         vm.assume(unprivilegedAddress != address(pool));
 
@@ -252,14 +263,13 @@ contract InterestTest is DebtTokenTest {
 //////////////////////////////////////////////////////////////*/
 
 contract TransferTest is DebtTokenTest {
-
-    function setUp() override public {
+    function setUp() public override {
         super.setUp();
     }
 
     function testRevert_approve(address spender, uint256 amount, address sender) public {
         // Given: all neccesary contracts are deployed on the setup
-        
+
         vm.startPrank(sender);
         // When: sender approve
         // Then: approve should revert with APPROVE_NOT_SUPPORTED
@@ -270,7 +280,7 @@ contract TransferTest is DebtTokenTest {
 
     function testRevert_transfer(address to, uint256 amount, address sender) public {
         // Given: all neccesary contracts are deployed on the setup
-        
+
         vm.startPrank(sender);
         // When: sender transfer
         // Then: transfer should revert with TRANSFER_NOT_SUPPORTED
@@ -281,7 +291,7 @@ contract TransferTest is DebtTokenTest {
 
     function testRevert_transferFrom(address from, address to, uint256 amount, address sender) public {
         // Given: all neccesary contracts are deployed on the setup
-        
+
         vm.startPrank(sender);
         // When: sender transferFrom
         // Then: transferFrom should revert with TRANSFERFROM_NOT_SUPPORTED
@@ -290,9 +300,20 @@ contract TransferTest is DebtTokenTest {
         vm.stopPrank();
     }
 
-    function testRevert_permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s, address sender) public {
+    function testRevert_permit(
+        address owner,
+        address spender,
+        uint256 value,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s,
+        address sender
+    )
+        public
+    {
         // Given: all neccesary contracts are deployed on the setup
-        
+
         vm.startPrank(sender);
         // When: sender permit
         // Then: permit should revert with PERMIT_NOT_SUPPORTED
@@ -300,5 +321,4 @@ contract TransferTest is DebtTokenTest {
         debt.permit(owner, spender, value, deadline, v, r, s);
         vm.stopPrank();
     }
-
 }

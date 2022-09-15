@@ -1,7 +1,7 @@
-/** 
-    Created by Arcadia Finance
-    https://www.arcadia.finance
-    SPDX-License-Identifier: BUSL-1.1
+/**
+ * Created by Arcadia Finance
+ * https://www.arcadia.finance
+ * SPDX-License-Identifier: BUSL-1.1
  */
 pragma solidity ^0.8.13;
 
@@ -25,13 +25,14 @@ contract DebtToken is ERC4626, Owned {
      * @notice The constructor for the debt token
      * @param _lendingPool the Lending Pool of the underlying ERC-20 token, with the lending logic.
      */
-    constructor(
-        address _lendingPool
-    ) ERC4626(
-        ILendingPool(address(_lendingPool)).asset(),
-        string(abi.encodePacked("Arcadia ", ILendingPool(_lendingPool).asset().name(), " Debt")),
-        string(abi.encodePacked("darc", ILendingPool(_lendingPool).asset().symbol()))
-    ) Owned(msg.sender) {
+    constructor(address _lendingPool)
+        ERC4626(
+            ILendingPool(address(_lendingPool)).asset(),
+            string(abi.encodePacked("Arcadia ", ILendingPool(_lendingPool).asset().name(), " Debt")),
+            string(abi.encodePacked("darc", ILendingPool(_lendingPool).asset().symbol()))
+        )
+        Owned(msg.sender)
+    {
         lendingPool = ILendingPool(_lendingPool);
     }
 
@@ -76,7 +77,7 @@ contract DebtToken is ERC4626, Owned {
     }
 
     function mint(uint256, address) public pure override returns (uint256) {
-        revert('MINT_NOT_SUPPORTED');
+        revert("MINT_NOT_SUPPORTED");
     }
 
     /**
@@ -86,11 +87,12 @@ contract DebtToken is ERC4626, Owned {
      * @param owner_ The Arcadia vault with collateral covering the loan
      * @return shares The corresponding amount of debt shares redeemed
      */
-    function withdraw(
-        uint256 assets,
-        address receiver,
-        address owner_
-    ) public override onlyLendingPool returns (uint256 shares) {
+    function withdraw(uint256 assets, address receiver, address owner_)
+        public
+        override
+        onlyLendingPool
+        returns (uint256 shares)
+    {
         shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
 
         _burn(owner_, shares);
@@ -98,11 +100,10 @@ contract DebtToken is ERC4626, Owned {
         totalDebt -= assets;
 
         emit Withdraw(msg.sender, receiver, owner_, assets, shares);
-
     }
 
     function redeem(uint256, address, address) public pure override returns (uint256) {
-        revert('REDEEM_NOT_SUPPORTED');
+        revert("REDEEM_NOT_SUPPORTED");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -113,8 +114,8 @@ contract DebtToken is ERC4626, Owned {
      * @notice Realises interest for all open debt positions
      * @param assets The total amount of assets of the underlying ERC-20 tokens that needs to be paid as interests
      * @dev Calculation of the amount of interests since last sync is done in the Lending Pool.
-     *      After calculation, the Lending Pool pays out the interests to the Liquidity Providers,
-     *      and calls this Debt Token contract to add the intersts to the outstanding debt.
+     * After calculation, the Lending Pool pays out the interests to the Liquidity Providers,
+     * and calls this Debt Token contract to add the intersts to the outstanding debt.
      */
     function syncInterests(uint256 assets) public onlyLendingPool {
         totalDebt += assets;
@@ -125,27 +126,19 @@ contract DebtToken is ERC4626, Owned {
     //////////////////////////////////////////////////////////////*/
 
     function approve(address, uint256) public pure override returns (bool) {
-        revert('APPROVE_NOT_SUPPORTED');
+        revert("APPROVE_NOT_SUPPORTED");
     }
 
     function transfer(address, uint256) public pure override returns (bool) {
-        revert('TRANSFER_NOT_SUPPORTED');
+        revert("TRANSFER_NOT_SUPPORTED");
     }
 
     function transferFrom(address, address, uint256) public pure override returns (bool) {
-        revert('TRANSFERFROM_NOT_SUPPORTED');
+        revert("TRANSFERFROM_NOT_SUPPORTED");
     }
 
-    function permit(
-        address,
-        address,
-        uint256,
-        uint256,
-        uint8,
-        bytes32,
-        bytes32
-    ) public pure override {
-        revert('PERMIT_NOT_SUPPORTED');
+    function permit(address, address, uint256, uint256, uint8, bytes32, bytes32) public pure override {
+        revert("PERMIT_NOT_SUPPORTED");
     }
 
     /* //////////////////////////////////////////////////////////////

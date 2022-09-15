@@ -1,8 +1,8 @@
-/** 
-    Created by Arcadia Finance
-    https://www.arcadia.finance
-
-    SPDX-License-Identifier: BUSL-1.1
+/**
+ * Created by Arcadia Finance
+ * https://www.arcadia.finance
+ *
+ * SPDX-License-Identifier: BUSL-1.1
  */
 pragma solidity ^0.8.13;
 
@@ -35,15 +35,14 @@ contract Tranche is ERC4626, Owned {
      * @param _prefixSymbol The prefix of the contract symbol (eg. SR  -> MZ -> JR)
      * @dev The name and symbol of the tranche are automatically generated, based on the name and symbol of the underlying token
      */
-    constructor(
-        address _lendingPool,
-        string memory _prefix,
-        string memory _prefixSymbol
-    ) ERC4626(
-        ILendingPool(address(_lendingPool)).asset(),
-        string(abi.encodePacked(_prefix, " Arcadia ", ILendingPool(_lendingPool).asset().name())),
-        string(abi.encodePacked(_prefixSymbol, "arc", ILendingPool(_lendingPool).asset().symbol()))
-    ) Owned(msg.sender) {
+    constructor(address _lendingPool, string memory _prefix, string memory _prefixSymbol)
+        ERC4626(
+            ILendingPool(address(_lendingPool)).asset(),
+            string(abi.encodePacked(_prefix, " Arcadia ", ILendingPool(_lendingPool).asset().name())),
+            string(abi.encodePacked(_prefixSymbol, "arc", ILendingPool(_lendingPool).asset().symbol()))
+        )
+        Owned(msg.sender)
+    {
         lendingPool = ILendingPool(_lendingPool);
     }
 
@@ -63,7 +62,7 @@ contract Tranche is ERC4626, Owned {
     /**
      * @notice Unlocks the tranche.
      * @dev Only the Owner can call this function, since tranches are locked due to complete defaults,
-     *      This function will only be called to partially refund existing share-holders after a default.
+     * This function will only be called to partially refund existing share-holders after a default.
      */
     function unLock() public onlyOwner {
         locked = false;
@@ -79,8 +78,8 @@ contract Tranche is ERC4626, Owned {
      * @param receiver The address that receives the minted shares.
      * @return shares The amount of shares minted
      * @dev This contract does not directly transfers the underlying assets from the sender to the receiver.
-     *      Instead it calls the deposit of the Lending Pool which calls the transferFrom of the underlying assets.
-     *      Hence the sender should not give this contract an allowance to transfer the underlying asset but the Lending Pool.
+     * Instead it calls the deposit of the Lending Pool which calls the transferFrom of the underlying assets.
+     * Hence the sender should not give this contract an allowance to transfer the underlying asset but the Lending Pool.
      */
     function deposit(uint256 assets, address receiver) public override notLocked returns (uint256 shares) {
         // Check for rounding error since we round down in previewDeposit.
@@ -100,8 +99,8 @@ contract Tranche is ERC4626, Owned {
      * @param receiver The address that receives the minted shares.
      * @return assets The corresponding amount of assets of the underlying ERC-20 token being deposited
      * @dev This contract does not directly transfers the underlying assets from the sender to the receiver.
-     *      Instead it calls the deposit of the Lending Pool which calls the transferFrom of the underlying assets.
-     *      Hence the sender should not give this contract an allowance to transfer the underlying asset but the Lending Pool.
+     * Instead it calls the deposit of the Lending Pool which calls the transferFrom of the underlying assets.
+     * Hence the sender should not give this contract an allowance to transfer the underlying asset but the Lending Pool.
      */
     function mint(uint256 shares, address receiver) public override notLocked returns (uint256 assets) {
         assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
@@ -121,17 +120,20 @@ contract Tranche is ERC4626, Owned {
      * @param owner_ The address of the owner of the assets being withdrawn
      * @return shares The corresponding amount of shares redeemed
      */
-    function withdraw(
-        uint256 assets,
-        address receiver,
-        address owner_
-    ) public override notLocked returns (uint256 shares) {
+    function withdraw(uint256 assets, address receiver, address owner_)
+        public
+        override
+        notLocked
+        returns (uint256 shares)
+    {
         shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
 
         if (msg.sender != owner_) {
             uint256 allowed = allowance[owner_][msg.sender]; // Saves gas for limited approvals.
 
-            if (allowed != type(uint256).max) allowance[owner_][msg.sender] = allowed - shares;
+            if (allowed != type(uint256).max) {
+                allowance[owner_][msg.sender] = allowed - shares;
+            }
         }
 
         ILendingPool(address(lendingPool)).withdraw(assets, receiver);
@@ -148,15 +150,18 @@ contract Tranche is ERC4626, Owned {
      * @param owner_ The address of the owner of the shares being redeemed
      * @return assets The corresponding amount of assets withdrawn
      */
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address owner_
-    ) public override notLocked returns (uint256 assets) {
+    function redeem(uint256 shares, address receiver, address owner_)
+        public
+        override
+        notLocked
+        returns (uint256 assets)
+    {
         if (msg.sender != owner_) {
             uint256 allowed = allowance[owner_][msg.sender]; // Saves gas for limited approvals.
 
-            if (allowed != type(uint256).max) allowance[owner_][msg.sender] = allowed - shares;
+            if (allowed != type(uint256).max) {
+                allowance[owner_][msg.sender] = allowed - shares;
+            }
         }
 
         // Check for rounding error since we round down in previewRedeem.
@@ -179,7 +184,7 @@ contract Tranche is ERC4626, Owned {
      * @dev The Liquidity Pool does the accounting of the outstanding claim on liquidity per tranche.
      */
     function totalAssets() public view override returns (uint256 assets) {
-        assets =  lendingPool.supplyBalances(address(this));
+        assets = lendingPool.supplyBalances(address(this));
     }
 
     /*//////////////////////////////////////////////////////////////
