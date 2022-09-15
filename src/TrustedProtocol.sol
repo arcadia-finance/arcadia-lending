@@ -1,8 +1,8 @@
-/** 
-    Created by Arcadia Finance
-    https://www.arcadia.finance
-
-    SPDX-License-Identifier: BUSL-1.1
+/**
+ * Created by Arcadia Finance
+ * https://www.arcadia.finance
+ *
+ * SPDX-License-Identifier: BUSL-1.1
  */
 pragma solidity ^0.8.13;
 
@@ -28,6 +28,5 @@ abstract contract TrustedProtocol {
      * @param vault The vault address.
      * @return openPosition The open position of the vault.
      */
-    function getOpenPosition(address vault) external virtual returns(uint128 openPosition);
-
+    function getOpenPosition(address vault) external virtual returns (uint128 openPosition);
 }

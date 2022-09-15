@@ -1,8 +1,8 @@
-/** 
-    Created by Arcadia Finance
-    https://www.arcadia.finance
-
-    SPDX-License-Identifier: BUSL-1.1
+/**
+ * Created by Arcadia Finance
+ * https://www.arcadia.finance
+ *
+ * SPDX-License-Identifier: BUSL-1.1
  */
 pragma solidity ^0.8.13;
 
@@ -39,11 +39,7 @@ contract LendingPool is Owned, TrustedProtocol {
      * @param _vaultFactory The address of the vault factory
      * @dev The name and symbol of the pool are automatically generated, based on the name and symbol of the underlying token
      */
-    constructor(
-        ERC20 _asset,
-        address _treasury,
-        address _vaultFactory
-    ) Owned(msg.sender) TrustedProtocol() {
+    constructor(ERC20 _asset, address _treasury, address _vaultFactory) Owned(msg.sender) TrustedProtocol() {
         asset = _asset;
         treasury = _treasury;
         vaultFactory = _vaultFactory;
@@ -52,13 +48,13 @@ contract LendingPool is Owned, TrustedProtocol {
         decimals = _asset.decimals();
     }
     // Lending Pool Metadata
+
     string public name;
     string public symbol;
     uint8 public immutable decimals;
 
     uint256 public totalSupply;
     mapping(address => uint256) public supplyBalances;
-
 
     /* //////////////////////////////////////////////////////////////
                             TRANCHES LOGIC
@@ -111,10 +107,10 @@ contract LendingPool is Owned, TrustedProtocol {
      * @notice Removes the tranche at the last index (most junior)
      * @param index The index of the last Tranche
      * @param tranche The address of the last Tranche
-     * @dev This function is only be called by the function _processDefault(uint256 assets), when there is a default as big (or bigger) 
-     *      as the complete principal of the most junior tranche
+     * @dev This function is only be called by the function _processDefault(uint256 assets), when there is a default as big (or bigger)
+     * as the complete principal of the most junior tranche
      * @dev Passing the input parameters to the function saves gas compared to reading the address and index of the last tranche from memory.
-     *      No need to be check if index and tranche are indeed of the last tranche since function is only called by _processDefault.
+     * No need to be check if index and tranche are indeed of the last tranche since function is only called by _processDefault.
      */
     function _popTranche(uint256 index, address tranche) internal {
         totalWeight -= weights[index];
@@ -130,7 +126,7 @@ contract LendingPool is Owned, TrustedProtocol {
      * @dev ToDo: Remove before deploying
      */
     function testPopTranche(uint256 index, address tranche) public {
-        _popTranche( index, tranche);
+        _popTranche(index, tranche);
     }
 
     /* ///////////////////////////////////////////////////////////////
@@ -169,8 +165,8 @@ contract LendingPool is Owned, TrustedProtocol {
      * @param from The address of the origin of the underlying ERC-20 token, who deposits assets via a Tranche
      * @dev This function can only be called by Tranches.
      * @dev IMPORTANT, this function deviates from the standard, instead of the parameter 'receiver':
-     *      (this is always msg.sender, a tranche), the second parameter is 'from':
-     *      (the origin of the underlying ERC-20 token, who deposits assets via a Tranche)
+     * (this is always msg.sender, a tranche), the second parameter is 'from':
+     * (the origin of the underlying ERC-20 token, who deposits assets via a Tranche)
      */
     function deposit(uint256 assets, address from) public onlyTranche {
         _syncInterests();
@@ -188,10 +184,7 @@ contract LendingPool is Owned, TrustedProtocol {
      * @param assets the amount of assets of the underlying ERC-20 token being withdrawn
      * @param receiver The address of the receiver of the underlying ERC-20 tokens
      */
-    function withdraw(
-        uint256 assets,
-        address receiver
-    ) public {
+    function withdraw(uint256 assets, address receiver) public {
         _syncInterests();
 
         require(supplyBalances[msg.sender] >= assets, "LP_W: Withdraw amount should be lower than the supplied balance");
@@ -251,17 +244,18 @@ contract LendingPool is Owned, TrustedProtocol {
      * @dev The sender might be different as the owner if they have the proper allowances
      */
     function borrow(uint256 amount, address vault, address to) public {
-
         require(IFactory(vaultFactory).isVault(vault), "LP_TL: Not a vault");
 
         //Check allowances to send underlying to to
         if (IVault(vault).owner() != msg.sender) {
             uint256 allowed = creditAllowance[vault][msg.sender];
-            if (allowed != type(uint256).max) creditAllowance[vault][msg.sender] = allowed - amount;
+            if (allowed != type(uint256).max) {
+                creditAllowance[vault][msg.sender] = allowed - amount;
+            }
         }
 
         //Call vault to check if there is sufficient collateral
-        require(IVault(vault).increaseMarginPosition(address(asset), amount), 'LP_TL: Reverted');
+        require(IVault(vault).increaseMarginPosition(address(asset), amount), "LP_TL: Reverted");
 
         //Process interests since last update
         _syncInterests();
@@ -269,7 +263,9 @@ contract LendingPool is Owned, TrustedProtocol {
         //Transfer fails if there is insufficient liquidity in pool
         asset.safeTransfer(to, amount);
 
-        if (amount != 0) ERC4626(debtToken).deposit(amount, vault);
+        if (amount != 0) {
+            ERC4626(debtToken).deposit(amount, vault);
+        }
 
         //Update interest rates
         _updateInterestRate();
@@ -279,11 +275,10 @@ contract LendingPool is Owned, TrustedProtocol {
      * @notice repays a loan
      * @param amount The amount of underlying ERC-20 tokens to be repaid
      * @param vault The address of the Arcadia Vault backing the loan
-     * @dev ToDo: should it be possible to trigger a repay on behalf of an other account, 
-     *      If so, work with allowances
+     * @dev ToDo: should it be possible to trigger a repay on behalf of an other account,
+     * If so, work with allowances
      */
     function repay(uint256 amount, address vault) public {
-
         require(IFactory(vaultFactory).isVault(vault), "LP_RL: Not a vault");
 
         //Process interests since last update
@@ -297,7 +292,7 @@ contract LendingPool is Owned, TrustedProtocol {
         ERC4626(debtToken).withdraw(transferAmount, vault, vault);
 
         //Call vault to unlock collateral
-        require(IVault(vault).decreaseMarginPosition(address(asset), transferAmount), 'LP_RL: Reverted');
+        require(IVault(vault).decreaseMarginPosition(address(asset), transferAmount), "LP_RL: Reverted");
 
         //Update interest rates
         _updateInterestRate();
@@ -312,20 +307,20 @@ contract LendingPool is Owned, TrustedProtocol {
     uint32 public lastSyncedBlock;
     uint256 public constant YEARLY_BLOCKS = 2628000;
 
-    /** 
+    /**
      * @notice Syncs all unrealised debt (= interest for LP and treasury).
      * @dev Calculates the unrealised debt since last sync, and realises it by minting an aqual amount of
-     *      debt tokens to all debt holders and interests to LPs and the treasury
-    */
+     * debt tokens to all debt holders and interests to LPs and the treasury
+     */
     function syncInterests() external {
         _syncInterests();
     }
 
-    /** 
+    /**
      * @notice Syncs all unrealised debt (= interest for LP and treasury).
      * @dev Calculates the unrealised debt since last sync, and realises it by minting an aqual amount of
-     *      debt tokens to all debt holders and interests to LPs and the treasury
-    */
+     * debt tokens to all debt holders and interests to LPs and the treasury
+     */
     function _syncInterests() internal {
         uint256 unrealisedDebt = uint256(_calcUnrealisedDebt());
 
@@ -336,15 +331,15 @@ contract LendingPool is Owned, TrustedProtocol {
         _syncInterestsToLendingPool(unrealisedDebt);
     }
 
-    /** 
+    /**
      * @notice Calculates the unrealised debt.
      * @dev To Find the unrealised debt over an amount of time, you need to calculate D[(1+r)^x-1].
-     *      The base of the exponential: 1 + r, is a 18 decimals fixed point number
-     *      with r the yearly interest rate.
-     *      The exponent of the exponential: x, is a 18 decimals fixed point number.
-     *      The exponent x is calculated as: the amount of blocks since last sync divided by the average of 
-     *      blocks produced over a year (using a 12s average block time).
-     *      _yearlyInterestRate = 1 + r expressed as 18 decimals fixed point number
+     * The base of the exponential: 1 + r, is a 18 decimals fixed point number
+     * with r the yearly interest rate.
+     * The exponent of the exponential: x, is a 18 decimals fixed point number.
+     * The exponent x is calculated as: the amount of blocks since last sync divided by the average of
+     * blocks produced over a year (using a 12s average block time).
+     * _yearlyInterestRate = 1 + r expressed as 18 decimals fixed point number
      */
     function _calcUnrealisedDebt() internal returns (uint256 unrealisedDebt) {
         uint256 realisedDebt = ERC4626(debtToken).totalAssets();
@@ -366,10 +361,7 @@ contract LendingPool is Owned, TrustedProtocol {
             //this won't overflow as long as opendebt < 3402823669209384912995114146594816
             //which is 3.4 million billion *10**18 decimals
 
-            unrealisedDebt = 
-                (realisedDebt * (LogExpMath.pow(base, exponent) - 1e18)) /
-                    1e18
-            ;
+            unrealisedDebt = (realisedDebt * (LogExpMath.pow(base, exponent) - 1e18)) / 1e18;
         }
 
         lastSyncedBlock = uint32(block.number);
@@ -380,17 +372,17 @@ contract LendingPool is Owned, TrustedProtocol {
         unrealisedDebt = _calcUnrealisedDebt();
     }
 
-    /** 
+    /**
      * @notice Syncs interest payments to the Lending providers and the treasury.
      * @param assets The total amount of underlying assets to be paid out as interests.
      * @dev The weight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
      * @dev The Shares for each Tranche are rounded up, if the treasury receives the remaining shares and will hence loose
-     *      part of their yield due to rounding errors (neglectable small).
+     * part of their yield due to rounding errors (neglectable small).
      */
     function _syncInterestsToLendingPool(uint256 assets) internal {
         uint256 remainingAssets = assets;
 
-        for (uint256 i; i < tranches.length; ) {
+        for (uint256 i; i < tranches.length;) {
             uint256 trancheShare = assets.mulDivUp(weights[i], totalWeight);
             supplyBalances[tranches[i]] += trancheShare;
             unchecked {
@@ -401,7 +393,7 @@ contract LendingPool is Owned, TrustedProtocol {
         totalSupply += assets;
 
         // Add the remainingAssets to the treasury balance
-        supplyBalances[treasury] += remainingAssets;        
+        supplyBalances[treasury] += remainingAssets;
     }
 
     //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
@@ -446,15 +438,15 @@ contract LendingPool is Owned, TrustedProtocol {
      * @param vault The contract address of the liquidator.
      * @param debt The amount of debt that was issued.
      * @dev At the start of the liquidation the debt tokens are already burned,
-     *      as such interests are not accrued during the liquidation.
+     * as such interests are not accrued during the liquidation.
      * @dev After the liquidation is finished, there are two options:
-     *        1) the collateral is auctioned for more than the debt position
-     *           and liquidator reward In this case the liquidator will transfer an equal amount
-     *           as the debt position to the Lending Pool.
-     *        2) the collateral is auctioned for less than the debt position
-     *           and keeper fee -> the vault became under-collateralised and we have a default event.
-     *           In this case the liquidator will call settleLiquidation() to settle the deficit.
-     *           the Liquidator will transfer any remaining funds to the Lending Pool.
+     * 1) the collateral is auctioned for more than the debt position
+     * and liquidator reward In this case the liquidator will transfer an equal amount
+     * as the debt position to the Lending Pool.
+     * 2) the collateral is auctioned for less than the debt position
+     * and keeper fee -> the vault became under-collateralised and we have a default event.
+     * In this case the liquidator will call settleLiquidation() to settle the deficit.
+     * the Liquidator will transfer any remaining funds to the Lending Pool.
      */
     function liquidateVault(address vault, uint256 debt) public onlyLiquidator {
         ERC4626(debtToken).withdraw(debt, vault, vault);
@@ -464,11 +456,11 @@ contract LendingPool is Owned, TrustedProtocol {
      * @notice Settles bad debt of liquidations.
      * @param default_ The amount of debt.that was not recouped by the auction
      * @param deficit The amount of debt that has to be repaid to the liquidator,
-     *                if the liquidation fee was bigger than the auction proceeds
+     * if the liquidation fee was bigger than the auction proceeds
      * @dev This function is called by the Liquidator after a liquidation is finished,
-     *      but only if there is bad debt.
+     * but only if there is bad debt.
      * @dev The liquidator will transfer the auction proceeds (the underlying asset)
-     *      Directly back to the liquidity pool after liquidation.
+     * Directly back to the liquidity pool after liquidation.
      */
     function settleLiquidation(uint256 default_, uint256 deficit) public onlyLiquidator {
         if (deficit != 0) {
@@ -483,7 +475,7 @@ contract LendingPool is Owned, TrustedProtocol {
      * @param assets The total amount of underlying assets that need to be written off as bad debt.
      * @dev The order of the tranches is important, the most senior tranche is at index 0, the most junior at the last index.
      * @dev The most junior tranche will loose its underlying capital first. If all liquidty of a certain Tranche is written off,
-     *      the complete tranche is locked and removed. If there is still remaining bad debt, the next Tranche starts losing capital.
+     * the complete tranche is locked and removed. If there is still remaining bad debt, the next Tranche starts losing capital.
      */
     function _processDefault(uint256 assets) internal {
         if (totalSupply < assets) {
@@ -491,8 +483,10 @@ contract LendingPool is Owned, TrustedProtocol {
             assets = totalSupply;
         }
 
-        for (uint256 i = tranches.length; i > 0; ) {
-            unchecked {--i;}
+        for (uint256 i = tranches.length; i > 0;) {
+            unchecked {
+                --i;
+            }
             address tranche = tranches[i];
             uint256 maxBurned = supplyBalances[tranche];
             if (assets < maxBurned) {
@@ -514,7 +508,6 @@ contract LendingPool is Owned, TrustedProtocol {
 
         //ToDo Although it should be an impossible state if the protocol functions as it should,
         //What if there is still more liquidity in the pool than totalSupply, start an emergency procedure?
-
     }
 
     //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
@@ -529,7 +522,12 @@ contract LendingPool is Owned, TrustedProtocol {
     /**
      * @inheritdoc TrustedProtocol
      */
-    function openMarginAccount() external override view returns (bool success, address baseCurrency, address liquidator_) {
+    function openMarginAccount()
+        external
+        view
+        override
+        returns (bool success, address baseCurrency, address liquidator_)
+    {
         require(IFactory(vaultFactory).isVault(msg.sender), "LP_OMA: Not a vault");
         //Todo: Check if vaultversion etc is ok
         success = true;
@@ -540,10 +538,9 @@ contract LendingPool is Owned, TrustedProtocol {
     /**
      * @inheritdoc TrustedProtocol
      */
-    function getOpenPosition(address vault) external override returns(uint128 openPosition) {
+    function getOpenPosition(address vault) external override returns (uint128 openPosition) {
         //ToDo: When ERC-4626 is correctly implemented, It should not be necessary to first sync interests.
         _syncInterests();
         openPosition = uint128(ERC4626(debtToken).maxWithdraw(vault));
     }
-
 }
