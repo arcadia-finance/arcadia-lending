@@ -5,10 +5,7 @@
  */
 pragma solidity ^0.8.13;
 
-import "../lib/solmate/src/auth/Owned.sol";
-import "../lib/solmate/src/mixins/ERC4626.sol";
-import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
-import "./interfaces/ILendingPool.sol";
+import {ERC20, ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
 
 /**
  * @title Debt Token
@@ -16,30 +13,19 @@ import "./interfaces/ILendingPool.sol";
  * @notice The Logic to do the debt accounting for a lending pool for a certain ERC20 token
  * @dev Protocol is according the ERC4626 standard, with a certain ERC20 as underlying
  */
-contract DebtToken is ERC4626, Owned {
-    using SafeTransferLib for ERC20;
-
-    ILendingPool lendingPool;
+abstract contract DebtToken is ERC4626 {
 
     /**
      * @notice The constructor for the debt token
-     * @param _lendingPool the Lending Pool of the underlying ERC-20 token, with the lending logic.
+     * @param asset The underlying ERC-20 token in which the debt is denominated
      */
-    constructor(address _lendingPool)
+    constructor(ERC20 asset)
         ERC4626(
-            ILendingPool(address(_lendingPool)).asset(),
-            string(abi.encodePacked("Arcadia ", ILendingPool(_lendingPool).asset().name(), " Debt")),
-            string(abi.encodePacked("darc", ILendingPool(_lendingPool).asset().symbol()))
+            asset,
+            string(abi.encodePacked("Arcadia ", asset.name(), " Debt")),
+            string(abi.encodePacked("darc", asset.symbol()))
         )
-        Owned(msg.sender)
-    {
-        lendingPool = ILendingPool(_lendingPool);
-    }
-
-    modifier onlyLendingPool() {
-        require(address(lendingPool) == msg.sender, "UNAUTHORIZED");
-        _;
-    }
+    {}
 
     /*//////////////////////////////////////////////////////////////
                             DEBT LOGIC
@@ -58,14 +44,18 @@ contract DebtToken is ERC4626, Owned {
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    function deposit(uint256, address) public pure override returns (uint256) {
+        revert("DEPOSIT_NOT_SUPPORTED");
+    }
+
     /**
      * @notice Modification of the standard ERC-4626 deposit implementation
      * @param assets The amount of assets of the underlying ERC-20 token being loaned out
      * @param receiver The Arcadia vault with collateral covering the loan
      * @return shares The corresponding amount of debt shares minted
-     * @dev Only the Lending Pool can issue debt
+     * @dev Only the Lending Pool (which inherits thios contract) can issue debt
      */
-    function deposit(uint256 assets, address receiver) public override onlyLendingPool returns (uint256 shares) {
+    function _deposit(uint256 assets, address receiver) internal returns (uint256 shares) {
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
@@ -80,17 +70,26 @@ contract DebtToken is ERC4626, Owned {
         revert("MINT_NOT_SUPPORTED");
     }
 
+    function withdraw(uint256, address, address)
+        public
+        pure
+        override
+        returns (uint256)
+    {
+        revert("WITHDRAW_NOT_SUPPORTED");
+
+    }
+
     /**
      * @notice Modification of the standard ERC-4626 withdraw implementation
      * @param assets The amount of assets of the underlying ERC-20 token being paid back
      * @param receiver Will always be the Lending Pool
      * @param owner_ The Arcadia vault with collateral covering the loan
      * @return shares The corresponding amount of debt shares redeemed
+     * @dev Only the Lending Pool (which inherits thios contract) can issue debt
      */
-    function withdraw(uint256 assets, address receiver, address owner_)
-        public
-        override
-        onlyLendingPool
+    function _withdraw(uint256 assets, address receiver, address owner_)
+        internal
         returns (uint256 shares)
     {
         shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
@@ -104,21 +103,6 @@ contract DebtToken is ERC4626, Owned {
 
     function redeem(uint256, address, address) public pure override returns (uint256) {
         revert("REDEEM_NOT_SUPPORTED");
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            INTERESTS LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    /**
-     * @notice Realises interest for all open debt positions
-     * @param assets The total amount of assets of the underlying ERC-20 tokens that needs to be paid as interests
-     * @dev Calculation of the amount of interests since last sync is done in the Lending Pool.
-     * After calculation, the Lending Pool pays out the interests to the Liquidity Providers,
-     * and calls this Debt Token contract to add the intersts to the outstanding debt.
-     */
-    function syncInterests(uint256 assets) public onlyLendingPool {
-        totalDebt += assets;
     }
 
     /*//////////////////////////////////////////////////////////////
