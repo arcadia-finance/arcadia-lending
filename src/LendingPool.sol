@@ -6,31 +6,58 @@
  */
 pragma solidity ^0.8.13;
 
-import "../lib/solmate/src/auth/Owned.sol";
+import {Owned} from "../lib/solmate/src/auth/Owned.sol";
 import {Auth} from "../lib/solmate/src/auth/Auth.sol";
-import "../lib/solmate/src/tokens/ERC20.sol";
-import "../lib/solmate/src/mixins/ERC4626.sol";
+import {ERC20, ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
 import {FixedPointMathLib} from "../lib/solmate/src/utils/FixedPointMathLib.sol";
 import {LogExpMath} from "./utils/LogExpMath.sol";
 import "./interfaces/ITranche.sol";
-import "./interfaces/IDebtToken.sol";
 import "./interfaces/IFactory.sol";
 import "./interfaces/IVault.sol";
 import "./interfaces/ILendingPool.sol";
-import "./TrustedProtocol.sol";
+import {TrustedProtocol} from "./TrustedProtocol.sol";
+import {DebtToken} from "./DebtToken.sol";
 
 /**
  * @title Lending Pool
  * @author Arcadia Finance
  * @notice The Lending pool contains the main logic to provide liquidity and take or repay loans for a certain asset
  */
-contract LendingPool is Owned, TrustedProtocol {
+contract LendingPool is Owned, TrustedProtocol, DebtToken {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
+    uint256 public constant YEARLY_BLOCKS = 2628000;
+
+    uint64 public interestRate; //18 decimals precision
+    uint32 public lastSyncedBlock;
+    uint256 public totalWeight;
+    uint256 public totalRedeemableAssets;
+    uint256 public feeWeight;
+
+    address public treasury;
+    address public liquidator;
     address public vaultFactory;
-    ERC20 public immutable asset;
+
+    uint256[] public weights;
+    address[] public tranches;
+
+    mapping(address => bool) public isTranche;
+    mapping(address => uint256) public redeemableAssetsOf;
+    mapping(address => mapping(address => uint256)) public creditAllowance;
+
+    event CreditApproval(address indexed vault, address indexed beneficiary, uint256 amount);
+
+    modifier onlyLiquidator() {
+        require(liquidator == msg.sender, "UNAUTHORIZED");
+        _;
+    }
+
+    modifier onlyTranche() {
+        require(isTranche[msg.sender], "UNAUTHORIZED");
+        _;
+    }
 
     /**
      * @notice The constructor for a lending pool
@@ -39,39 +66,14 @@ contract LendingPool is Owned, TrustedProtocol {
      * @param _vaultFactory The address of the vault factory
      * @dev The name and symbol of the pool are automatically generated, based on the name and symbol of the underlying token
      */
-    constructor(ERC20 _asset, address _treasury, address _vaultFactory) Owned(msg.sender) TrustedProtocol() {
-        asset = _asset;
+    constructor(ERC20 _asset, address _treasury, address _vaultFactory) Owned(msg.sender) TrustedProtocol() DebtToken(_asset) {
         treasury = _treasury;
         vaultFactory = _vaultFactory;
-        name = string(abi.encodePacked("Arcadia ", _asset.name(), " Pool"));
-        symbol = string(abi.encodePacked("arc", _asset.symbol()));
-        decimals = _asset.decimals();
     }
-    // Lending Pool Metadata
-
-    string public name;
-    string public symbol;
-    uint8 public immutable decimals;
-
-    uint256 public totalSupply;
-    mapping(address => uint256) public supplyBalances;
 
     /* //////////////////////////////////////////////////////////////
                             TRANCHES LOGIC
     ////////////////////////////////////////////////////////////// */
-
-    uint256 public totalWeight;
-
-    // Tranche
-    uint256[] public weights;
-    address[] public tranches;
-
-    mapping(address => bool) public isTranche;
-
-    modifier onlyTranche() {
-        require(isTranche[msg.sender], "UNAUTHORIZED");
-        _;
-    }
 
     /**
      * @notice Adds a tranche to the Lending Pool
@@ -133,9 +135,6 @@ contract LendingPool is Owned, TrustedProtocol {
                     PROTOCOL FEE CONFIGURATION
     ////////////////////////////////////////////////////////////// */
 
-    uint256 public feeWeight;
-    address public treasury;
-
     /**
      * @notice Changes the weight of the protocol fee
      * @param _feeWeight The new weight of the protocol fee
@@ -168,13 +167,13 @@ contract LendingPool is Owned, TrustedProtocol {
      * (this is always msg.sender, a tranche), the second parameter is 'from':
      * (the origin of the underlying ERC-20 token, who deposits assets via a Tranche)
      */
-    function deposit(uint256 assets, address from) public onlyTranche {
+    function depositInLendingPool(uint256 assets, address from) public onlyTranche {
         _syncInterests();
 
         asset.safeTransferFrom(from, address(this), assets);
 
-        supplyBalances[msg.sender] += assets;
-        totalSupply += assets;
+        redeemableAssetsOf[msg.sender] += assets;
+        totalRedeemableAssets += assets;
 
         _updateInterestRate();
     }
@@ -184,13 +183,13 @@ contract LendingPool is Owned, TrustedProtocol {
      * @param assets the amount of assets of the underlying ERC-20 token being withdrawn
      * @param receiver The address of the receiver of the underlying ERC-20 tokens
      */
-    function withdraw(uint256 assets, address receiver) public {
+    function withdrawFromLendingPool(uint256 assets, address receiver) public {
         _syncInterests();
 
-        require(supplyBalances[msg.sender] >= assets, "LP_W: Withdraw amount should be lower than the supplied balance");
+        require(redeemableAssetsOf[msg.sender] >= assets, "LP_W: Withdraw amount should be lower than the supplied balance");
 
-        supplyBalances[msg.sender] -= assets;
-        totalSupply -= assets;
+        redeemableAssetsOf[msg.sender] -= assets;
+        totalRedeemableAssets -= assets;
 
         asset.safeTransfer(receiver, assets);
 
@@ -200,22 +199,6 @@ contract LendingPool is Owned, TrustedProtocol {
     /* //////////////////////////////////////////////////////////////
                             LENDING LOGIC
     ////////////////////////////////////////////////////////////// */
-
-    event CreditApproval(address indexed vault, address indexed beneficiary, uint256 amount);
-
-    address public debtToken;
-    mapping(address => mapping(address => uint256)) public creditAllowance;
-
-    /**
-     * @notice Set the Debt Token contract of the Lending Pool
-     * @param _debtToken The address of the Debt Token
-     * @dev Debt Token is an ERC-4626 contract
-     * @dev ToDo: For now manually add newly created tranche, do via factory in future?
-     * @dev ToDo: TBD of we want the debt token to be changeable
-     */
-    function setDebtToken(address _debtToken) external onlyOwner {
-        debtToken = _debtToken;
-    }
 
     /**
      * @notice Approve a beneficiacy to take out a loan against an Arcadia Vault
@@ -264,7 +247,7 @@ contract LendingPool is Owned, TrustedProtocol {
         asset.safeTransfer(to, amount);
 
         if (amount != 0) {
-            ERC4626(debtToken).deposit(amount, vault);
+            _deposit(amount, vault);
         }
 
         //Update interest rates
@@ -284,12 +267,12 @@ contract LendingPool is Owned, TrustedProtocol {
         //Process interests since last update
         _syncInterests();
 
-        uint256 totalDebt = ERC4626(debtToken).maxWithdraw(vault);
-        uint256 transferAmount = totalDebt > amount ? amount : totalDebt;
+        uint256 vaultDebt = maxWithdraw(vault);
+        uint256 transferAmount = vaultDebt > amount ? amount : vaultDebt;
 
         asset.safeTransferFrom(msg.sender, address(this), transferAmount);
 
-        ERC4626(debtToken).withdraw(transferAmount, vault, vault);
+        _withdraw(transferAmount, vault, vault);
 
         //Call vault to unlock collateral
         require(IVault(vault).decreaseMarginPosition(address(asset), transferAmount), "LP_RL: Reverted");
@@ -301,11 +284,6 @@ contract LendingPool is Owned, TrustedProtocol {
     /* //////////////////////////////////////////////////////////////
                             INTERESTS LOGIC
     ////////////////////////////////////////////////////////////// */
-
-    //ToDo: optimise storage allocations
-    uint64 public interestRate; //18 decimals precision
-    uint32 public lastSyncedBlock;
-    uint256 public constant YEARLY_BLOCKS = 2628000;
 
     /**
      * @notice Syncs all unrealised debt (= interest for LP and treasury).
@@ -325,7 +303,7 @@ contract LendingPool is Owned, TrustedProtocol {
         uint256 unrealisedDebt = uint256(_calcUnrealisedDebt());
 
         //Sync interests for borrowers
-        IDebtToken(debtToken).syncInterests(unrealisedDebt);
+        totalDebt += unrealisedDebt;
 
         //Sync interests for LPs and Protocol Treasury
         _syncInterestsToLendingPool(unrealisedDebt);
@@ -342,8 +320,6 @@ contract LendingPool is Owned, TrustedProtocol {
      * _yearlyInterestRate = 1 + r expressed as 18 decimals fixed point number
      */
     function _calcUnrealisedDebt() internal returns (uint256 unrealisedDebt) {
-        uint256 realisedDebt = ERC4626(debtToken).totalAssets();
-
         uint256 base;
         uint256 exponent;
 
@@ -361,7 +337,7 @@ contract LendingPool is Owned, TrustedProtocol {
             //this won't overflow as long as opendebt < 3402823669209384912995114146594816
             //which is 3.4 million billion *10**18 decimals
 
-            unrealisedDebt = (realisedDebt * (LogExpMath.pow(base, exponent) - 1e18)) / 1e18;
+            unrealisedDebt = (totalDebt * (LogExpMath.pow(base, exponent) - 1e18)) / 1e18;
         }
 
         lastSyncedBlock = uint32(block.number);
@@ -384,16 +360,16 @@ contract LendingPool is Owned, TrustedProtocol {
 
         for (uint256 i; i < tranches.length;) {
             uint256 trancheShare = assets.mulDivUp(weights[i], totalWeight);
-            supplyBalances[tranches[i]] += trancheShare;
+            redeemableAssetsOf[tranches[i]] += trancheShare;
             unchecked {
                 remainingAssets -= trancheShare;
                 ++i;
             }
         }
-        totalSupply += assets;
+        totalRedeemableAssets += assets;
 
         // Add the remainingAssets to the treasury balance
-        supplyBalances[treasury] += remainingAssets;
+        redeemableAssetsOf[treasury] += remainingAssets;
     }
 
     //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
@@ -417,13 +393,6 @@ contract LendingPool is Owned, TrustedProtocol {
     /* //////////////////////////////////////////////////////////////
                         LIQUIDATION LOGIC
     ////////////////////////////////////////////////////////////// */
-
-    address public liquidator;
-
-    modifier onlyLiquidator() {
-        require(liquidator == msg.sender, "UNAUTHORIZED");
-        _;
-    }
 
     /**
      * @notice Set's the contract address of the liquidator.
@@ -449,7 +418,7 @@ contract LendingPool is Owned, TrustedProtocol {
      * the Liquidator will transfer any remaining funds to the Lending Pool.
      */
     function liquidateVault(address vault, uint256 debt) public onlyLiquidator {
-        ERC4626(debtToken).withdraw(debt, vault, vault);
+        _withdraw(debt, vault, vault);
     }
 
     /**
@@ -478,9 +447,9 @@ contract LendingPool is Owned, TrustedProtocol {
      * the complete tranche is locked and removed. If there is still remaining bad debt, the next Tranche starts losing capital.
      */
     function _processDefault(uint256 assets) internal {
-        if (totalSupply < assets) {
+        if (totalRedeemableAssets < assets) {
             //Should never be possible, this means the total protocol has more debt than claimable liquidity.
-            assets = totalSupply;
+            assets = totalRedeemableAssets;
         }
 
         for (uint256 i = tranches.length; i > 0;) {
@@ -488,17 +457,17 @@ contract LendingPool is Owned, TrustedProtocol {
                 --i;
             }
             address tranche = tranches[i];
-            uint256 maxBurned = supplyBalances[tranche];
+            uint256 maxBurned = redeemableAssetsOf[tranche];
             if (assets < maxBurned) {
                 // burn
-                supplyBalances[tranche] -= assets;
-                totalSupply -= assets;
+                redeemableAssetsOf[tranche] -= assets;
+                totalRedeemableAssets -= assets;
                 break;
             } else {
                 ITranche(tranche).lock();
                 // burn
-                supplyBalances[tranche] -= maxBurned;
-                totalSupply -= maxBurned;
+                redeemableAssetsOf[tranche] -= maxBurned;
+                totalRedeemableAssets -= maxBurned;
                 _popTranche(i, tranche);
                 unchecked {
                     assets -= maxBurned;
@@ -507,7 +476,7 @@ contract LendingPool is Owned, TrustedProtocol {
         }
 
         //ToDo Although it should be an impossible state if the protocol functions as it should,
-        //What if there is still more liquidity in the pool than totalSupply, start an emergency procedure?
+        //What if there is still more liquidity in the pool than totalRedeemableAssets, start an emergency procedure?
     }
 
     //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
@@ -541,6 +510,6 @@ contract LendingPool is Owned, TrustedProtocol {
     function getOpenPosition(address vault) external override returns (uint128 openPosition) {
         //ToDo: When ERC-4626 is correctly implemented, It should not be necessary to first sync interests.
         _syncInterests();
-        openPosition = uint128(ERC4626(debtToken).maxWithdraw(vault));
+        openPosition = uint128(maxWithdraw(vault));
     }
 }
