@@ -44,6 +44,10 @@ abstract contract DebtToken is ERC4626 {
                         DEPOSIT/WITHDRAWAL LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /**
+     * @notice Modification of the standard ERC-4626 deposit implementation
+     * @dev No public deposit allowed
+     */
     function deposit(uint256, address) public pure override returns (uint256) {
         revert("DEPOSIT_NOT_SUPPORTED");
     }
@@ -66,10 +70,18 @@ abstract contract DebtToken is ERC4626 {
         emit Deposit(msg.sender, receiver, assets, shares);
     }
 
+    /**
+     * @notice Modification of the standard ERC-4626 deposit implementation
+     * @dev No public mint allowed
+     */
     function mint(uint256, address) public pure override returns (uint256) {
         revert("MINT_NOT_SUPPORTED");
     }
 
+    /**
+     * @notice Modification of the standard ERC-4626 withdraw implementation
+     * @dev No public withdraw allowed
+     */
     function withdraw(uint256, address, address)
         public
         pure
@@ -101,6 +113,10 @@ abstract contract DebtToken is ERC4626 {
         emit Withdraw(msg.sender, receiver, owner_, assets, shares);
     }
 
+    /**
+     * @notice Modification of the standard ERC-4626 redeem implementation
+     * @dev No public redeem allowed
+     */
     function redeem(uint256, address, address) public pure override returns (uint256) {
         revert("REDEEM_NOT_SUPPORTED");
     }
@@ -109,18 +125,34 @@ abstract contract DebtToken is ERC4626 {
                             TRANSFER LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /**
+     * @notice Modification of the standard ERC-4626 approve implementation
+     * @dev No public approve allowed
+     */
     function approve(address, uint256) public pure override returns (bool) {
         revert("APPROVE_NOT_SUPPORTED");
     }
 
+    /**
+     * @notice Modification of the standard ERC-4626 transfer implementation
+     * @dev No public transfer allowed
+     */
     function transfer(address, uint256) public pure override returns (bool) {
         revert("TRANSFER_NOT_SUPPORTED");
     }
 
+    /**
+     * @notice Modification of the standard ERC-4626 transferFrom implementation
+     * @dev No public transferFrom allowed
+     */
     function transferFrom(address, address, uint256) public pure override returns (bool) {
         revert("TRANSFERFROM_NOT_SUPPORTED");
     }
 
+    /**
+     * @notice Modification of the standard ERC-4626 permit implementation
+     * @dev No public permit allowed
+     */
     function permit(address, address, uint256, uint256, uint8, bytes32, bytes32) public pure override {
         revert("PERMIT_NOT_SUPPORTED");
     }

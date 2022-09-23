@@ -340,7 +340,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
 
         vm.startPrank(unprivilegedAddress);
         // Then: withdraw by unprivilegedAddress should revert with LP_W: UNAUTHORIZED
-        vm.expectRevert("LP_W: Withdraw amount should be lower than the supplied balance");
+        vm.expectRevert("LP_W: Amount exceeds balance");
         pool.withdrawFromLendingPool(assetsWithdrawn, receiver);
         vm.stopPrank();
     }
@@ -359,7 +359,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         pool.depositInLendingPool(assetsDeposited, liquidityProvider);
 
         // Then: withdraw assetsWithdrawn should revert
-        vm.expectRevert("LP_W: Withdraw amount should be lower than the supplied balance");
+        vm.expectRevert("LP_W: Amount exceeds balance");
         pool.withdrawFromLendingPool(assetsWithdrawn, receiver);
         vm.stopPrank();
     }

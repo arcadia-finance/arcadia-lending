@@ -170,10 +170,12 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
     function depositInLendingPool(uint256 assets, address from) public onlyTranche {
         _syncInterests();
 
-        asset.safeTransferFrom(from, address(this), assets);
+        asset.transferFrom(from, address(this), assets);
 
-        redeemableAssetsOf[msg.sender] += assets;
-        totalRedeemableAssets += assets;
+        unchecked{
+            redeemableAssetsOf[msg.sender] += assets;
+            totalRedeemableAssets += assets;
+        }
 
         _updateInterestRate();
     }
@@ -186,7 +188,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
     function withdrawFromLendingPool(uint256 assets, address receiver) public {
         _syncInterests();
 
-        require(redeemableAssetsOf[msg.sender] >= assets, "LP_W: Withdraw amount should be lower than the supplied balance");
+        require(redeemableAssetsOf[msg.sender] >= assets, "LP_W: Amount exceeds balance");
 
         redeemableAssetsOf[msg.sender] -= assets;
         totalRedeemableAssets -= assets;
@@ -270,7 +272,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         uint256 vaultDebt = maxWithdraw(vault);
         uint256 transferAmount = vaultDebt > amount ? amount : vaultDebt;
 
-        asset.safeTransferFrom(msg.sender, address(this), transferAmount);
+        asset.transferFrom(msg.sender, address(this), transferAmount);
 
         _withdraw(transferAmount, vault, vault);
 
@@ -303,7 +305,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         uint256 unrealisedDebt = uint256(_calcUnrealisedDebt());
 
         //Sync interests for borrowers
-        totalDebt += unrealisedDebt;
+        unchecked{totalDebt += unrealisedDebt;}
 
         //Sync interests for LPs and Protocol Treasury
         _syncInterestsToLendingPool(unrealisedDebt);
@@ -360,16 +362,18 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
 
         for (uint256 i; i < tranches.length;) {
             uint256 trancheShare = assets.mulDivUp(weights[i], totalWeight);
-            redeemableAssetsOf[tranches[i]] += trancheShare;
             unchecked {
+                redeemableAssetsOf[tranches[i]] += trancheShare;
                 remainingAssets -= trancheShare;
                 ++i;
             }
         }
-        totalRedeemableAssets += assets;
+        unchecked {
+            totalRedeemableAssets += assets;
 
-        // Add the remainingAssets to the treasury balance
-        redeemableAssetsOf[treasury] += remainingAssets;
+            // Add the remainingAssets to the treasury balance
+            redeemableAssetsOf[treasury] += remainingAssets;
+        }
     }
 
     //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
