@@ -86,7 +86,7 @@ abstract contract DebtToken is ERC4626 {
      * @param receiver Will always be the Lending Pool
      * @param owner_ The Arcadia vault with collateral covering the loan
      * @return shares The corresponding amount of debt shares redeemed
-     * @dev Only the Lending Pool (which inherits thios contract) can issue debt
+     * @dev Only the Lending Pool (which inherits this contract) can issue debt
      */
     function _withdraw(uint256 assets, address receiver, address owner_)
         internal
