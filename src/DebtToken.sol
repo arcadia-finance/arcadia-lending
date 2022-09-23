@@ -53,7 +53,7 @@ abstract contract DebtToken is ERC4626 {
      * @param assets The amount of assets of the underlying ERC-20 token being loaned out
      * @param receiver The Arcadia vault with collateral covering the loan
      * @return shares The corresponding amount of debt shares minted
-     * @dev Only the Lending Pool (which inherits thios contract) can issue debt
+     * @dev Only the Lending Pool (which inherits this contract) can issue debt
      */
     function _deposit(uint256 assets, address receiver) internal returns (uint256 shares) {
         // Check for rounding error since we round down in previewDeposit.
