@@ -697,10 +697,10 @@ contract LoanTest is LendingPoolTest {
         pool.borrow(amountLoaned, address(vault), vaultOwner);
 
         vm.startPrank(sender);
-        // When: sender approve and repay amountLoaned
         asset.approve(address(pool), type(uint256).max);
-        // Then: repay should revert with "TRANSFER_FAILED"
-        vm.expectRevert("TRANSFER_FAILED");
+        // When: sender repays amountLoaned which is more than his available funds
+        // Then: repay should revert with an ovcerflow
+        vm.expectRevert(stdError.arithmeticError);
         pool.repay(amountLoaned, address(vault));
         vm.stopPrank();
     }
