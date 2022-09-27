@@ -321,14 +321,17 @@ contract LendingPool is Owned, TrustedProtocol {
      * @dev Calculates the unrealised debt since last sync, and realises it by minting an aqual amount of
      * debt tokens to all debt holders and interests to LPs and the treasury
      */
-    function _syncInterests() internal {
-        uint256 unrealisedDebt = uint256(_calcUnrealisedDebt());
+    function _syncInterests() internal {        
+        uint256 unrealisedDebt = calcUnrealisedDebt();
+
+        lastSyncedBlock = uint32(block.number);
 
         //Sync interests for borrowers
         IDebtToken(debtToken).syncInterests(unrealisedDebt);
 
         //Sync interests for LPs and Protocol Treasury
         _syncInterestsToLendingPool(unrealisedDebt);
+
     }
 
     /**
@@ -341,7 +344,7 @@ contract LendingPool is Owned, TrustedProtocol {
      * blocks produced over a year (using a 12s average block time).
      * _yearlyInterestRate = 1 + r expressed as 18 decimals fixed point number
      */
-    function _calcUnrealisedDebt() internal returns (uint256 unrealisedDebt) {
+    function calcUnrealisedDebt() public view returns (uint256 unrealisedDebt) {
         uint256 realisedDebt = ERC4626(debtToken).totalAssets();
 
         uint256 base;
@@ -364,14 +367,13 @@ contract LendingPool is Owned, TrustedProtocol {
             unrealisedDebt = (realisedDebt * (LogExpMath.pow(base, exponent) - 1e18)) / 1e18;
         }
 
-        lastSyncedBlock = uint32(block.number);
     }
-
+/* 
     //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
     function testCalcUnrealisedDebt() public returns (uint256 unrealisedDebt) {
-        unrealisedDebt = _calcUnrealisedDebt();
+        unrealisedDebt = calcUnrealisedDebt();
     }
-
+ */
     /**
      * @notice Syncs interest payments to the Lending providers and the treasury.
      * @param assets The total amount of underlying assets to be paid out as interests.

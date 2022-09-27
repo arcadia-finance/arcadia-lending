@@ -928,7 +928,7 @@ contract InterestsTest is LendingPoolTest {
         vm.roll(block.number + deltaBlocks);
 
         uint256 expectedValue = calcUnrealisedDebtChecked(interestRate, deltaBlocks, realisedDebt);
-        uint256 actualValue = pool.testCalcUnrealisedDebt();
+        uint256 actualValue = pool.calcUnrealisedDebt();
 
         assertEq(expectedValue, actualValue);
     }

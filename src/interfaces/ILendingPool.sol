@@ -18,4 +18,6 @@ interface ILendingPool {
     function deposit(uint256 assets, address from) external;
 
     function withdraw(uint256 assets, address receiver) external;
+
+    function calcUnrealisedDebt() external view returns (uint256 unrealisedDebt);
 }

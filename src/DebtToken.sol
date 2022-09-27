@@ -48,10 +48,12 @@ contract DebtToken is ERC4626, Owned {
 
     /**
      * @notice Returns the total amount of outstanding debt in the underlying asset
-     * @return totalDebt The total debt in underlying assets
+     * @return totalDebt_ The total debt in underlying assets
      */
-    function totalAssets() public view override returns (uint256) {
-        return totalDebt;
+    function totalAssets() public view override returns (uint256 totalDebt_) {
+        uint256 interests = lendingPool.calcUnrealisedDebt();
+
+        totalDebt_ = totalDebt + interests;
     }
 
     /*//////////////////////////////////////////////////////////////
