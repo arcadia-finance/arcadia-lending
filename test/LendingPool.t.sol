@@ -1029,7 +1029,7 @@ contract DefaultTest is LendingPoolTest {
         vm.prank(creator);
         pool.setLiquidator(liquidator);
 
-        // When: unprivilegedAddress liquidates a vault
+        // When: liquidator liquidates a vault
         vm.prank(liquidator);
         pool.liquidateVault(address(vault), amountLoaned);
 

@@ -368,12 +368,12 @@ contract LendingPool is Owned, TrustedProtocol {
         }
 
     }
-/* 
+/*
     //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
     function testCalcUnrealisedDebt() public returns (uint256 unrealisedDebt) {
         unrealisedDebt = calcUnrealisedDebt();
     }
- */
+*/
     /**
      * @notice Syncs interest payments to the Lending providers and the treasury.
      * @param assets The total amount of underlying assets to be paid out as interests.
