@@ -21,4 +21,5 @@ interface ILendingPool {
 
     function calcUnrealisedDebt() external view returns (uint256 unrealisedDebt);
 
+    function calcUnrealisedDebt(uint256 realisedDebt) external view returns (uint256 unrealisedDebt);
 }

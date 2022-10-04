@@ -81,6 +81,18 @@ contract DeploymentTest is DebtTokenTest {
 }
 
 /*//////////////////////////////////////////////////////////////
+                            DEBT LOGIC
+//////////////////////////////////////////////////////////////*/
+
+contract DebtTest is DebtTokenTest {
+    function setUp() public override {
+        super.setUp();
+    }
+
+
+}
+
+/*//////////////////////////////////////////////////////////////
                     DEPOSIT/WITHDRAWAL LOGIC
 //////////////////////////////////////////////////////////////*/
 contract DepositAndWithdrawalTest is DebtTokenTest {
@@ -90,8 +102,9 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
 
     function testRevert_deposit_Unauthorised(uint128 assets, address receiver, address unprivilegedAddress) public {
         vm.assume(unprivilegedAddress != address(pool));
-        // Given: all neccesary contracts are deployed on the setup
+        // Given: all neccesary contracts are deployed on the setup and last sync block is set
 
+        pool.syncInterests();
         vm.startPrank(unprivilegedAddress);
         // When: depositing with unprivilegedAddress
         // Then: deposit should revert with UNAUTHORIZED
@@ -113,8 +126,9 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
 
     function testSuccess_deposit(uint128 assets, address receiver) public {
         vm.assume(assets > 0);
-        // Given: all neccesary contracts are deployed on the setup
-
+        // Given: all neccesary contracts are deployed on the setup and last sync block is set
+        
+        pool.syncInterests();
         vm.prank(address(pool));
         // When: pool deposits assets
         debt.deposit(assets, receiver);
@@ -177,6 +191,7 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
         vm.assume(assetsDeposited > 0);
         vm.assume(assetsDeposited >= assetsWithdrawn);
 
+        pool.syncInterests();
         vm.startPrank(address(pool));
         // When: pool deposit assetsDeposited, withdraw assetsWithdrawn
         debt.deposit(assetsDeposited, owner);
@@ -224,7 +239,8 @@ contract InterestTest is DebtTokenTest {
 
         vm.assume(assetsDeposited <= type(uint128).max);
         vm.assume(assetsDeposited > 0);
-
+        
+        pool.syncInterests();
         vm.prank(address(pool));
         // When: pool deposit assetsDeposited
         debt.deposit(assetsDeposited, owner);
@@ -244,6 +260,7 @@ contract InterestTest is DebtTokenTest {
         vm.assume(assetsDeposited <= type(uint256).max / totalAssets);
         vm.assume(interests <= type(uint256).max / totalAssets);
 
+        pool.syncInterests();
         vm.startPrank(address(pool));
         // When: pool deposit assetsDeposited, syncInterests with interests
         debt.deposit(assetsDeposited, owner);

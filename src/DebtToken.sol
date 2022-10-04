@@ -55,7 +55,7 @@ contract DebtToken is ERC4626, Owned {
     }
 
     function calcInterests() internal view returns (uint256 interests) {
-        interests = lendingPool.calcUnrealisedDebt();
+        interests = lendingPool.calcUnrealisedDebt(totalDebt);
     }
 
     /*//////////////////////////////////////////////////////////////

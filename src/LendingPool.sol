@@ -345,8 +345,31 @@ contract LendingPool is Owned, TrustedProtocol {
      * _yearlyInterestRate = 1 + r expressed as 18 decimals fixed point number
      */
     function calcUnrealisedDebt() public view returns (uint256 unrealisedDebt) {
-        uint256 realisedDebt = ERC4626(debtToken).totalAssets();
+        uint256 realisedDebt = IDebtToken(debtToken).totalDebt();
 
+        uint256 base;
+        uint256 exponent;
+
+        unchecked {
+            //gas: can't overflow for reasonable interest rates
+            base = 1e18 + interestRate;
+
+            //gas: only overflows when blocks.number > 894262060268226281981748468
+            //in practice: assumption that delta of blocks < 341640000 (150 years)
+            //as foreseen in LogExpMath lib
+            exponent = ((block.number - lastSyncedBlock) * 1e18) / YEARLY_BLOCKS;
+
+            //gas: taking an imaginary worst-case scenario with max interest of 1000%
+            //over a period of 5 years
+            //this won't overflow as long as opendebt < 3402823669209384912995114146594816
+            //which is 3.4 million billion *10**18 decimals
+
+            unrealisedDebt = (realisedDebt * (LogExpMath.pow(base, exponent) - 1e18)) / 1e18;
+        }
+
+    }
+
+    function calcUnrealisedDebt(uint256 realisedDebt) public view returns (uint256 unrealisedDebt) {
         uint256 base;
         uint256 exponent;
 
