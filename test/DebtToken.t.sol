@@ -88,8 +88,38 @@ contract DebtTest is DebtTokenTest {
     function setUp() public override {
         super.setUp();
     }
+    
+    function testSuccess_totalAssets(uint128 assets, address receiver, uint24 deltaBlocks) public {
+        // Given: all neccesary contracts are deployed on the setup and last sync block is set
+        vm.assume(assets > 0);
+        vm.assume(deltaBlocks <= 13140000); //5 year
+        
+        pool.syncInterests();
+        vm.prank(address(pool));
+        // When: pool deposits assets
+        debt.deposit(assets, receiver);
+        uint64 interestRate = pool.interestRate();
 
+        vm.roll(block.number + deltaBlocks);
 
+        uint256 unrealisedDebt = calcUnrealisedDebtChecked(interestRate, deltaBlocks, assets);
+        emit log_uint(unrealisedDebt);
+        uint256 actualValue = assets + unrealisedDebt;
+        uint256 expectedValue = debt.totalAssets();
+
+        assertEq(actualValue, expectedValue);
+    }
+
+    //Helper functions
+    function calcUnrealisedDebtChecked(uint64 interestRate, uint24 deltaBlocks, uint128 realisedDebt)
+        internal
+        view
+        returns (uint256 unrealisedDebt)
+    {
+        uint256 base = 1e18 + uint256(interestRate);
+        uint256 exponent = uint256(deltaBlocks) * 1e18 / pool.YEARLY_BLOCKS();
+        unrealisedDebt = (uint256(realisedDebt) * (LogExpMath.pow(base, exponent) - 1e18)) / 1e18;
+    }
 }
 
 /*//////////////////////////////////////////////////////////////
