@@ -30,15 +30,16 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
 
     uint256 public constant YEARLY_BLOCKS = 2628000;
 
-    uint64 public interestRate; //18 decimals precision
-    uint32 public lastSyncedBlock;
-    uint256 public totalWeight;
-    uint256 public totalRedeemableAssets;
-    uint256 public feeWeight;
+    uint256 public totalWeight; 
+    uint256 public totalRedeemableAssets; 
+    uint256 public feeWeight; 
 
-    address public treasury;
-    address public liquidator;
+    uint64 public interestRate; //18 decimals precision 
+    uint32 public lastSyncedBlock; 
+    
     address public vaultFactory;
+    address public treasury; 
+    address public liquidator; 
 
     uint256[] public weights;
     address[] public tranches;
