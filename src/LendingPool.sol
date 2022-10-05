@@ -66,7 +66,11 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
      * @param _vaultFactory The address of the vault factory
      * @dev The name and symbol of the pool are automatically generated, based on the name and symbol of the underlying token
      */
-    constructor(ERC20 _asset, address _treasury, address _vaultFactory) Owned(msg.sender) TrustedProtocol() DebtToken(_asset) {
+    constructor(ERC20 _asset, address _treasury, address _vaultFactory)
+        Owned(msg.sender)
+        TrustedProtocol()
+        DebtToken(_asset)
+    {
         treasury = _treasury;
         vaultFactory = _vaultFactory;
     }
@@ -172,7 +176,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
 
         asset.transferFrom(from, address(this), assets);
 
-        unchecked{
+        unchecked {
             redeemableAssetsOf[msg.sender] += assets;
             totalRedeemableAssets += assets;
         }
@@ -305,7 +309,9 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         uint256 unrealisedDebt = uint256(_calcUnrealisedDebt());
 
         //Sync interests for borrowers
-        unchecked{totalDebt += unrealisedDebt;}
+        unchecked {
+            totalDebt += unrealisedDebt;
+        }
 
         //Sync interests for LPs and Protocol Treasury
         _syncInterestsToLendingPool(unrealisedDebt);

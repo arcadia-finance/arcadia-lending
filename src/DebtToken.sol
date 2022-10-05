@@ -14,7 +14,6 @@ import {ERC20, ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
  * @dev Protocol is according the ERC4626 standard, with a certain ERC20 as underlying
  */
 abstract contract DebtToken is ERC4626 {
-
     /**
      * @notice The constructor for the debt token
      * @param asset The underlying ERC-20 token in which the debt is denominated
@@ -82,14 +81,8 @@ abstract contract DebtToken is ERC4626 {
      * @notice Modification of the standard ERC-4626 withdraw implementation
      * @dev No public withdraw allowed
      */
-    function withdraw(uint256, address, address)
-        public
-        pure
-        override
-        returns (uint256)
-    {
+    function withdraw(uint256, address, address) public pure override returns (uint256) {
         revert("WITHDRAW_NOT_SUPPORTED");
-
     }
 
     /**
@@ -100,10 +93,7 @@ abstract contract DebtToken is ERC4626 {
      * @return shares The corresponding amount of debt shares redeemed
      * @dev Only the Lending Pool (which inherits this contract) can issue debt
      */
-    function _withdraw(uint256 assets, address receiver, address owner_)
-        internal
-        returns (uint256 shares)
-    {
+    function _withdraw(uint256 assets, address receiver, address owner_) internal returns (uint256 shares) {
         shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
 
         _burn(owner_, shares);
