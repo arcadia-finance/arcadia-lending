@@ -86,7 +86,7 @@ contract Tranche is ERC4626, Owned {
         require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
 
         // Need to transfer (via lendingPool.deposit()) before minting or ERC777s could reenter.
-        lendingPool.deposit(assets, msg.sender);
+        lendingPool.depositInLendingPool(assets, msg.sender);
 
         _mint(receiver, shares);
 
@@ -106,7 +106,7 @@ contract Tranche is ERC4626, Owned {
         assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
 
         // Need to transfer (via lendingPool.deposit()) before minting or ERC777s could reenter.
-        ILendingPool(address(lendingPool)).deposit(assets, msg.sender);
+        lendingPool.depositInLendingPool(assets, msg.sender);
 
         _mint(receiver, shares);
 
@@ -136,7 +136,7 @@ contract Tranche is ERC4626, Owned {
             }
         }
 
-        ILendingPool(address(lendingPool)).withdraw(assets, receiver);
+        lendingPool.withdrawFromLendingPool(assets, receiver);
 
         _burn(owner_, shares);
 
@@ -171,7 +171,7 @@ contract Tranche is ERC4626, Owned {
 
         emit Withdraw(msg.sender, receiver, owner_, assets, shares);
 
-        ILendingPool(address(lendingPool)).withdraw(assets, receiver);
+        lendingPool.withdrawFromLendingPool(assets, receiver);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -184,7 +184,7 @@ contract Tranche is ERC4626, Owned {
      * @dev The Liquidity Pool does the accounting of the outstanding claim on liquidity per tranche.
      */
     function totalAssets() public view override returns (uint256 assets) {
-        assets = lendingPool.supplyBalances(address(this));
+        assets = lendingPool.redeemableAssetsOf(address(this));
     }
 
     /*//////////////////////////////////////////////////////////////

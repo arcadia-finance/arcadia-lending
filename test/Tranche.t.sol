@@ -47,12 +47,11 @@ abstract contract TrancheTest is Test {
         pool = new LendingPool(asset, treasury, address(factory));
         pool.updateInterestRate(5 * 10 ** 16); //5% with 18 decimals precision
 
-        debt = new DebtToken(address(pool));
-        pool.setDebtToken(address(debt));
-
         tranche = new Tranche(address(pool), "Senior", "SR");
         pool.addTranche(address(tranche), 50);
         vm.stopPrank();
+
+        debt = DebtToken(address(pool));
 
         vm.prank(liquidityProvider);
         asset.approve(address(pool), type(uint256).max);
@@ -278,7 +277,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         // When: beneficiary withdraw
 
         // Then: withdraw should revert with stdError.arithmeticError
-        vm.expectRevert("LP_W: Withdraw amount should be lower than the supplied balance");
+        vm.expectRevert("LP_W: Amount exceeds balance");
         tranche.withdraw(sharesAllowed, receiver, owner);
         vm.stopPrank();
     }
@@ -302,7 +301,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         // When: owner withdraw
 
         // Then: withdraw should revert with stdError.arithmeticError
-        vm.expectRevert("LP_W: Withdraw amount should be lower than the supplied balance");
+        vm.expectRevert("LP_W: Amount exceeds balance");
         tranche.withdraw(assetsWithdrawn, receiver, owner);
         vm.stopPrank();
     }
