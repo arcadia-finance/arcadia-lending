@@ -120,6 +120,34 @@ contract DebtTest is DebtTokenTest {
         uint256 exponent = uint256(deltaBlocks) * 1e18 / pool.YEARLY_BLOCKS();
         unrealisedDebt = (uint256(realisedDebt) * (LogExpMath.pow(base, exponent) - 1e18)) / 1e18;
     }
+
+    function testSuccess_previewDeposit(uint256 assets, address receiver) public {
+        vm.assume(assets > 0);
+
+        pool.syncInterests();
+        vm.startPrank(address(pool));
+        debt.previewDeposit(assets);
+        debt.deposit(assets, receiver);
+        vm.stopPrank();
+
+        assertEq(debt.totalAssets(), assets);
+    }
+
+    function testSuccess_previewWithdraw(uint128 assetsDeposited, uint128 assetsWithdrawn, address receiver, address owner) public {
+        // Given: assetsDeposited are bigger than 0 and bigger than or equal to assetsWithdrawn
+        vm.assume(assetsDeposited > 0);
+        vm.assume(assetsDeposited >= assetsWithdrawn);
+
+        pool.syncInterests();
+        vm.startPrank(address(pool));
+        debt.deposit(assetsDeposited, owner);
+
+        debt.previewWithdraw(assetsDeposited);
+        debt.withdraw(assetsWithdrawn, receiver, owner);
+        vm.stopPrank();
+
+        assertEq(debt.totalAssets(), assetsDeposited - assetsWithdrawn);
+    }
 }
 
 /*//////////////////////////////////////////////////////////////
