@@ -104,8 +104,8 @@ contract DebtTest is DebtTokenTest {
 
         uint256 unrealisedDebt = calcUnrealisedDebtChecked(interestRate, deltaBlocks, assets);
         emit log_uint(unrealisedDebt);
-        uint256 actualValue = assets + unrealisedDebt;
-        uint256 expectedValue = debt.totalAssets();
+        uint256 actualValue = debt.totalAssets();
+        uint256 expectedValue = assets + unrealisedDebt;
 
         assertEq(actualValue, expectedValue);
     }
