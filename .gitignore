@@ -1,6 +1,7 @@
 cache/
 out/
 
+.DS_Store
 
 # Jetbrains
 .idea
