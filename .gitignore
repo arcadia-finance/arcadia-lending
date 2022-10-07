@@ -1,7 +1,11 @@
 cache/
 out/
 
-.DS_Store
-
 # Jetbrains
 .idea
+
+# Vscode
+.vscode
+
+# OS generated
+.DS_STORE
