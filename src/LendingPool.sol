@@ -286,7 +286,13 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
      * @return totalDebt The total debt in underlying assets
      */
     function totalAssets() public view override returns (uint256 totalDebt) {
-        totalDebt = realisedDebt + calcUnrealisedDebt();
+        // Avoid a second calculation of unrealised debt (expensive)
+        // if interersts are already synced this block.
+        if (lastSyncedBlock != uint32(block.number)) {
+            totalDebt = realisedDebt + calcUnrealisedDebt();
+        } else {
+            totalDebt = realisedDebt;
+        }
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -309,7 +315,6 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
      */
     function _syncInterests() internal {        
         uint256 unrealisedDebt = calcUnrealisedDebt();
-
         lastSyncedBlock = uint32(block.number);
 
         //Sync interests for borrowers
@@ -349,7 +354,6 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
             //over a period of 5 years
             //this won't overflow as long as opendebt < 3402823669209384912995114146594816
             //which is 3.4 million billion *10**18 decimals
-
             unrealisedDebt = (realisedDebt * (LogExpMath.pow(base, exponent) - 1e18)) / 1e18;
         }
     }
