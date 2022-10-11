@@ -185,7 +185,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
     function withdrawFromLendingPool(uint256 assets, address receiver) public {
         _syncInterests();
 
-        require(realisedLiquidityOf[msg.sender] >= assets, "LP_W: Amount exceeds balance");
+        require(realisedLiquidityOf[msg.sender] >= assets, "LP_WFLP: Amount exceeds balance");
 
         realisedLiquidityOf[msg.sender] -= assets;
         totalRealisedLiquidity -= assets;
@@ -226,7 +226,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
      * @dev The sender might be different as the owner if they have the proper allowances
      */
     function borrow(uint256 amount, address vault, address to) public {
-        require(IFactory(vaultFactory).isVault(vault), "LP_TL: Not a vault");
+        require(IFactory(vaultFactory).isVault(vault), "LP_B: Not a vault");
 
         //Check allowances to send underlying to to
         if (IVault(vault).owner() != msg.sender) {
@@ -237,7 +237,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         }
 
         //Call vault to check if there is sufficient collateral
-        require(IVault(vault).increaseMarginPosition(address(asset), amount), "LP_TL: Reverted");
+        require(IVault(vault).increaseMarginPosition(address(asset), amount), "LP_B: Reverted");
 
         //Process interests since last update
         _syncInterests();
@@ -261,7 +261,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
      * If so, work with allowances
      */
     function repay(uint256 amount, address vault) public {
-        require(IFactory(vaultFactory).isVault(vault), "LP_RL: Not a vault");
+        require(IFactory(vaultFactory).isVault(vault), "LP_R: Not a vault");
 
         //Process interests since last update
         _syncInterests();
@@ -274,7 +274,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         _withdraw(transferAmount, vault, vault);
 
         //Call vault to unlock collateral
-        require(IVault(vault).decreaseMarginPosition(address(asset), transferAmount), "LP_RL: Reverted");
+        require(IVault(vault).decreaseMarginPosition(address(asset), transferAmount), "LP_R: Reverted");
 
         //Update interest rates
         _updateInterestRate();

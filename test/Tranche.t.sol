@@ -273,7 +273,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         // When: beneficiary withdraw
 
         // Then: withdraw should revert with stdError.arithmeticError
-        vm.expectRevert("LP_W: Amount exceeds balance");
+        vm.expectRevert("LP_WFLP: Amount exceeds balance");
         tranche.withdraw(sharesAllowed, receiver, owner);
         vm.stopPrank();
     }
@@ -295,7 +295,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         // When: owner withdraw
 
         // Then: withdraw should revert with stdError.arithmeticError
-        vm.expectRevert("LP_W: Amount exceeds balance");
+        vm.expectRevert("LP_WFLP: Amount exceeds balance");
         tranche.withdraw(assetsWithdrawn, receiver, owner);
         vm.stopPrank();
     }

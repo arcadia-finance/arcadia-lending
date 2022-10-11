@@ -373,7 +373,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
 
         vm.startPrank(unprivilegedAddress);
         // Then: withdraw by unprivilegedAddress should revert with LP_W: UNAUTHORIZED
-        vm.expectRevert("LP_W: Amount exceeds balance");
+        vm.expectRevert("LP_WFLP: Amount exceeds balance");
         pool.withdrawFromLendingPool(assetsWithdrawn, receiver);
         vm.stopPrank();
     }
@@ -392,7 +392,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         pool.depositInLendingPool(assetsDeposited, liquidityProvider);
 
         // Then: withdraw assetsWithdrawn should revert
-        vm.expectRevert("LP_W: Amount exceeds balance");
+        vm.expectRevert("LP_WFLP: Amount exceeds balance");
         pool.withdrawFromLendingPool(assetsWithdrawn, receiver);
         vm.stopPrank();
     }
@@ -483,8 +483,8 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(nonVault != address(vault));
         // When: borrow as nonVault
 
-        // Then: borrow should revert with "LP_TL: Not a vault"
-        vm.expectRevert("LP_TL: Not a vault");
+        // Then: borrow should revert with "LP_B: Not a vault"
+        vm.expectRevert("LP_B: Not a vault");
         pool.borrow(amount, nonVault, to);
     }
 
@@ -537,8 +537,8 @@ contract LendingLogicTest is LendingPoolTest {
         vm.startPrank(vaultOwner);
         // When: borrow amountLoaned as vaultOwner
 
-        // Then: borrow should revert with "LP_TL: Reverted"
-        vm.expectRevert("LP_TL: Reverted");
+        // Then: borrow should revert with "LP_B: Reverted"
+        vm.expectRevert("LP_B: Reverted");
         pool.borrow(amountLoaned, address(vault), to);
         vm.stopPrank();
     }
@@ -691,8 +691,8 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(nonVault != address(vault));
         // When: repay amount to nonVault
 
-        // Then: repay should revert with "LP_RL: Not a vault"
-        vm.expectRevert("LP_RL: Not a vault");
+        // Then: repay should revert with "LP_R: Not a vault"
+        vm.expectRevert("LP_R: Not a vault");
         pool.repay(amount, nonVault);
     }
 
