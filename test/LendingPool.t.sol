@@ -967,6 +967,7 @@ contract AccountingTest is LendingPoolTest {
 
         vm.startPrank(creator);
         pool.addTranche(address(srTranche), 50);
+        pool.addTranche(address(jrTranche), 40);
         vm.stopPrank();
 
         vm.prank(vaultOwner);
@@ -974,19 +975,17 @@ contract AccountingTest is LendingPoolTest {
 
         vm.prank(liquidityProvider);
         asset.approve(address(pool), type(uint256).max);
-
-        vm.prank(address(srTranche));
-        pool.depositInLendingPool(type(uint128).max, liquidityProvider);
     }
     
     function testSuccess_totalAssets(uint128 realisedDebt, uint64 interestRate, uint24 deltaBlocks) public {
         // Given: all neccesary contracts are deployed on the setup
-        vm.assume(realisedDebt > 0);
         vm.assume(interestRate <= 10 * 10 ** 18); //1000%
         vm.assume(deltaBlocks <= 13140000); //5 year
 
         vm.prank(creator);
         pool.updateInterestRate(interestRate);
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(type(uint128).max, liquidityProvider);
         vault.setTotalValue(realisedDebt);
 
         vm.prank(vaultOwner);
@@ -1001,12 +1000,30 @@ contract AccountingTest is LendingPoolTest {
         assertEq(actualValue, expectedValue);
     }
 
-    function testSuccess_previewDeposit() public {
+    function testSuccess_liquidityOf(uint128 initialLiquidity, uint128 realisedDebt, uint64 interestRate, uint24 deltaBlocks) public {
+        // Given: all neccesary contracts are deployed on the setup
+        vm.assume(initialLiquidity >= realisedDebt);
+        vm.assume(interestRate <= 10 * 10 ** 18); //1000%
+        vm.assume(deltaBlocks <= 13140000); //5 year
 
-    }
+        vm.prank(creator);
+        pool.updateInterestRate(interestRate);
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(initialLiquidity, liquidityProvider);
+        vault.setTotalValue(realisedDebt);
 
-    function testSuccess_previewWithdraw() public {
+        vm.prank(vaultOwner);
+        pool.borrow(realisedDebt, address(vault), vaultOwner);
 
+        vm.roll(block.number + deltaBlocks);
+        uint256 unrealisedDebt = calcUnrealisedDebtChecked(interestRate, deltaBlocks, realisedDebt);
+        uint256 interest = unrealisedDebt * 50 / 90;
+        if (interest * 90 < unrealisedDebt * 50) interest += 1; // interest for a tranche is rounded up
+        uint256 expectedValue = initialLiquidity + interest;
+
+        uint256 actualValue = pool.liquidityOf(address(srTranche));
+
+        assertEq(actualValue, expectedValue);
     }
 }
 

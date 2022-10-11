@@ -9,9 +9,7 @@ pragma solidity ^0.8.13;
 import "../../lib/solmate/src/tokens/ERC20.sol";
 
 interface ILendingPool {
-    function realisedLiquidityOf(address) external view returns (uint256);
-
-    function totalRealisedLiquidity() external view returns (uint256);
+    function liquidityOf(address) external view returns (uint256);
 
     function asset() external returns (ERC20);
 
@@ -20,6 +18,4 @@ interface ILendingPool {
     function withdrawFromLendingPool(uint256 assets, address receiver) external;
 
     function calcUnrealisedDebt() external view returns (uint256 unrealisedDebt);
-
-    function calcUnrealisedDebt(uint256 realisedDebt) external view returns (uint256 unrealisedDebt);
 }

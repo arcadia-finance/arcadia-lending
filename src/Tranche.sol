@@ -184,7 +184,7 @@ contract Tranche is ERC4626, Owned {
      * @dev The Liquidity Pool does the accounting of the outstanding claim on liquidity per tranche.
      */
     function totalAssets() public view override returns (uint256 assets) {
-        assets = lendingPool.realisedLiquidityOf(address(this));
+        assets = lendingPool.liquidityOf(address(this));
     }
 
     /*//////////////////////////////////////////////////////////////

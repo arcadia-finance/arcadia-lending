@@ -298,6 +298,25 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         }
     }
 
+    /**
+     * @notice Returns the redeemable amount of liquidity in the underlying asset of an address
+     * @param _of The address of the liquidity provider
+     * @dev For this implementation, _of is or an address of a tranche, or an address of a treasury
+     * @return liquidityOf_ The redeemable amount of liquidity
+     */
+    function liquidityOf(address _of) public view returns (uint256 liquidityOf_) {
+        // Avoid a second calculation of unrealised debt (expensive)
+        // if interersts are already synced this block.
+        if (lastSyncedBlock != uint32(block.number)) {
+            // The total liquidity of a tranche equals the sum of the realised liquidity 
+            // of the tranche, and its pending interests
+            uint256 interest = calcUnrealisedDebt().mulDivUp(weight[_of], totalWeight);
+            liquidityOf_ = realisedLiquidityOf[_of] + interest;
+        } else {
+            liquidityOf_ = realisedLiquidityOf[_of];
+        }
+    }
+
     /* //////////////////////////////////////////////////////////////
                             INTERESTS LOGIC
     ////////////////////////////////////////////////////////////// */
