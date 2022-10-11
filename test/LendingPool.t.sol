@@ -22,7 +22,7 @@ contract LendingPoolExtension is LendingPool {
     }
 
     function testSyncInterestsToLendingPool(uint256 assets) public onlyOwner {
-        _syncInterestsToLendingPool(assets);
+        _syncInterestsToLiquidityProviders(assets);
     }
 
     function testProcessDefault(uint256 assets) public onlyOwner {
@@ -852,7 +852,7 @@ contract InterestsTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_syncInterestsToLendingPool_Exact() public {
+    function testSuccess_syncInterestsToLiquidityProviders_Exact() public {
         // Given: all necessary contracts are deployed on the setup
         vm.prank(creator);
         // When: creator testSyncInterestsToLendingPool with 100
@@ -866,7 +866,7 @@ contract InterestsTest is LendingPoolTest {
         assertEq(pool.totalRealisedLiquidity(), 100);
     }
 
-    function testSuccess_syncInterestsToLendingPool_Rounded() public {
+    function testSuccess_syncInterestsToLiquidityProviders_Rounded() public {
         // Given: all necessary contracts are deployed on the setup
         vm.prank(creator);
         // When: creator testSyncInterestsToLendingPool with 99

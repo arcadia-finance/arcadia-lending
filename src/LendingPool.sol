@@ -336,16 +336,19 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
      * debt tokens to all debt holders and interests to LPs and the treasury
      */
     function _syncInterests() internal {
-        uint256 unrealisedDebt = calcUnrealisedDebt();
-        lastSyncedBlock = uint32(block.number);
+        // Only Sync interests once per block
+        if (lastSyncedBlock != uint32(block.number)) {
+            uint256 unrealisedDebt = calcUnrealisedDebt();
+            lastSyncedBlock = uint32(block.number);
 
-        //Sync interests for borrowers
-        unchecked {
-            realisedDebt += unrealisedDebt;
+            //Sync interests for borrowers
+            unchecked {
+                realisedDebt += unrealisedDebt;
+            }
+
+            //Sync interests for LPs and Protocol Treasury
+            _syncInterestsToLiquidityProviders(unrealisedDebt);
         }
-
-        //Sync interests for LPs and Protocol Treasury
-        _syncInterestsToLendingPool(unrealisedDebt);
     }
 
     /**
@@ -386,7 +389,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
      * @dev The Shares for each Tranche are rounded up, if the treasury receives the remaining shares and will hence loose
      * part of their yield due to rounding errors (neglectable small).
      */
-    function _syncInterestsToLendingPool(uint256 assets) internal {
+    function _syncInterestsToLiquidityProviders(uint256 assets) internal {
         uint256 remainingAssets = assets;
 
         for (uint256 i; i < tranches.length;) {
