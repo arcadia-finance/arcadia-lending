@@ -308,7 +308,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         // Avoid a second calculation of unrealised debt (expensive)
         // if interersts are already synced this block.
         if (lastSyncedBlock != uint32(block.number)) {
-            // The total liquidity of a tranche equals the sum of the realised liquidity 
+            // The total liquidity of a tranche equals the sum of the realised liquidity
             // of the tranche, and its pending interests
             uint256 interest = calcUnrealisedDebt().mulDivUp(weight[_of], totalWeight);
             liquidityOf_ = realisedLiquidityOf[_of] + interest;
@@ -335,7 +335,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
      * @dev Calculates the unrealised debt since last sync, and realises it by minting an aqual amount of
      * debt tokens to all debt holders and interests to LPs and the treasury
      */
-    function _syncInterests() internal {        
+    function _syncInterests() internal {
         uint256 unrealisedDebt = calcUnrealisedDebt();
         lastSyncedBlock = uint32(block.number);
 

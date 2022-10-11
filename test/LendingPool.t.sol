@@ -455,9 +455,7 @@ contract LendingLogicTest is LendingPoolTest {
         address beneficiary,
         uint256 amount,
         address unprivilegedAddress
-    )
-        public
-    {
+    ) public {
         // Given: unprivilegedAddress is not vaultOwner
         vm.assume(unprivilegedAddress != vaultOwner);
 
@@ -511,9 +509,7 @@ contract LendingLogicTest is LendingPoolTest {
         uint256 amountLoaned,
         address beneficiary,
         address to
-    )
-        public
-    {
+    ) public {
         // Given: beneficiary is not vaultOwner, amountAllowed is less than amountLoaned, vaultOwner approveBeneficiary
         vm.assume(beneficiary != vaultOwner);
         vm.assume(amountAllowed < amountLoaned);
@@ -552,9 +548,7 @@ contract LendingLogicTest is LendingPoolTest {
         uint256 collateralValue,
         uint256 liquidity,
         address to
-    )
-        public
-    {
+    ) public {
         // Given: collateralValue less than equal to amountLoaned, liquidity is bigger than 0 but less than amountLoaned,
         // to is not address 0, creator setDebtToken to debt, liquidityProvider approve pool to max value,
         // srTranche deposit liquidity, setTotalValue to colletralValue
@@ -583,9 +577,7 @@ contract LendingLogicTest is LendingPoolTest {
         uint256 collateralValue,
         uint256 liquidity,
         address to
-    )
-        public
-    {
+    ) public {
         // Given: collateralValue and liquidity bigger than equal to amountLoaned, amountLoaned is bigger than 0,
         // to is not address 0 and not liquidityProvider, creator setDebtToken to debt, setTotalValue to colletralValue,
         // liquidityProvider approve pool to max value, srTranche deposit liquidity
@@ -620,9 +612,7 @@ contract LendingLogicTest is LendingPoolTest {
         uint256 liquidity,
         address beneficiary,
         address to
-    )
-        public
-    {
+    ) public {
         // Given: amountAllowed, collateralValue and liquidity bigger than equal to amountLoaned, amountLoaned is bigger than 0,
         // amountAllowed is less than max value, beneficiary is not vaultOwner, to is not address 0 and not liquidityProvider,
         // creator setDebtToken to debt, liquidityProvider approve pool to max value, srTranche deposit liquidity,
@@ -663,9 +653,7 @@ contract LendingLogicTest is LendingPoolTest {
         uint256 liquidity,
         address beneficiary,
         address to
-    )
-        public
-    {
+    ) public {
         // Given: collateralValue and liquidity bigger than equal to amountLoaned, amountLoaned is bigger than 0,
         // beneficiary is not vaultOwner, to is not address 0 and not liquidityProvider,
         // creator setDebtToken to debt, setTotalValue to collateralValue, liquidityProvider approve pool to max value,
@@ -976,7 +964,7 @@ contract AccountingTest is LendingPoolTest {
         vm.prank(liquidityProvider);
         asset.approve(address(pool), type(uint256).max);
     }
-    
+
     function testSuccess_totalAssets(uint128 realisedDebt, uint64 interestRate, uint24 deltaBlocks) public {
         // Given: all neccesary contracts are deployed on the setup
         vm.assume(interestRate <= 10 * 10 ** 18); //1000%
@@ -1000,7 +988,12 @@ contract AccountingTest is LendingPoolTest {
         assertEq(actualValue, expectedValue);
     }
 
-    function testSuccess_liquidityOf(uint128 initialLiquidity, uint128 realisedDebt, uint64 interestRate, uint24 deltaBlocks) public {
+    function testSuccess_liquidityOf(
+        uint128 initialLiquidity,
+        uint128 realisedDebt,
+        uint64 interestRate,
+        uint24 deltaBlocks
+    ) public {
         // Given: all neccesary contracts are deployed on the setup
         vm.assume(initialLiquidity >= realisedDebt);
         vm.assume(interestRate <= 10 * 10 ** 18); //1000%
@@ -1127,9 +1120,7 @@ contract DefaultTest is LendingPoolTest {
         uint256 defaultAmount,
         uint256 deficitAmount,
         address unprivilegedAddress
-    )
-        public
-    {
+    ) public {
         // Given: The liquidator is set
         vm.prank(creator);
         pool.setLiquidator(liquidator);
@@ -1168,9 +1159,7 @@ contract DefaultTest is LendingPoolTest {
         uint256 defaultAmount,
         uint256 deficitAmount,
         uint256 liquidity
-    )
-        public
-    {
+    ) public {
         // Given: Provided liquidity is bigger than the default amount (Sould always be true)
         vm.assume(liquidity >= defaultAmount);
         // And: Available liquidity is bigger than the deficit amount (ToDo: unhappy flow!!!)
@@ -1194,9 +1183,7 @@ contract DefaultTest is LendingPoolTest {
         uint256 liquiditySenior,
         uint256 liquidityJunior,
         uint256 defaultAmount
-    )
-        public
-    {
+    ) public {
         // Given: srTranche deposit liquiditySenior, jrTranche deposit liquidityJunior
         vm.assume(liquiditySenior <= type(uint256).max - liquidityJunior);
         uint256 totalAmount = uint256(liquiditySenior) + uint256(liquidityJunior);
@@ -1222,9 +1209,7 @@ contract DefaultTest is LendingPoolTest {
         uint256 liquiditySenior,
         uint256 liquidityJunior,
         uint256 defaultAmount
-    )
-        public
-    {
+    ) public {
         // Given: srTranche deposit liquiditySenior, jrTranche deposit liquidityJunior
         vm.assume(liquiditySenior <= type(uint256).max - liquidityJunior);
         uint256 totalAmount = uint256(liquiditySenior) + uint256(liquidityJunior);
@@ -1252,9 +1237,7 @@ contract DefaultTest is LendingPoolTest {
         uint256 liquiditySenior,
         uint256 liquidityJunior,
         uint256 defaultAmount
-    )
-        public
-    {
+    ) public {
         // Given: srTranche deposit liquiditySenior, jrTranche deposit liquidityJunior
         vm.assume(liquiditySenior <= type(uint256).max - liquidityJunior);
         uint256 totalAmount = uint256(liquiditySenior) + uint256(liquidityJunior);

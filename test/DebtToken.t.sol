@@ -184,9 +184,7 @@ contract TransferTest is DebtTokenTest {
         bytes32 r,
         bytes32 s,
         address sender
-    )
-        public
-    {
+    ) public {
         // Given: all neccesary contracts are deployed on the setup
 
         vm.startPrank(sender);

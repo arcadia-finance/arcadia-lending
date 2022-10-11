@@ -31,13 +31,12 @@ abstract contract DebtToken is ERC4626 {
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
-    
 
     /**
      * @notice Returns the total amount of outstanding debt in the underlying asset
      * @return totalDebt The total debt in underlying assets
      */
-    function totalAssets() public view override virtual returns (uint256) {}
+    function totalAssets() public view virtual override returns (uint256) {}
 
     /*//////////////////////////////////////////////////////////////
                         DEPOSIT/WITHDRAWAL LOGIC
