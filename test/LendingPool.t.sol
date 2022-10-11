@@ -13,10 +13,27 @@ import "../src/mocks/Factory.sol";
 import "../src/Tranche.sol";
 import "../src/DebtToken.sol";
 
+contract LendingPoolExtension is LendingPool {
+    //Extensions to test internal functions
+    constructor(ERC20 _asset, address _treasury, address _vaultFactory) LendingPool(_asset, _treasury, _vaultFactory) {}
+
+    function testPopTranche(uint256 index, address tranche) public {
+        _popTranche(index, tranche);
+    }
+
+    function testSyncInterestsToLendingPool(uint256 assets) public onlyOwner {
+        _syncInterestsToLendingPool(assets);
+    }
+
+    function testProcessDefault(uint256 assets) public onlyOwner {
+        _processDefault(assets);
+    }
+}
+
 abstract contract LendingPoolTest is Test {
     Asset asset;
     Factory factory;
-    LendingPool pool;
+    LendingPoolExtension pool;
     Tranche srTranche;
     Tranche jrTranche;
     DebtToken debt;
@@ -44,7 +61,7 @@ abstract contract LendingPoolTest is Test {
     //Before Each
     function setUp() public virtual {
         vm.startPrank(creator);
-        pool = new LendingPool(asset, treasury, address(factory));
+        pool = new LendingPoolExtension(asset, treasury, address(factory));
         srTranche = new Tranche(address(pool), "Senior", "SR");
         jrTranche = new Tranche(address(pool), "Junior", "JR");
         vm.stopPrank();

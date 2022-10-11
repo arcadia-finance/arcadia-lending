@@ -125,16 +125,6 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         tranches.pop();
     }
 
-    /**
-     * @notice Function for unit testing purposes only
-     * @param index The index of the last Tranche
-     * @param tranche The address of the last Tranche
-     * @dev ToDo: Remove before deploying
-     */
-    function testPopTranche(uint256 index, address tranche) public {
-        _popTranche(index, tranche);
-    }
-
     /* ///////////////////////////////////////////////////////////////
                     PROTOCOL FEE CONFIGURATION
     ////////////////////////////////////////////////////////////// */
@@ -390,11 +380,6 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         }
     }
 
-    //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
-    function testSyncInterestsToLendingPool(uint256 assets) public onlyOwner {
-        _syncInterestsToLendingPool(assets);
-    }
-
     /* //////////////////////////////////////////////////////////////
                         INTEREST RATE LOGIC
     ////////////////////////////////////////////////////////////// */
@@ -495,11 +480,6 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
 
         //ToDo Although it should be an impossible state if the protocol functions as it should,
         //What if there is still more liquidity in the pool than totalRedeemableAssets, start an emergency procedure?
-    }
-
-    //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
-    function testProcessDefault(uint256 assets) public onlyOwner {
-        _processDefault(assets);
     }
 
     /* //////////////////////////////////////////////////////////////
