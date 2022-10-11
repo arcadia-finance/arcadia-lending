@@ -392,8 +392,9 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
     function _syncInterestsToLiquidityProviders(uint256 assets) internal {
         uint256 remainingAssets = assets;
 
+        uint256 trancheShare;
         for (uint256 i; i < tranches.length;) {
-            uint256 trancheShare = assets.mulDivUp(weights[i], totalWeight);
+            trancheShare = assets.mulDivUp(weights[i], totalWeight);
             unchecked {
                 realisedLiquidityOf[tranches[i]] += trancheShare;
                 remainingAssets -= trancheShare;
@@ -483,12 +484,14 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
             assets = totalRealisedLiquidity;
         }
 
+        address tranche;
+        uint256 maxBurned;
         for (uint256 i = tranches.length; i > 0;) {
             unchecked {
                 --i;
             }
-            address tranche = tranches[i];
-            uint256 maxBurned = realisedLiquidityOf[tranche];
+            tranche = tranches[i];
+            maxBurned = realisedLiquidityOf[tranche];
             if (assets < maxBurned) {
                 // burn
                 realisedLiquidityOf[tranche] -= assets;
