@@ -45,8 +45,7 @@ abstract contract DebtTokenTest is Test {
         pool = new LendingPool(asset, treasury, address(factory));
         pool.updateInterestRate(5 * 10 ** 16); //5% with 18 decimals precision
 
-        debt = new DebtToken(address(pool));
-        pool.setDebtToken(address(debt));
+        debt = DebtToken(address(pool));
 
         tranche = new Tranche(address(pool), "Senior", "SR");
         pool.addTranche(address(tranche), 50);
@@ -81,120 +80,23 @@ contract DeploymentTest is DebtTokenTest {
 }
 
 /*//////////////////////////////////////////////////////////////
-                            DEBT LOGIC
+                            DEPOSIT/WITHDRAWAL LOGIC
 //////////////////////////////////////////////////////////////*/
 
-contract DebtTest is DebtTokenTest {
-    function setUp() public override {
-        super.setUp();
-    }
-    
-    function testSuccess_totalAssets(uint128 assets, address receiver, uint24 deltaBlocks) public {
-        // Given: all neccesary contracts are deployed on the setup and last sync block is set
-        vm.assume(assets > 0);
-        vm.assume(deltaBlocks <= 13140000); //5 year
-        
-        pool.syncInterests();
-        vm.prank(address(pool));
-        // When: pool deposits assets
-        debt.deposit(assets, receiver);
-        uint64 interestRate = pool.interestRate();
-
-        vm.roll(block.number + deltaBlocks);
-
-        uint256 unrealisedDebt = calcUnrealisedDebtChecked(interestRate, deltaBlocks, assets);
-        emit log_uint(unrealisedDebt);
-        uint256 actualValue = debt.totalAssets();
-        uint256 expectedValue = assets + unrealisedDebt;
-
-        assertEq(actualValue, expectedValue);
-    }
-
-    //Helper functions
-    function calcUnrealisedDebtChecked(uint64 interestRate, uint24 deltaBlocks, uint128 realisedDebt)
-        internal
-        view
-        returns (uint256 unrealisedDebt)
-    {
-        uint256 base = 1e18 + uint256(interestRate);
-        uint256 exponent = uint256(deltaBlocks) * 1e18 / pool.YEARLY_BLOCKS();
-        unrealisedDebt = (uint256(realisedDebt) * (LogExpMath.pow(base, exponent) - 1e18)) / 1e18;
-    }
-
-    function testSuccess_previewDeposit(uint256 assets, address receiver) public {
-        vm.assume(assets > 0);
-
-        pool.syncInterests();
-        vm.startPrank(address(pool));
-        debt.previewDeposit(assets);
-        debt.deposit(assets, receiver);
-        vm.stopPrank();
-
-        assertEq(debt.totalAssets(), assets);
-    }
-
-    function testSuccess_previewWithdraw(uint128 assetsDeposited, uint128 assetsWithdrawn, address receiver, address owner) public {
-        // Given: assetsDeposited are bigger than 0 and bigger than or equal to assetsWithdrawn
-        vm.assume(assetsDeposited > 0);
-        vm.assume(assetsDeposited >= assetsWithdrawn);
-
-        pool.syncInterests();
-        vm.startPrank(address(pool));
-        debt.deposit(assetsDeposited, owner);
-
-        debt.previewWithdraw(assetsDeposited);
-        debt.withdraw(assetsWithdrawn, receiver, owner);
-        vm.stopPrank();
-
-        assertEq(debt.totalAssets(), assetsDeposited - assetsWithdrawn);
-    }
-}
-
-/*//////////////////////////////////////////////////////////////
-                    DEPOSIT/WITHDRAWAL LOGIC
-//////////////////////////////////////////////////////////////*/
-contract DepositAndWithdrawalTest is DebtTokenTest {
+contract DepositWithdrawalTest is DebtTokenTest {
     function setUp() public override {
         super.setUp();
     }
 
-    function testRevert_deposit_Unauthorised(uint128 assets, address receiver, address unprivilegedAddress) public {
-        vm.assume(unprivilegedAddress != address(pool));
-        // Given: all neccesary contracts are deployed on the setup and last sync block is set
-
-        pool.syncInterests();
-        vm.startPrank(unprivilegedAddress);
-        // When: depositing with unprivilegedAddress
-        // Then: deposit should revert with UNAUTHORIZED
-        vm.expectRevert("UNAUTHORIZED");
-        debt.deposit(assets, receiver);
-        vm.stopPrank();
-    }
-
-    function testRevert_deposit_ZeroShares(address receiver) public {
+    function testRevert_deposit(uint256 assets, address receiver, address sender) public {
         // Given: all neccesary contracts are deployed on the setup
 
-        vm.startPrank(address(pool));
-        // When: depositing zero shares
-        // Then: deposit should revert with ZERO_SHARES
-        vm.expectRevert("ZERO_SHARES");
-        debt.deposit(0, receiver);
+        vm.startPrank(sender);
+        // When: sender deposits assets
+        // Then: deposit should revert with DEPOSIT_NOT_SUPPORTED
+        vm.expectRevert("DEPOSIT_NOT_SUPPORTED");
+        pool.deposit(assets, receiver);
         vm.stopPrank();
-    }
-
-    function testSuccess_deposit(uint128 assets, address receiver) public {
-        vm.assume(assets > 0);
-        // Given: all neccesary contracts are deployed on the setup and last sync block is set
-        
-        pool.syncInterests();
-        vm.prank(address(pool));
-        // When: pool deposits assets
-        debt.deposit(assets, receiver);
-
-        // Then: receiver's maxWithdraw should be equal assets, maxRedeem should be equal assets, totalAssets should be equal assets
-        assertEq(debt.maxWithdraw(receiver), assets);
-        assertEq(debt.maxRedeem(receiver), assets);
-        assertEq(debt.totalAssets(), assets);
     }
 
     function testRevert_mint(uint256 shares, address receiver, address sender) public {
@@ -208,60 +110,15 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
         vm.stopPrank();
     }
 
-    function testRevert_withdraw_Unauthorised(uint256 assets, address receiver, address owner, address sender) public {
-        // Given: pool is not the sender
-        vm.assume(sender != address(pool));
+    function testRevert_withdraw(uint256 assets, address receiver, address owner, address sender) public {
+        // Given: all neccesary contracts are deployed on the setup
 
         vm.startPrank(sender);
         // When: sender withdraw
-        // Then: withdraw should revert with UNAUTHORIZED
-        vm.expectRevert("UNAUTHORIZED");
+        // Then: withdraw should revert with WITHDRAW_NOT_SUPPORTED
+        vm.expectRevert("WITHDRAW_NOT_SUPPORTED");
         debt.withdraw(assets, receiver, owner);
         vm.stopPrank();
-    }
-
-    function testRevert_withdraw_InsufficientAssets(
-        uint128 assetsDeposited,
-        uint128 assetsWithdrawn,
-        address receiver,
-        address owner
-    )
-        public
-    {
-        // Given: assetsDeposited are bigger than 0 but less than assetsWithdrawn
-        vm.assume(assetsDeposited > 0);
-        vm.assume(assetsDeposited < assetsWithdrawn);
-
-        vm.startPrank(address(pool));
-        // When: pool deposit assetsDeposited
-        debt.deposit(assetsDeposited, owner);
-
-        // Then: withdraw should revert
-        vm.expectRevert(stdError.arithmeticError);
-        debt.withdraw(assetsWithdrawn, receiver, owner);
-        vm.stopPrank();
-    }
-
-    function testSuccess_withdraw(uint128 assetsDeposited, uint128 assetsWithdrawn, address receiver, address owner)
-        public
-    {
-        // Given: assetsDeposited are bigger than 0 and bigger than or equal to assetsWithdrawn
-        vm.assume(assetsDeposited > 0);
-        vm.assume(assetsDeposited >= assetsWithdrawn);
-
-        pool.syncInterests();
-        vm.startPrank(address(pool));
-        // When: pool deposit assetsDeposited, withdraw assetsWithdrawn
-        debt.deposit(assetsDeposited, owner);
-
-        debt.withdraw(assetsWithdrawn, receiver, owner);
-        vm.stopPrank();
-
-        // Then: maxWithdraw should be equal to assetsDeposited minus assetsWithdrawn,
-        // maxRedeem should be equal to assetsDeposited minus assetsWithdrawn, totalAssets should be equal to assetsDeposited minus assetsWithdrawn
-        assertEq(debt.maxWithdraw(owner), assetsDeposited - assetsWithdrawn);
-        assertEq(debt.maxRedeem(owner), assetsDeposited - assetsWithdrawn);
-        assertEq(debt.totalAssets(), assetsDeposited - assetsWithdrawn);
     }
 
     function testRevert_redeem(uint256 shares, address receiver, address owner, address sender) public {
@@ -273,63 +130,6 @@ contract DepositAndWithdrawalTest is DebtTokenTest {
         vm.expectRevert("REDEEM_NOT_SUPPORTED");
         debt.redeem(shares, receiver, owner);
         vm.stopPrank();
-    }
-}
-
-/*//////////////////////////////////////////////////////////////
-                        INTERESTS LOGIC
-//////////////////////////////////////////////////////////////*/
-contract InterestTest is DebtTokenTest {
-    function setUp() public override {
-        super.setUp();
-    }
-
-    function testRevert_syncInterests_Unauthorised(
-        uint128 assetsDeposited,
-        uint128 interests,
-        address owner,
-        address unprivilegedAddress
-    )
-        public
-    {
-        // Given: unprivilegedAddress is not pool, assetsDeposited are bigger than zero but less than maximum uint128 value
-        vm.assume(unprivilegedAddress != address(pool));
-
-        vm.assume(assetsDeposited <= type(uint128).max);
-        vm.assume(assetsDeposited > 0);
-        
-        pool.syncInterests();
-        vm.prank(address(pool));
-        // When: pool deposit assetsDeposited
-        debt.deposit(assetsDeposited, owner);
-
-        vm.startPrank(unprivilegedAddress);
-        // Then: unprivilegedAddress syncInterests attempt should revert with UNAUTHORIZED
-        vm.expectRevert("UNAUTHORIZED");
-        debt.syncInterests(interests);
-        vm.stopPrank();
-    }
-
-    function testSucces_syncInterests(uint128 assetsDeposited, uint128 interests, address owner) public {
-        // Given: assetsDeposited are bigger than zero but less than equal to maximum uint256 value divided by totalAssets,
-        // interests less than equal to maximum uint256 value divided by totalAssets
-        vm.assume(assetsDeposited > 0);
-        uint256 totalAssets = uint256(assetsDeposited) + uint256(interests);
-        vm.assume(assetsDeposited <= type(uint256).max / totalAssets);
-        vm.assume(interests <= type(uint256).max / totalAssets);
-
-        pool.syncInterests();
-        vm.startPrank(address(pool));
-        // When: pool deposit assetsDeposited, syncInterests with interests
-        debt.deposit(assetsDeposited, owner);
-
-        debt.syncInterests(interests);
-        vm.stopPrank();
-
-        // Then: debt's maxWithdraw should be equal to totalAssets, debt's maxRedeem should be equal to assetsDeposited, debt's totalAssets should be equal to totalAssets
-        assertEq(debt.maxWithdraw(owner), totalAssets);
-        assertEq(debt.maxRedeem(owner), assetsDeposited);
-        assertEq(debt.totalAssets(), totalAssets);
     }
 }
 
