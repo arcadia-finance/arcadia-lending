@@ -14,6 +14,8 @@ import {ERC20, ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
  * @dev Protocol is according the ERC4626 standard, with a certain ERC20 as underlying
  */
 abstract contract DebtToken is ERC4626 {
+    uint256 public realisedDebt;
+
     /**
      * @notice The constructor for the debt token
      * @param asset The underlying ERC-20 token in which the debt is denominated
@@ -27,17 +29,14 @@ abstract contract DebtToken is ERC4626 {
     {}
 
     /*//////////////////////////////////////////////////////////////
-                            DEBT LOGIC
+                            ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
-    uint256 public totalDebt;
 
     /**
      * @notice Returns the total amount of outstanding debt in the underlying asset
      * @return totalDebt The total debt in underlying assets
      */
-    function totalAssets() public view override returns (uint256) {
-        return totalDebt;
-    }
+    function totalAssets() public view virtual override returns (uint256) {}
 
     /*//////////////////////////////////////////////////////////////
                         DEPOSIT/WITHDRAWAL LOGIC
@@ -64,7 +63,7 @@ abstract contract DebtToken is ERC4626 {
 
         _mint(receiver, shares);
 
-        totalDebt += assets;
+        realisedDebt += assets;
 
         emit Deposit(msg.sender, receiver, assets, shares);
     }
@@ -98,7 +97,7 @@ abstract contract DebtToken is ERC4626 {
 
         _burn(owner_, shares);
 
-        totalDebt -= assets;
+        realisedDebt -= assets;
 
         emit Withdraw(msg.sender, receiver, owner_, assets, shares);
     }

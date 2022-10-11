@@ -80,9 +80,10 @@ contract DeploymentTest is DebtTokenTest {
 }
 
 /*//////////////////////////////////////////////////////////////
-                    DEPOSIT/WITHDRAWAL LOGIC
+                            DEPOSIT/WITHDRAWAL LOGIC
 //////////////////////////////////////////////////////////////*/
-contract DepositAndWithdrawalTest is DebtTokenTest {
+
+contract DepositWithdrawalTest is DebtTokenTest {
     function setUp() public override {
         super.setUp();
     }
@@ -183,9 +184,7 @@ contract TransferTest is DebtTokenTest {
         bytes32 r,
         bytes32 s,
         address sender
-    )
-        public
-    {
+    ) public {
         // Given: all neccesary contracts are deployed on the setup
 
         vm.startPrank(sender);

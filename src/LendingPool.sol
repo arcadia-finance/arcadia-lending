@@ -33,7 +33,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
     uint64 public interestRate; //18 decimals precision
     uint32 public lastSyncedBlock;
     uint256 public totalWeight;
-    uint256 public totalRedeemableAssets;
+    uint256 public totalRealisedLiquidity;
     uint256 public feeWeight;
 
     address public treasury;
@@ -44,7 +44,8 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
     address[] public tranches;
 
     mapping(address => bool) public isTranche;
-    mapping(address => uint256) public redeemableAssetsOf;
+    mapping(address => uint256) public weight;
+    mapping(address => uint256) public realisedLiquidityOf;
     mapping(address => mapping(address => uint256)) public creditAllowance;
 
     event CreditApproval(address indexed vault, address indexed beneficiary, uint256 amount);
@@ -82,16 +83,17 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
     /**
      * @notice Adds a tranche to the Lending Pool
      * @param tranche The address of the Tranche
-     * @param weight The weight of the specific Tranche
+     * @param _weight The weight of the specific Tranche
      * @dev The order of the tranches is important, the most senior tranche is at index 0, the most junior at the last index.
      * @dev Each Tranche is an ERC-4626 contract
      * @dev The weight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
      * @dev ToDo: For now manually add newly created tranche, do via factory in future?
      */
-    function addTranche(address tranche, uint256 weight) public onlyOwner {
+    function addTranche(address tranche, uint256 _weight) public onlyOwner {
         require(!isTranche[tranche], "TR_AD: Already exists");
-        totalWeight += weight;
-        weights.push(weight);
+        totalWeight += _weight;
+        weights.push(_weight);
+        weight[tranche] = _weight;
         tranches.push(tranche);
         isTranche[tranche] = true;
     }
@@ -99,14 +101,15 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
     /**
      * @notice Changes the weight of a specific tranche
      * @param index The index of the Tranche for which a new weight is being set
-     * @param weight The new weight of the Tranche at the index
+     * @param _weight The new weight of the Tranche at the index
      * @dev The weight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
      * @dev ToDo: TBD of we want the weight to be changeable?
      */
-    function setWeight(uint256 index, uint256 weight) public onlyOwner {
+    function setWeight(uint256 index, uint256 _weight) public onlyOwner {
         require(index < tranches.length, "TR_SW: Inexisting Tranche");
-        totalWeight = totalWeight - weights[index] + weight;
-        weights[index] = weight;
+        totalWeight = totalWeight - weights[index] + _weight;
+        weights[index] = _weight;
+        weight[tranches[index]] = _weight;
     }
 
     /**
@@ -123,16 +126,6 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         isTranche[tranche] = false;
         weights.pop();
         tranches.pop();
-    }
-
-    /**
-     * @notice Function for unit testing purposes only
-     * @param index The index of the last Tranche
-     * @param tranche The address of the last Tranche
-     * @dev ToDo: Remove before deploying
-     */
-    function testPopTranche(uint256 index, address tranche) public {
-        _popTranche(index, tranche);
     }
 
     /* ///////////////////////////////////////////////////////////////
@@ -177,8 +170,8 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         asset.transferFrom(from, address(this), assets);
 
         unchecked {
-            redeemableAssetsOf[msg.sender] += assets;
-            totalRedeemableAssets += assets;
+            realisedLiquidityOf[msg.sender] += assets;
+            totalRealisedLiquidity += assets;
         }
 
         _updateInterestRate();
@@ -192,10 +185,10 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
     function withdrawFromLendingPool(uint256 assets, address receiver) public {
         _syncInterests();
 
-        require(redeemableAssetsOf[msg.sender] >= assets, "LP_W: Amount exceeds balance");
+        require(realisedLiquidityOf[msg.sender] >= assets, "LP_WFLP: Amount exceeds balance");
 
-        redeemableAssetsOf[msg.sender] -= assets;
-        totalRedeemableAssets -= assets;
+        realisedLiquidityOf[msg.sender] -= assets;
+        totalRealisedLiquidity -= assets;
 
         asset.safeTransfer(receiver, assets);
 
@@ -233,7 +226,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
      * @dev The sender might be different as the owner if they have the proper allowances
      */
     function borrow(uint256 amount, address vault, address to) public {
-        require(IFactory(vaultFactory).isVault(vault), "LP_TL: Not a vault");
+        require(IFactory(vaultFactory).isVault(vault), "LP_B: Not a vault");
 
         //Check allowances to send underlying to to
         if (IVault(vault).owner() != msg.sender) {
@@ -244,7 +237,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         }
 
         //Call vault to check if there is sufficient collateral
-        require(IVault(vault).increaseMarginPosition(address(asset), amount), "LP_TL: Reverted");
+        require(IVault(vault).increaseMarginPosition(address(asset), amount), "LP_B: Reverted");
 
         //Process interests since last update
         _syncInterests();
@@ -268,7 +261,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
      * If so, work with allowances
      */
     function repay(uint256 amount, address vault) public {
-        require(IFactory(vaultFactory).isVault(vault), "LP_RL: Not a vault");
+        require(IFactory(vaultFactory).isVault(vault), "LP_R: Not a vault");
 
         //Process interests since last update
         _syncInterests();
@@ -281,10 +274,47 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         _withdraw(transferAmount, vault, vault);
 
         //Call vault to unlock collateral
-        require(IVault(vault).decreaseMarginPosition(address(asset), transferAmount), "LP_RL: Reverted");
+        require(IVault(vault).decreaseMarginPosition(address(asset), transferAmount), "LP_R: Reverted");
 
         //Update interest rates
         _updateInterestRate();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            ACCOUNTING LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @notice Returns the total amount of outstanding debt in the underlying asset
+     * @return totalDebt The total debt in underlying assets
+     */
+    function totalAssets() public view override returns (uint256 totalDebt) {
+        // Avoid a second calculation of unrealised debt (expensive)
+        // if interersts are already synced this block.
+        if (lastSyncedBlock != uint32(block.number)) {
+            totalDebt = realisedDebt + calcUnrealisedDebt();
+        } else {
+            totalDebt = realisedDebt;
+        }
+    }
+
+    /**
+     * @notice Returns the redeemable amount of liquidity in the underlying asset of an address
+     * @param _of The address of the liquidity provider
+     * @dev For this implementation, _of is or an address of a tranche, or an address of a treasury
+     * @return liquidityOf_ The redeemable amount of liquidity
+     */
+    function liquidityOf(address _of) public view returns (uint256 liquidityOf_) {
+        // Avoid a second calculation of unrealised debt (expensive)
+        // if interersts are already synced this block.
+        if (lastSyncedBlock != uint32(block.number)) {
+            // The total liquidity of a tranche equals the sum of the realised liquidity
+            // of the tranche, and its pending interests
+            uint256 interest = calcUnrealisedDebt().mulDivUp(weight[_of], totalWeight);
+            liquidityOf_ = realisedLiquidityOf[_of] + interest;
+        } else {
+            liquidityOf_ = realisedLiquidityOf[_of];
+        }
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -306,15 +336,19 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
      * debt tokens to all debt holders and interests to LPs and the treasury
      */
     function _syncInterests() internal {
-        uint256 unrealisedDebt = uint256(_calcUnrealisedDebt());
+        // Only Sync interests once per block
+        if (lastSyncedBlock != uint32(block.number)) {
+            uint256 unrealisedDebt = calcUnrealisedDebt();
+            lastSyncedBlock = uint32(block.number);
 
-        //Sync interests for borrowers
-        unchecked {
-            totalDebt += unrealisedDebt;
+            //Sync interests for borrowers
+            unchecked {
+                realisedDebt += unrealisedDebt;
+            }
+
+            //Sync interests for LPs and Protocol Treasury
+            _syncInterestsToLiquidityProviders(unrealisedDebt);
         }
-
-        //Sync interests for LPs and Protocol Treasury
-        _syncInterestsToLendingPool(unrealisedDebt);
     }
 
     /**
@@ -327,7 +361,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
      * blocks produced over a year (using a 12s average block time).
      * _yearlyInterestRate = 1 + r expressed as 18 decimals fixed point number
      */
-    function _calcUnrealisedDebt() internal returns (uint256 unrealisedDebt) {
+    function calcUnrealisedDebt() public view returns (uint256 unrealisedDebt) {
         uint256 base;
         uint256 exponent;
 
@@ -344,16 +378,8 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
             //over a period of 5 years
             //this won't overflow as long as opendebt < 3402823669209384912995114146594816
             //which is 3.4 million billion *10**18 decimals
-
-            unrealisedDebt = (totalDebt * (LogExpMath.pow(base, exponent) - 1e18)) / 1e18;
+            unrealisedDebt = (realisedDebt * (LogExpMath.pow(base, exponent) - 1e18)) / 1e18;
         }
-
-        lastSyncedBlock = uint32(block.number);
-    }
-
-    //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
-    function testCalcUnrealisedDebt() public returns (uint256 unrealisedDebt) {
-        unrealisedDebt = _calcUnrealisedDebt();
     }
 
     /**
@@ -363,28 +389,24 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
      * @dev The Shares for each Tranche are rounded up, if the treasury receives the remaining shares and will hence loose
      * part of their yield due to rounding errors (neglectable small).
      */
-    function _syncInterestsToLendingPool(uint256 assets) internal {
+    function _syncInterestsToLiquidityProviders(uint256 assets) internal {
         uint256 remainingAssets = assets;
 
+        uint256 trancheShare;
         for (uint256 i; i < tranches.length;) {
-            uint256 trancheShare = assets.mulDivUp(weights[i], totalWeight);
+            trancheShare = assets.mulDivUp(weights[i], totalWeight);
             unchecked {
-                redeemableAssetsOf[tranches[i]] += trancheShare;
+                realisedLiquidityOf[tranches[i]] += trancheShare;
                 remainingAssets -= trancheShare;
                 ++i;
             }
         }
         unchecked {
-            totalRedeemableAssets += assets;
+            totalRealisedLiquidity += assets;
 
             // Add the remainingAssets to the treasury balance
-            redeemableAssetsOf[treasury] += remainingAssets;
+            realisedLiquidityOf[treasury] += remainingAssets;
         }
-    }
-
-    //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
-    function testSyncInterestsToLendingPool(uint256 assets) public onlyOwner {
-        _syncInterestsToLendingPool(assets);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -457,27 +479,29 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
      * the complete tranche is locked and removed. If there is still remaining bad debt, the next Tranche starts losing capital.
      */
     function _processDefault(uint256 assets) internal {
-        if (totalRedeemableAssets < assets) {
+        if (totalRealisedLiquidity < assets) {
             //Should never be possible, this means the total protocol has more debt than claimable liquidity.
-            assets = totalRedeemableAssets;
+            assets = totalRealisedLiquidity;
         }
 
+        address tranche;
+        uint256 maxBurned;
         for (uint256 i = tranches.length; i > 0;) {
             unchecked {
                 --i;
             }
-            address tranche = tranches[i];
-            uint256 maxBurned = redeemableAssetsOf[tranche];
+            tranche = tranches[i];
+            maxBurned = realisedLiquidityOf[tranche];
             if (assets < maxBurned) {
                 // burn
-                redeemableAssetsOf[tranche] -= assets;
-                totalRedeemableAssets -= assets;
+                realisedLiquidityOf[tranche] -= assets;
+                totalRealisedLiquidity -= assets;
                 break;
             } else {
                 ITranche(tranche).lock();
                 // burn
-                redeemableAssetsOf[tranche] -= maxBurned;
-                totalRedeemableAssets -= maxBurned;
+                realisedLiquidityOf[tranche] -= maxBurned;
+                totalRealisedLiquidity -= maxBurned;
                 _popTranche(i, tranche);
                 unchecked {
                     assets -= maxBurned;
@@ -486,12 +510,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         }
 
         //ToDo Although it should be an impossible state if the protocol functions as it should,
-        //What if there is still more liquidity in the pool than totalRedeemableAssets, start an emergency procedure?
-    }
-
-    //todo: Function only for testing purposes, to delete as soon as foundry allows to test internal functions.
-    function testProcessDefault(uint256 assets) public onlyOwner {
-        _processDefault(assets);
+        //What if there is still more liquidity in the pool than totalRealisedLiquidity, start an emergency procedure?
     }
 
     /* //////////////////////////////////////////////////////////////

@@ -234,9 +234,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address receiver,
         address owner,
         address unprivilegedAddress
-    )
-        public
-    {
+    ) public {
         // Given: unprivilegedAddress is not owner, assets bigger than 0, liquidityProvider deposit assets
         vm.assume(unprivilegedAddress != owner);
         vm.assume(assets > 0);
@@ -259,9 +257,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address receiver,
         address owner,
         address beneficiary
-    )
-        public
-    {
+    ) public {
         // Given: beneficiary is not owner, assetsDeposited is bigger than 0 and less than sharesAllowed, liquidityProvider deposit assetsDeposited, owner approve beneficiary
         vm.assume(beneficiary != owner);
         vm.assume(assetsDeposited > 0);
@@ -277,7 +273,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         // When: beneficiary withdraw
 
         // Then: withdraw should revert with stdError.arithmeticError
-        vm.expectRevert("LP_W: Amount exceeds balance");
+        vm.expectRevert("LP_WFLP: Amount exceeds balance");
         tranche.withdraw(sharesAllowed, receiver, owner);
         vm.stopPrank();
     }
@@ -287,9 +283,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         uint128 assetsWithdrawn,
         address owner,
         address receiver
-    )
-        public
-    {
+    ) public {
         // Given: assetsDeposited should be bigger than 0, less than assetsWithdrawn, liquidityProvider deposit assetsDeposited
         vm.assume(assetsDeposited > 0);
         vm.assume(assetsDeposited < assetsWithdrawn);
@@ -301,7 +295,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         // When: owner withdraw
 
         // Then: withdraw should revert with stdError.arithmeticError
-        vm.expectRevert("LP_W: Amount exceeds balance");
+        vm.expectRevert("LP_WFLP: Amount exceeds balance");
         tranche.withdraw(assetsWithdrawn, receiver, owner);
         vm.stopPrank();
     }
@@ -311,9 +305,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         uint128 assetsWithdrawn,
         address owner,
         address receiver
-    )
-        public
-    {
+    ) public {
         // Given: assetsDeposited bigger than 0, bigger than equal to assetsWithdrawn, receiver is not pool or liquidityProvider
         vm.assume(assetsDeposited > 0);
         vm.assume(assetsDeposited >= assetsWithdrawn);
@@ -342,9 +334,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address receiver,
         address owner,
         address beneficiary
-    )
-        public
-    {
+    ) public {
         // Given: assetsDeposited bigger than 0, bigger than equal to assetsWithdrawn, sharesAllowed bigger than equal to assetsWithdrawn,
         // receiver is not pool or liquidityProvider, beneficiary is not owner
         vm.assume(assetsDeposited > 0);
@@ -379,9 +369,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address receiver,
         address owner,
         address beneficiary
-    )
-        public
-    {
+    ) public {
         // Given: assetsDeposited is bigger than 0, bigger than equal to assetsWithdrawn, receiver is not liquidityProvider,
         // receiver is not pool, beneficiary is not owner
         vm.assume(assetsDeposited > 0);
@@ -429,9 +417,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address receiver,
         address owner,
         address unprivilegedAddress
-    )
-        public
-    {
+    ) public {
         // Given: unprivilegedAddress is not owner, shares bigger than 0, liquidityProvider mint shares
         vm.assume(unprivilegedAddress != owner);
         vm.assume(shares > 0);
@@ -454,9 +440,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address receiver,
         address owner,
         address beneficiary
-    )
-        public
-    {
+    ) public {
         // Given: beneficiary is not owner, sharesMinted bigger than 0 and less than sharesAllowed, liquidityProvider mint shares, owner approve beneficiary
         vm.assume(beneficiary != owner);
         vm.assume(sharesMinted > 0);
@@ -482,9 +466,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         uint128 sharesRedeemed,
         address owner,
         address receiver
-    )
-        public
-    {
+    ) public {
         // Given: sharesMinted bigger than 0, sharesMinted less than sharesRedeemed, liquidityProvider mint sharesMinted
         vm.assume(sharesMinted > 0);
         vm.assume(sharesMinted < sharesRedeemed);
@@ -533,9 +515,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address receiver,
         address owner,
         address beneficiary
-    )
-        public
-    {
+    ) public {
         // Given: sharesMinted and sharesRedeemed bigger than 0, sharesMinted and sharesAllowed bigger than equal sharesRedeemed, receiver is not liquidityProvider, receiver is not pool, beneficiary is not owner
         vm.assume(sharesMinted > 0);
         vm.assume(sharesRedeemed > 0);
@@ -572,9 +552,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address receiver,
         address owner,
         address beneficiary
-    )
-        public
-    {
+    ) public {
         // Given: sharesMinted and sharesRedeemed bigger than 0, sharesMinted bigger than equal sharesRedeemed, receiver is not liquidityProvider, receiver is not pool, beneficiary is not owner
         vm.assume(sharesMinted > 0);
         vm.assume(sharesRedeemed > 0);
