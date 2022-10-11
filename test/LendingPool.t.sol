@@ -128,6 +128,7 @@ contract TranchesTest is LendingPoolTest {
         // tranches address should be equal to srTranche address, isTranche with input srTranche should return true
         assertEq(pool.totalWeight(), 50);
         assertEq(pool.weights(0), 50);
+        assertEq(pool.weight(address(srTranche)), 50);
         assertEq(pool.tranches(0), address(srTranche));
         assertTrue(pool.isTranche(address(srTranche)));
     }
@@ -159,6 +160,8 @@ contract TranchesTest is LendingPoolTest {
         assertEq(pool.totalWeight(), 90);
         assertEq(pool.weights(0), 50);
         assertEq(pool.weights(1), 40);
+        assertEq(pool.weight(address(srTranche)), 50);
+        assertEq(pool.weight(address(jrTranche)), 40);
         assertEq(pool.tranches(0), address(srTranche));
         assertEq(pool.tranches(1), address(jrTranche));
         assertTrue(pool.isTranche(address(srTranche)));
@@ -196,7 +199,9 @@ contract TranchesTest is LendingPoolTest {
         vm.stopPrank();
 
         // Then: weights for index 0 should return 40
+        assertEq(pool.totalWeight(), 40);
         assertEq(pool.weights(0), 40);
+        assertEq(pool.weight(address(srTranche)), 40);
     }
 
     function testSuccess_popTranche() public {

@@ -44,6 +44,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
     address[] public tranches;
 
     mapping(address => bool) public isTranche;
+    mapping(address => uint256) public weight;
     mapping(address => uint256) public realisedLiquidityOf;
     mapping(address => mapping(address => uint256)) public creditAllowance;
 
@@ -82,16 +83,17 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
     /**
      * @notice Adds a tranche to the Lending Pool
      * @param tranche The address of the Tranche
-     * @param weight The weight of the specific Tranche
+     * @param _weight The weight of the specific Tranche
      * @dev The order of the tranches is important, the most senior tranche is at index 0, the most junior at the last index.
      * @dev Each Tranche is an ERC-4626 contract
      * @dev The weight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
      * @dev ToDo: For now manually add newly created tranche, do via factory in future?
      */
-    function addTranche(address tranche, uint256 weight) public onlyOwner {
+    function addTranche(address tranche, uint256 _weight) public onlyOwner {
         require(!isTranche[tranche], "TR_AD: Already exists");
-        totalWeight += weight;
-        weights.push(weight);
+        totalWeight += _weight;
+        weights.push(_weight);
+        weight[tranche] = _weight;
         tranches.push(tranche);
         isTranche[tranche] = true;
     }
@@ -99,14 +101,15 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
     /**
      * @notice Changes the weight of a specific tranche
      * @param index The index of the Tranche for which a new weight is being set
-     * @param weight The new weight of the Tranche at the index
+     * @param _weight The new weight of the Tranche at the index
      * @dev The weight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
      * @dev ToDo: TBD of we want the weight to be changeable?
      */
-    function setWeight(uint256 index, uint256 weight) public onlyOwner {
+    function setWeight(uint256 index, uint256 _weight) public onlyOwner {
         require(index < tranches.length, "TR_SW: Inexisting Tranche");
-        totalWeight = totalWeight - weights[index] + weight;
-        weights[index] = weight;
+        totalWeight = totalWeight - weights[index] + _weight;
+        weights[index] = _weight;
+        weight[tranches[index]] = _weight;
     }
 
     /**
@@ -324,7 +327,6 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
 
         //Sync interests for LPs and Protocol Treasury
         _syncInterestsToLendingPool(unrealisedDebt);
-
     }
 
     /**
