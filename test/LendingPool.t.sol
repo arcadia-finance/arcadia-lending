@@ -326,8 +326,8 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         pool.depositInLendingPool(amount, liquidityProvider);
 
         // Then: supplyBalances srTranche should be amount, totatlSupply should be amount, supplyBalances pool should be amount
-        assertEq(pool.redeemableAssetsOf(address(srTranche)), amount);
-        assertEq(pool.totalRedeemableAssets(), amount);
+        assertEq(pool.realisedLiquidityOf(address(srTranche)), amount);
+        assertEq(pool.totalRealisedLiquidity(), amount);
         assertEq(asset.balanceOf(address(pool)), amount);
     }
 
@@ -347,8 +347,8 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         pool.depositInLendingPool(amount1, liquidityProvider);
 
         // Then: supplyBalances jrTranche should be amount1, totalSupply should be totalAmount, supplyBalances pool should be totalAmount
-        assertEq(pool.redeemableAssetsOf(address(jrTranche)), amount1);
-        assertEq(pool.totalRedeemableAssets(), totalAmount);
+        assertEq(pool.realisedLiquidityOf(address(jrTranche)), amount1);
+        assertEq(pool.totalRealisedLiquidity(), totalAmount);
         assertEq(asset.balanceOf(address(pool)), totalAmount);
     }
 
@@ -411,8 +411,8 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
 
         // Then: supplyBalances srTranche, pool and totalSupply should be assetsDeposited minus assetsWithdrawn,
         // supplyBalances receiver should be assetsWithdrawn
-        assertEq(pool.redeemableAssetsOf(address(srTranche)), assetsDeposited - assetsWithdrawn);
-        assertEq(pool.totalRedeemableAssets(), assetsDeposited - assetsWithdrawn);
+        assertEq(pool.realisedLiquidityOf(address(srTranche)), assetsDeposited - assetsWithdrawn);
+        assertEq(pool.totalRealisedLiquidity(), assetsDeposited - assetsWithdrawn);
         assertEq(asset.balanceOf(address(pool)), assetsDeposited - assetsWithdrawn);
         assertEq(asset.balanceOf(receiver), assetsWithdrawn);
     }
@@ -867,10 +867,10 @@ contract InterestsTest is LendingPoolTest {
 
         // Then: supplyBalances srTranche should be equal to 50, supplyBalances jrTranche should be equal to 40,
         // supplyBalances treasury should be equal to 10, totalSupply should be equal to 100
-        assertEq(pool.redeemableAssetsOf(address(srTranche)), 50);
-        assertEq(pool.redeemableAssetsOf(address(jrTranche)), 40);
-        assertEq(pool.redeemableAssetsOf(address(treasury)), 10);
-        assertEq(pool.totalRedeemableAssets(), 100);
+        assertEq(pool.realisedLiquidityOf(address(srTranche)), 50);
+        assertEq(pool.realisedLiquidityOf(address(jrTranche)), 40);
+        assertEq(pool.realisedLiquidityOf(address(treasury)), 10);
+        assertEq(pool.totalRealisedLiquidity(), 100);
     }
 
     function testSuccess_syncInterestsToLendingPool_Rounded() public {
@@ -881,10 +881,10 @@ contract InterestsTest is LendingPoolTest {
 
         // Then: supplyBalances srTranche should be equal to 50, supplyBalances jrTranche should be equal to 40,
         // supplyBalances treasury should be equal to 9, totalSupply should be equal to 99
-        assertEq(pool.redeemableAssetsOf(address(srTranche)), 50);
-        assertEq(pool.redeemableAssetsOf(address(jrTranche)), 40);
-        assertEq(pool.redeemableAssetsOf(address(treasury)), 9);
-        assertEq(pool.totalRedeemableAssets(), 99);
+        assertEq(pool.realisedLiquidityOf(address(srTranche)), 50);
+        assertEq(pool.realisedLiquidityOf(address(jrTranche)), 40);
+        assertEq(pool.realisedLiquidityOf(address(treasury)), 9);
+        assertEq(pool.totalRealisedLiquidity(), 99);
     }
 
     function testSuccess_calcUnrealisedDebt_Unchecked(uint64 interestRate, uint24 deltaBlocks, uint128 realisedDebt)
@@ -946,7 +946,7 @@ contract InterestsTest is LendingPoolTest {
         uint256 interests = calcUnrealisedDebtChecked(interestRate, deltaBlocks, realisedDebt);
 
         //Then: Total redeemable interest of LP providers and total open debt of borrowers should increase with interests
-        assertEq(pool.totalRedeemableAssets(), realisedDebt + interests);
+        assertEq(pool.totalRealisedLiquidity(), realisedDebt + interests);
         assertEq(debt.maxWithdraw(address(vault)), realisedDebt + interests);
         assertEq(debt.maxRedeem(address(vault)), realisedDebt);
         assertEq(debt.totalAssets(), realisedDebt + interests);
@@ -1138,8 +1138,8 @@ contract DefaultTest is LendingPoolTest {
         pool.settleLiquidation(defaultAmount, 0);
 
         // Then: The default amount should be discounted from the most junior tranche
-        assertEq(pool.redeemableAssetsOf(address(srTranche)), liquidity - defaultAmount);
-        assertEq(pool.totalRedeemableAssets(), liquidity - defaultAmount);
+        assertEq(pool.realisedLiquidityOf(address(srTranche)), liquidity - defaultAmount);
+        assertEq(pool.totalRealisedLiquidity(), liquidity - defaultAmount);
     }
 
     function testSuccess_settleLiquidation_ProcessDeficit(
@@ -1191,9 +1191,9 @@ contract DefaultTest is LendingPoolTest {
 
         // Then: supplyBalances srTranche should be liquiditySenior, supplyBalances jrTranche should be liquidityJunior minus defaultAmount,
         // totalSupply should be equal to totalAmount minus defaultAmount
-        assertEq(pool.redeemableAssetsOf(address(srTranche)), liquiditySenior);
-        assertEq(pool.redeemableAssetsOf(address(jrTranche)), liquidityJunior - defaultAmount);
-        assertEq(pool.totalRedeemableAssets(), totalAmount - defaultAmount);
+        assertEq(pool.realisedLiquidityOf(address(srTranche)), liquiditySenior);
+        assertEq(pool.realisedLiquidityOf(address(jrTranche)), liquidityJunior - defaultAmount);
+        assertEq(pool.totalRealisedLiquidity(), totalAmount - defaultAmount);
     }
 
     function testSuccess_processDefault_TwoTranches(
@@ -1220,9 +1220,9 @@ contract DefaultTest is LendingPoolTest {
 
         // Then: supplyBalances srTranche should be totalAmount minus defaultAmount, supplyBalances jrTranche should be 0,
         // totalSupply should be equal to totalAmount minus defaultAmount, isTranche for jrTranche should return false
-        assertEq(pool.redeemableAssetsOf(address(srTranche)), totalAmount - defaultAmount);
-        assertEq(pool.redeemableAssetsOf(address(jrTranche)), 0);
-        assertEq(pool.totalRedeemableAssets(), totalAmount - defaultAmount);
+        assertEq(pool.realisedLiquidityOf(address(srTranche)), totalAmount - defaultAmount);
+        assertEq(pool.realisedLiquidityOf(address(jrTranche)), 0);
+        assertEq(pool.totalRealisedLiquidity(), totalAmount - defaultAmount);
         assertFalse(pool.isTranche(address(jrTranche)));
     }
 
@@ -1249,9 +1249,9 @@ contract DefaultTest is LendingPoolTest {
 
         // Then: balanceOf srTranche should be 0, balanceOf jrTranche should be 0,
         // totalSupply should be equal to 0, isTranche for jrTranche and srTranche should return false
-        assertEq(pool.redeemableAssetsOf(address(srTranche)), 0);
-        assertEq(pool.redeemableAssetsOf(address(jrTranche)), 0);
-        assertEq(pool.totalRedeemableAssets(), 0);
+        assertEq(pool.realisedLiquidityOf(address(srTranche)), 0);
+        assertEq(pool.realisedLiquidityOf(address(jrTranche)), 0);
+        assertEq(pool.totalRealisedLiquidity(), 0);
         assertFalse(pool.isTranche(address(jrTranche)));
         assertFalse(pool.isTranche(address(srTranche)));
 

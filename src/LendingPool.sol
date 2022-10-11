@@ -33,7 +33,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
     uint64 public interestRate; //18 decimals precision
     uint32 public lastSyncedBlock;
     uint256 public totalWeight;
-    uint256 public totalRedeemableAssets;
+    uint256 public totalRealisedLiquidity;
     uint256 public feeWeight;
 
     address public treasury;
@@ -44,7 +44,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
     address[] public tranches;
 
     mapping(address => bool) public isTranche;
-    mapping(address => uint256) public redeemableAssetsOf;
+    mapping(address => uint256) public realisedLiquidityOf;
     mapping(address => mapping(address => uint256)) public creditAllowance;
 
     event CreditApproval(address indexed vault, address indexed beneficiary, uint256 amount);
@@ -167,8 +167,8 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         asset.transferFrom(from, address(this), assets);
 
         unchecked {
-            redeemableAssetsOf[msg.sender] += assets;
-            totalRedeemableAssets += assets;
+            realisedLiquidityOf[msg.sender] += assets;
+            totalRealisedLiquidity += assets;
         }
 
         _updateInterestRate();
@@ -182,10 +182,10 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
     function withdrawFromLendingPool(uint256 assets, address receiver) public {
         _syncInterests();
 
-        require(redeemableAssetsOf[msg.sender] >= assets, "LP_W: Amount exceeds balance");
+        require(realisedLiquidityOf[msg.sender] >= assets, "LP_W: Amount exceeds balance");
 
-        redeemableAssetsOf[msg.sender] -= assets;
-        totalRedeemableAssets -= assets;
+        realisedLiquidityOf[msg.sender] -= assets;
+        totalRealisedLiquidity -= assets;
 
         asset.safeTransfer(receiver, assets);
 
@@ -371,16 +371,16 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         for (uint256 i; i < tranches.length;) {
             uint256 trancheShare = assets.mulDivUp(weights[i], totalWeight);
             unchecked {
-                redeemableAssetsOf[tranches[i]] += trancheShare;
+                realisedLiquidityOf[tranches[i]] += trancheShare;
                 remainingAssets -= trancheShare;
                 ++i;
             }
         }
         unchecked {
-            totalRedeemableAssets += assets;
+            totalRealisedLiquidity += assets;
 
             // Add the remainingAssets to the treasury balance
-            redeemableAssetsOf[treasury] += remainingAssets;
+            realisedLiquidityOf[treasury] += remainingAssets;
         }
     }
 
@@ -454,9 +454,9 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
      * the complete tranche is locked and removed. If there is still remaining bad debt, the next Tranche starts losing capital.
      */
     function _processDefault(uint256 assets) internal {
-        if (totalRedeemableAssets < assets) {
+        if (totalRealisedLiquidity < assets) {
             //Should never be possible, this means the total protocol has more debt than claimable liquidity.
-            assets = totalRedeemableAssets;
+            assets = totalRealisedLiquidity;
         }
 
         for (uint256 i = tranches.length; i > 0;) {
@@ -464,17 +464,17 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
                 --i;
             }
             address tranche = tranches[i];
-            uint256 maxBurned = redeemableAssetsOf[tranche];
+            uint256 maxBurned = realisedLiquidityOf[tranche];
             if (assets < maxBurned) {
                 // burn
-                redeemableAssetsOf[tranche] -= assets;
-                totalRedeemableAssets -= assets;
+                realisedLiquidityOf[tranche] -= assets;
+                totalRealisedLiquidity -= assets;
                 break;
             } else {
                 ITranche(tranche).lock();
                 // burn
-                redeemableAssetsOf[tranche] -= maxBurned;
-                totalRedeemableAssets -= maxBurned;
+                realisedLiquidityOf[tranche] -= maxBurned;
+                totalRealisedLiquidity -= maxBurned;
                 _popTranche(i, tranche);
                 unchecked {
                     assets -= maxBurned;
@@ -483,7 +483,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         }
 
         //ToDo Although it should be an impossible state if the protocol functions as it should,
-        //What if there is still more liquidity in the pool than totalRedeemableAssets, start an emergency procedure?
+        //What if there is still more liquidity in the pool than totalRealisedLiquidity, start an emergency procedure?
     }
 
     /* //////////////////////////////////////////////////////////////
