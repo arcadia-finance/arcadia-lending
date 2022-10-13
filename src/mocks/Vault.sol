@@ -1,13 +1,12 @@
-/** 
-    Created by Arcadia Finance
-    https://www.arcadia.finance
-
-    SPDX-License-Identifier: BUSL-1.1
+/**
+ * Created by Arcadia Finance
+ * https://www.arcadia.finance
+ *
+ * SPDX-License-Identifier: BUSL-1.1
  */
- pragma solidity ^0.8.13;
+pragma solidity ^0.8.13;
 
- contract Vault {
-
+contract Vault {
     address public owner;
     uint256 public totalValue;
     uint256 public lockedValue;
@@ -21,7 +20,7 @@
         totalValue = _totalValue;
     }
 
-    function increaseMarginPosition(uint256, uint256 amount) external returns (bool) {
+    function increaseMarginPosition(address, uint256 amount) external returns (bool) {
         if (totalValue - lockedValue >= amount) {
             lockedValue += amount;
             return true;
@@ -30,7 +29,7 @@
         }
     }
 
-    function decreaseMarginPosition(uint256, uint256 amount) external returns (bool) {
+    function decreaseMarginPosition(address, uint256 amount) external returns (bool) {
         if (lockedValue >= amount) {
             lockedValue -= amount;
             return true;
@@ -38,5 +37,4 @@
             return false;
         }
     }
-
- }
+}
