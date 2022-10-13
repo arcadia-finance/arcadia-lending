@@ -18,13 +18,13 @@ abstract contract DebtToken is ERC4626 {
 
     /**
      * @notice The constructor for the debt token
-     * @param asset The underlying ERC-20 token in which the debt is denominated
+     * @param asset_ The underlying ERC-20 token in which the debt is denominated
      */
-    constructor(ERC20 asset)
+    constructor(ERC20 asset_)
         ERC4626(
-            asset,
-            string(abi.encodePacked("Arcadia ", asset.name(), " Debt")),
-            string(abi.encodePacked("darc", asset.symbol()))
+            asset_,
+            string(abi.encodePacked("Arcadia ", asset_.name(), " Debt")),
+            string(abi.encodePacked("darc", asset_.symbol()))
         )
     {}
 
