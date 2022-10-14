@@ -19,19 +19,19 @@ import "./libraries/DataTypes.sol";
 import "./interfaces/ILendingPool.sol";
 import {TrustedProtocol} from "./TrustedProtocol.sol";
 import {DebtToken} from "./DebtToken.sol";
+import {InterestRateModule} from "./libraries/InterestRateModule.sol";
 
 /**
  * @title Lending Pool
  * @author Arcadia Finance
  * @notice The Lending pool contains the main logic to provide liquidity and take or repay loans for a certain asset
  */
-contract LendingPool is Owned, TrustedProtocol, DebtToken {
+contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
     uint256 public constant YEARLY_BLOCKS = 2628000;
 
-    uint64 public interestRate; //18 decimals precision
     uint32 public lastSyncedBlock;
     uint256 public totalWeight;
     uint256 public totalRealisedLiquidity;
@@ -175,7 +175,10 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
             totalRealisedLiquidity += assets;
         }
 
-        _updateInterestRate();
+        uint256 _utilisation = realisedDebt / totalRealisedLiquidity;
+
+        //Update interest rates
+        _updateInterestRate(_utilisation);
     }
 
     /**
@@ -193,7 +196,10 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
 
         asset.safeTransfer(receiver, assets);
 
-        _updateInterestRate();
+        uint256 _utilisation = realisedDebt / totalRealisedLiquidity;
+
+        //Update interest rates
+        _updateInterestRate(_utilisation);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -250,8 +256,10 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
             _deposit(amount, vault);
         }
 
+        uint256 _utilisation = realisedDebt / totalRealisedLiquidity;
+
         //Update interest rates
-        _updateInterestRate();
+        _updateInterestRate(_utilisation);
     }
 
     /**
@@ -277,8 +285,10 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         //Call vault to unlock collateral
         require(IVault(vault).decreaseMarginPosition(address(asset), transferAmount), "LP_R: Reverted");
 
+        uint256 _utilisation = realisedDebt / totalRealisedLiquidity;
+
         //Update interest rates
-        _updateInterestRate();
+        _updateInterestRate(_utilisation);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -417,10 +427,6 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
     function updateInterestRate(uint64 _interestRate) external onlyOwner {
         //Todo: Remove function after _updateInterestRate() is implemented
         interestRate = _interestRate; //with 18 decimals precision
-    }
-
-    function _updateInterestRate() internal {
-        //ToDo
     }
 
     /* //////////////////////////////////////////////////////////////

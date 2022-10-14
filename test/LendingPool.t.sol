@@ -885,8 +885,10 @@ contract InterestsTest is LendingPoolTest {
     {
         // Given: interestRate is smaller than %1000, deltaBlocks than 5 years, realisedDebt than 3402823669209384912995114146594816
         vm.assume(interestRate <= 10 * 10 ** 18); //1000%
+        vm.assume(interestRate > 0);
         vm.assume(deltaBlocks <= 13140000); //5 year
         vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
+        vm.assume(realisedDebt > 0);
 
         // And: the interest rate is interestRate
         uint256 loc = stdstore.target(address(pool)).sig(pool.interestRate.selector).find();
@@ -914,8 +916,10 @@ contract InterestsTest is LendingPoolTest {
     function testSucces_syncInterests(uint64 interestRate, uint24 deltaBlocks, uint128 realisedDebt) public {
         // Given: interestRate is smaller than %1000, deltaBlocks than 5 years, realisedDebt than 3402823669209384912995114146594816
         vm.assume(interestRate <= 10 * 10 ** 18); //1000%
+        vm.assume(interestRate > 0);
         vm.assume(deltaBlocks <= 13140000); //5 year
         vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
+        vm.assume(realisedDebt > 0);
 
         // And: the vaultOwner takes realisedDebt debt
         vault.setTotalValue(realisedDebt);
@@ -968,6 +972,8 @@ contract AccountingTest is LendingPoolTest {
     function testSuccess_totalAssets(uint128 realisedDebt, uint64 interestRate, uint24 deltaBlocks) public {
         // Given: all neccesary contracts are deployed on the setup
         vm.assume(interestRate <= 10 * 10 ** 18); //1000%
+        vm.assume(interestRate > 0);
+        vm.assume(realisedDebt > 0);
         vm.assume(deltaBlocks <= 13140000); //5 year
 
         vm.prank(creator);
@@ -997,6 +1003,8 @@ contract AccountingTest is LendingPoolTest {
         // Given: all neccesary contracts are deployed on the setup
         vm.assume(initialLiquidity >= realisedDebt);
         vm.assume(interestRate <= 10 * 10 ** 18); //1000%
+        vm.assume(interestRate > 0);
+        vm.assume(realisedDebt > 0);
         vm.assume(deltaBlocks <= 13140000); //5 year
 
         vm.prank(creator);
@@ -1137,7 +1145,7 @@ contract DefaultTest is LendingPoolTest {
     }
 
     function testSuccess_settleLiquidation_ProcessDefault(uint256 defaultAmount, uint256 liquidity) public {
-        // Given: provided liquidity is bigger than the default amount (Sould always be true)
+        // Given: provided liquidity is bigger than the default amount (Should always be true)
         vm.assume(liquidity >= defaultAmount);
         // And: Liquidity is deposited in Lending Pool
         vm.prank(address(srTranche));
