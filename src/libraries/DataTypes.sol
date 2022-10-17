@@ -1,3 +1,6 @@
+
+pragma solidity ^0.8.13;
+
 library DataTypes {
     // TODO: Optimize the variables
     struct InterestRateConfiguration {
