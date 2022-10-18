@@ -403,7 +403,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-//ASK
+//Ask
     function testSuccess_withdraw(uint256 assetsDeposited, uint256 assetsWithdrawn, address receiver) public {
         // Given: assetsWithdrawn less than equal assetsDeposited, receiver is not pool or liquidityProvider,
         // liquidityProvider approve max value
@@ -411,7 +411,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         vm.assume(receiver != liquidityProvider);
         vm.assume(assetsDeposited > 0 );
         vm.assume(assetsWithdrawn > 0 );
-        vm.assume(assetsDeposited > assetsWithdrawn);
+        vm.assume(assetsDeposited >= assetsWithdrawn);
 
         vm.prank(liquidityProvider);
         asset.approve(address(pool), type(uint256).max);
