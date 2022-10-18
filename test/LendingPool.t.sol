@@ -980,12 +980,21 @@ contract AccountingTest is LendingPoolTest {
         asset.approve(address(pool), type(uint256).max);
     }
 
-    function testSuccess_totalAssets(uint128 realisedDebt, uint64 interestRate, uint24 deltaBlocks) public {
+    function testSuccess_totalAssets(
+        uint128 realisedDebt, 
+        uint128 initialLiquidity, 
+        uint24 deltaBlocks, 
+        DataTypes.InterestRateConfiguration memory interestRateConfig
+        ) public {
         // Given: all neccesary contracts are deployed on the setup
-        vm.assume(interestRate <= 10 * 10 ** 18); //1000%
-        vm.assume(interestRate > 0);
+        vm.assume(initialLiquidity >= realisedDebt);
+        //vm.assume(interestRate <= 10 * 10 ** 18); //1000%
+        //vm.assume(interestRate > 0);
         vm.assume(realisedDebt > 0);
         vm.assume(deltaBlocks <= 13140000); //5 year
+
+        uint256 utilisation = realisedDebt / initialLiquidity;
+        uint64 interestRate = InterestRateTestUtils.calculateInterestRate(utilisation, interestRateConfig);
 
         vm.prank(creator);
         pool.updateInterestRate(interestRate);
@@ -1030,7 +1039,7 @@ contract AccountingTest is LendingPoolTest {
         vm.prank(vaultOwner);
         pool.borrow(realisedDebt, address(vault), vaultOwner);
 
-        // 
+        // When: 
         vm.roll(block.number + deltaBlocks);
         uint256 unrealisedDebt = calcUnrealisedDebtChecked(interestRate, deltaBlocks, realisedDebt);
         uint256 interest = unrealisedDebt * 50 / 90;
@@ -1189,6 +1198,8 @@ contract DefaultTest is LendingPoolTest {
         vm.assume(liquidity >= defaultAmount);
         // And: Available liquidity is bigger than the deficit amount (ToDo: unhappy flow!!!)
         vm.assume(liquidity >= deficitAmount);
+        // And: Liquidity is bigger than zero
+        vm.assume(liquidity > 0);
         // And: Liquidity is deposited in Lending Pool
         vm.prank(address(srTranche));
         pool.depositInLendingPool(liquidity, liquidityProvider);

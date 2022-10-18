@@ -11,7 +11,7 @@ import "./DataTypes.sol";
 
 abstract contract InterestRateModule is Owned {
 
-    uint256 public interestRate; //18 decimals precision
+    uint64 public interestRate; //18 decimals precision
 
     DataTypes.InterestRateConfiguration internal config;
 
@@ -20,19 +20,19 @@ abstract contract InterestRateModule is Owned {
     }
 
     // TODO: Add safe math
-    function calculateInterestRate(uint256 utilisation) internal returns(uint256){
+    function calculateInterestRate(uint64 utilisation) internal returns(uint64){
         if (utilisation >= config.utilisationThreshold) {
-            uint256 lowSlopeInterest = uint256(config.utilisationThreshold * config.lowSlope);
-            uint256 highSlopeInterest = uint256((utilisation - config.utilisationThreshold) * config.highSlope);
-            return uint256(config.baseRate + lowSlopeInterest + highSlopeInterest);
+            uint64 lowSlopeInterest = uint64(config.utilisationThreshold * config.lowSlope);
+            uint64 highSlopeInterest = uint64((utilisation - config.utilisationThreshold) * config.highSlope);
+            return uint64(config.baseRate + lowSlopeInterest + highSlopeInterest);
         } else {
-            return uint256(config.baseRate + config.lowSlope * utilisation);
+            return uint64(config.baseRate + config.lowSlope * utilisation);
         }
     }
 
-    function _updateInterestRate(uint256 utilisation) internal {
+    function _updateInterestRate(uint64 utilisation) internal {
         //ToDo
-        uint256 interestRate_ = calculateInterestRate(utilisation);
+        uint64 interestRate_ = calculateInterestRate(utilisation);
         interestRate = interestRate_;
     }
 

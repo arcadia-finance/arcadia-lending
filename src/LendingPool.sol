@@ -175,7 +175,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
             totalRealisedLiquidity += assets;
         }
 
-        uint256 _utilisation = realisedDebt / totalRealisedLiquidity;
+        uint64 _utilisation = uint64(realisedDebt / totalRealisedLiquidity);
 
         //Update interest rates
         _updateInterestRate(_utilisation);
@@ -196,7 +196,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
 
         asset.safeTransfer(receiver, assets);
 
-        uint256 _utilisation = realisedDebt / totalRealisedLiquidity;
+        uint64 _utilisation = uint64(realisedDebt / totalRealisedLiquidity);
 
         //Update interest rates
         _updateInterestRate(_utilisation);
@@ -256,7 +256,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
             _deposit(amount, vault);
         }
 
-        uint256 _utilisation = realisedDebt / totalRealisedLiquidity;
+        uint64 _utilisation = uint64(realisedDebt / totalRealisedLiquidity);
 
         //Update interest rates
         _updateInterestRate(_utilisation);
@@ -285,7 +285,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
         //Call vault to unlock collateral
         require(IVault(vault).decreaseMarginPosition(address(asset), transferAmount), "LP_R: Reverted");
 
-        uint256 _utilisation = realisedDebt / totalRealisedLiquidity;
+        uint64 _utilisation = uint64(realisedDebt / totalRealisedLiquidity);
 
         //Update interest rates
         _updateInterestRate(_utilisation);
