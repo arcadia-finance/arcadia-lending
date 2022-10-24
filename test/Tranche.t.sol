@@ -45,7 +45,6 @@ abstract contract TrancheTest is Test {
     function setUp() public virtual {
         vm.startPrank(creator);
         pool = new LendingPool(asset, treasury, address(factory));
-        pool.updateInterestRate(5 * 10 ** 16); //5% with 18 decimals precision
 
         tranche = new Tranche(address(pool), "Senior", "SR");
         pool.addTranche(address(tranche), 50);

@@ -43,7 +43,6 @@ abstract contract DebtTokenTest is Test {
     function setUp() public virtual {
         vm.startPrank(creator);
         pool = new LendingPool(asset, treasury, address(factory));
-        pool.updateInterestRate(5 * 10 ** 16); //5% with 18 decimals precision
 
         debt = DebtToken(address(pool));
 
@@ -57,7 +56,7 @@ abstract contract DebtTokenTest is Test {
 }
 
 /*//////////////////////////////////////////////////////////////
-                        DEPLOYMENT
+                            DEPLOYMENT
 //////////////////////////////////////////////////////////////*/
 contract DeploymentTest is DebtTokenTest {
     function setUp() public override {
@@ -80,7 +79,7 @@ contract DeploymentTest is DebtTokenTest {
 }
 
 /*//////////////////////////////////////////////////////////////
-                            DEPOSIT/WITHDRAWAL LOGIC
+                    DEPOSIT/WITHDRAWAL LOGIC
 //////////////////////////////////////////////////////////////*/
 
 contract DepositWithdrawalTest is DebtTokenTest {

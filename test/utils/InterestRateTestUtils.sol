@@ -8,15 +8,28 @@ pragma solidity ^0.8.13;
 
 import "../../src/libraries/DataTypes.sol";
 
-library InterestRateTestUtils {
+abstract contract InterestRateTestUtils {
 
-    function calculateInterestRate(uint256 utilisation, DataTypes.InterestRateConfiguration memory config) public returns (uint64){
+    uint64 public interestRate; //18 decimals precision
+
+    DataTypes.InterestRateConfiguration internal config;
+
+    function setInterestConfig(DataTypes.InterestRateConfiguration memory newConfig) public {
+        config = newConfig;
+    }
+
+    function calculateInterestRate(uint64 utilisation) public view returns (uint64){
         if (utilisation >= config.utilisationThreshold) {
-            uint256 lowSlopeInterest = uint256(config.utilisationThreshold * config.lowSlope);
-            uint256 highSlopeInterest = uint256((utilisation - config.utilisationThreshold) * config.highSlope);
+            uint64 lowSlopeInterest = uint64(config.utilisationThreshold * config.lowSlope);
+            uint64 highSlopeInterest = uint64((utilisation - config.utilisationThreshold) * config.highSlope);
             return uint64(config.baseRate + lowSlopeInterest + highSlopeInterest);
         } else {
             return uint64(config.baseRate + config.lowSlope * utilisation);
         }
+    }
+
+    function _updateInterestRate(uint64 utilisation) public {
+        uint64 interestRate_ = calculateInterestRate(utilisation);
+        interestRate = interestRate_;
     }
 }

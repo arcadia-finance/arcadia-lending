@@ -424,9 +424,11 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
                         INTEREST RATE LOGIC
     ////////////////////////////////////////////////////////////// */
 
-    function updateInterestRate(uint64 _interestRate) external onlyOwner {
+    function updateInterestRate() external onlyOwner {
         //Todo: Remove function after _updateInterestRate() is implemented
-        interestRate = _interestRate; //with 18 decimals precision
+        //interestRate = _interestRate; //with 18 decimals precision
+        uint64 _utilisation = uint64(realisedDebt / totalRealisedLiquidity);
+        _updateInterestRate(_utilisation);
     }
 
     /* //////////////////////////////////////////////////////////////
