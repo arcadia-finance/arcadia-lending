@@ -12,7 +12,7 @@ import "../src/mocks/Asset.sol";
 import "../src/mocks/Factory.sol";
 import "../src/Tranche.sol";
 import "../src/DebtToken.sol";
-import "./utils/InterestRateTestUtils.sol";
+//import "./utils/InterestRateTestUtils.sol";
 
 contract LendingPoolExtension is LendingPool {
     //Extensions to test internal functions
@@ -927,8 +927,6 @@ contract InterestsTest is LendingPoolTest {
 
     function testSucces_syncInterests(uint24 deltaBlocks, uint128 realisedDebt) public {
         // Given: interestRate is smaller than %1000, deltaBlocks than 5 years, realisedDebt than 3402823669209384912995114146594816
-/*         vm.assume(interestRate <= 10 * 10 ** 18); //1000%
-        vm.assume(interestRate > 0); */
         vm.assume(deltaBlocks <= 13140000); //5 year
         vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
         vm.assume(realisedDebt > 0);
