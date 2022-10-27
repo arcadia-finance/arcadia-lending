@@ -33,19 +33,19 @@ contract InterestRateModuleTest is Test {
     }
 
     function testSuccess_calculateInterestRate_UnderOptimalUtilisation(uint64 utilisation) public {
-        // Given: utilisation is between 0 and 80
+        // Given: utilisation is between 0 and 80, InterestRateConfiguration setted as config
         vm.assume(utilisation > 0);
         vm.assume(utilisation <= 80);
 
-        // When: creator sets the InterestRateConfiguration as config and calls setInterestConfig with config
-        vm.startPrank(creator);
         DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
             baseRate: 1,
             highSlope: 2,
             lowSlope: 1,
             utilisationThreshold: 80
         });
-        
+
+        // When: creator calls setInterestConfig with config
+        vm.startPrank(creator);
         interest.setInterestConfig(config);
         
         // And: actualInterestRate is _calculateInterestRate with utilisation
@@ -60,12 +60,11 @@ contract InterestRateModuleTest is Test {
     }
 
     function testSuccess_calculateInterestRate_OverOptimalUtilisation(uint64 utilisation) public {
-        // Given: utilisation is between 80 and 100
+        // Given: utilisation is between 80 and 100, InterestRateConfiguration setted as config
+        //TODO: Fuzz
         vm.assume(utilisation > 80);
         vm.assume(utilisation <= 100);
 
-        // When: creator sets the InterestRateConfiguration as config and calls setInterestConfig with config
-        vm.startPrank(creator);
         DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
             baseRate: 1,
             highSlope: 2,
@@ -73,6 +72,8 @@ contract InterestRateModuleTest is Test {
             utilisationThreshold: 80
         });
         
+        // When: creator calls setInterestConfig with config
+        vm.startPrank(creator);
         interest.setInterestConfig(config);
         
         // And: actualInterestRate is _calculateInterestRate with utilisation
@@ -90,4 +91,22 @@ contract InterestRateModuleTest is Test {
         assertEq(actualInterestRate, expectedInterestRate);
     }
     
+    function testRevert_setInterestConfig_NonOwner(address unprivilegedAddress) public {
+        // Given: unprivilegedAddress is not creator, InterestRateConfiguration setted as config
+        vm.assume(unprivilegedAddress != creator);
+
+        DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
+            baseRate: 1,
+            highSlope: 2,
+            lowSlope: 1,
+            utilisationThreshold: 80
+        });
+        
+        vm.startPrank(unprivilegedAddress);
+        // When: unprivilegedAddress calls setInterestConfig
+        // Then: setInterestConfig should revert with UNAUTHORIZED
+        vm.expectRevert("UNAUTHORIZED");
+        interest.setInterestConfig(config);
+        vm.stopPrank();
+    }
 }

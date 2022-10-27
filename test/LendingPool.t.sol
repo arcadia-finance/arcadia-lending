@@ -277,7 +277,7 @@ contract ProtocolFeeTest is LendingPoolTest {
         vm.assume(unprivilegedAddress != creator);
 
         vm.startPrank(unprivilegedAddress);
-        // When: unprivilegedAddress setTreasury
+        // When: unprivilegedAddress calls setTreasury
         // Then: setTreasury should revert with UNAUTHORIZED
         vm.expectRevert("UNAUTHORIZED");
         pool.setTreasury(creator);
@@ -936,10 +936,6 @@ contract InterestsTest is LendingPoolTest {
         vm.prank(vaultOwner);
         pool.borrow(realisedDebt, address(vault), address(vault));
 
-        // And: creator calls updateInterestRate
-        vm.prank(creator);
-        pool.updateInterestRate();
-
         // And: deltaBlocks have passed
         vm.roll(block.number + deltaBlocks);
 
@@ -989,7 +985,7 @@ contract AccountingTest is LendingPoolTest {
         vm.prank(address(srTranche));
         pool.depositInLendingPool(type(uint128).max, liquidityProvider);
         vm.prank(creator);
-        pool.updateInterestRate();
+        //pool.updateInterestRate();
         vault.setTotalValue(realisedDebt);
 
         vm.prank(vaultOwner);
@@ -1017,8 +1013,6 @@ contract AccountingTest is LendingPoolTest {
 
         vm.prank(address(srTranche));
         pool.depositInLendingPool(initialLiquidity, liquidityProvider);
-        vm.prank(creator);
-        pool.updateInterestRate();
         vault.setTotalValue(realisedDebt);
 
         vm.prank(vaultOwner);
