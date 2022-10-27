@@ -32,15 +32,22 @@ contract InterestRateModuleTest is Test {
 
     }
 
-    function testSuccess_calculateInterestRate_UnderOptimalUtilisation(uint64 utilisation) public {
+    function testSuccess_calculateInterestRate_UnderOptimalUtilisation(
+        uint64 utilisation, 
+        uint8 baseRate_,
+        uint8 highSlope_,
+        uint8 lowSlope_
+        ) public {
         // Given: utilisation is between 0 and 80, InterestRateConfiguration setted as config
         vm.assume(utilisation > 0);
         vm.assume(utilisation <= 80);
+        vm.assume(baseRate_ < 10);
+        vm.assume(highSlope_ > lowSlope_);
 
         DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
-            baseRate: 1,
-            highSlope: 2,
-            lowSlope: 1,
+            baseRate: baseRate_,
+            highSlope: highSlope_,
+            lowSlope: lowSlope_,
             utilisationThreshold: 80
         });
 
@@ -59,16 +66,21 @@ contract InterestRateModuleTest is Test {
         assertEq(actualInterestRate, expectedInterestRate);
     }
 
-    function testSuccess_calculateInterestRate_OverOptimalUtilisation(uint64 utilisation) public {
+    function testSuccess_calculateInterestRate_OverOptimalUtilisation(
+        uint64 utilisation, 
+        uint8 baseRate_,
+        uint8 highSlope_,
+        uint8 lowSlope_
+        ) public {
         // Given: utilisation is between 80 and 100, InterestRateConfiguration setted as config
-        //TODO: Fuzz
         vm.assume(utilisation > 80);
         vm.assume(utilisation <= 100);
+        vm.assume(highSlope_ > lowSlope_);
 
         DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
-            baseRate: 1,
-            highSlope: 2,
-            lowSlope: 1,
+            baseRate: baseRate_,
+            highSlope: highSlope_,
+            lowSlope: lowSlope_,
             utilisationThreshold: 80
         });
         
@@ -91,15 +103,21 @@ contract InterestRateModuleTest is Test {
         assertEq(actualInterestRate, expectedInterestRate);
     }
     
-    function testRevert_setInterestConfig_NonOwner(address unprivilegedAddress) public {
+    function testRevert_setInterestConfig_NonOwner(
+        address unprivilegedAddress,
+        uint8 baseRate_,
+        uint8 highSlope_,
+        uint8 lowSlope_,
+        uint8 utilisationThreshold_
+        ) public {
         // Given: unprivilegedAddress is not creator, InterestRateConfiguration setted as config
         vm.assume(unprivilegedAddress != creator);
 
         DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
-            baseRate: 1,
-            highSlope: 2,
-            lowSlope: 1,
-            utilisationThreshold: 80
+            baseRate: baseRate_,
+            highSlope: highSlope_,
+            lowSlope: lowSlope_,
+            utilisationThreshold: utilisationThreshold_
         });
         
         vm.startPrank(unprivilegedAddress);
