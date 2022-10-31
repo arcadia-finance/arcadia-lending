@@ -15,7 +15,6 @@ import {LogExpMath} from "./utils/LogExpMath.sol";
 import "./interfaces/ITranche.sol";
 import "./interfaces/IFactory.sol";
 import "./interfaces/IVault.sol";
-import "./libraries/DataTypes.sol";
 import "./interfaces/ILendingPool.sol";
 import {TrustedProtocol} from "./TrustedProtocol.sol";
 import {DebtToken} from "./DebtToken.sol";

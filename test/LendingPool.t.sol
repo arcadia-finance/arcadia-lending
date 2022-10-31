@@ -12,7 +12,6 @@ import "../src/mocks/Asset.sol";
 import "../src/mocks/Factory.sol";
 import "../src/Tranche.sol";
 import "../src/DebtToken.sol";
-//import "./utils/InterestRateTestUtils.sol";
 
 contract LendingPoolExtension is LendingPool {
     //Extensions to test internal functions
@@ -985,7 +984,6 @@ contract AccountingTest is LendingPoolTest {
         vm.prank(address(srTranche));
         pool.depositInLendingPool(type(uint128).max, liquidityProvider);
         vm.prank(creator);
-        //pool.updateInterestRate();
         vault.setTotalValue(realisedDebt);
 
         vm.prank(vaultOwner);
