@@ -19,7 +19,6 @@ abstract contract InterestRateModule is Owned {
         config = newConfig;
     }
 
-    // TODO: Add safe math
     function calculateInterestRate(uint64 utilisation) internal view returns(uint64){
         if (utilisation >= config.utilisationThreshold) {
             uint64 lowSlopeInterest = uint64(config.utilisationThreshold * config.lowSlope);
@@ -31,8 +30,7 @@ abstract contract InterestRateModule is Owned {
     }
 
     function _updateInterestRate(uint64 utilisation) internal {
-        uint64 interestRate_ = calculateInterestRate(utilisation);
-        interestRate = interestRate_;
+        interestRate = calculateInterestRate(utilisation);
     }
 
 }

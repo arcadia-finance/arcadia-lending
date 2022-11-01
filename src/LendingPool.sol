@@ -424,6 +424,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     ////////////////////////////////////////////////////////////// */
 
     function updateInterestRate() external onlyOwner {
+        _syncInterests();
         uint64 _utilisation = uint64(realisedDebt / totalRealisedLiquidity);
         _updateInterestRate(_utilisation);
     }
