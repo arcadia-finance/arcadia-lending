@@ -240,9 +240,6 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
         //Call vault to check if there is sufficient collateral
         require(IVault(vault).increaseMarginPosition(address(asset), amount), "LP_B: Reverted");
 
-        //Process interests since last update
-        _syncInterests();
-
         //Transfer fails if there is insufficient liquidity in pool
         asset.safeTransfer(to, amount);
 
@@ -251,7 +248,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
         }
 
         //Update interest rates
-        _updateInterestRate(realisedDebt, totalRealisedLiquidity);
+        updateInterestRate();
     }
 
     /**
@@ -417,9 +414,8 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     /**
      * @notice Updates the interest rate
      */
-    function updateInterestRate() external onlyOwner {
+    function updateInterestRate() internal {
         _syncInterests();
-        //uint256 _utilisation = realisedDebt / totalRealisedLiquidity;
         _updateInterestRate(realisedDebt, totalRealisedLiquidity);
     }
 

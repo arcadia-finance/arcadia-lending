@@ -32,7 +32,8 @@ abstract contract InterestRateModule is Owned {
     function calculateInterestRate(uint256 utilisation) internal view returns (uint256) {
         if (utilisation >= interestRateConfig.utilisationThreshold) {
             uint256 lowSlopeInterest = interestRateConfig.utilisationThreshold * (interestRateConfig.lowSlope / 10 ** 5);
-            uint256 highSlopeInterest = (utilisation - interestRateConfig.utilisationThreshold) * (interestRateConfig.highSlope / 10 ** 5);
+            uint256 highSlopeInterest =
+                (utilisation - interestRateConfig.utilisationThreshold) * (interestRateConfig.highSlope / 10 ** 5);
             return uint256(interestRateConfig.baseRate + lowSlopeInterest + highSlopeInterest);
         } else {
             return uint256(interestRateConfig.baseRate + ((interestRateConfig.lowSlope / 10 ** 5) * utilisation));
@@ -47,7 +48,12 @@ abstract contract InterestRateModule is Owned {
      * calculates the interest rate
      */
     function _updateInterestRate(uint256 realisedDebt_, uint256 totalRealisedLiquidity_) internal {
-        uint256 utilisation = (10 ** 5 * realisedDebt_) / totalRealisedLiquidity_;
+        uint256 utilisation;
+        if (totalRealisedLiquidity_ > 0) {
+            utilisation = (10 ** 5 * realisedDebt_) / totalRealisedLiquidity_;
+        } else {
+            utilisation = 0;
+        }
 
         interestRate = calculateInterestRate(utilisation);
     }

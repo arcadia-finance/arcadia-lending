@@ -82,7 +82,7 @@ abstract contract LendingPoolTest is Test {
 }
 
 /*//////////////////////////////////////////////////////////////
-                        DEPLOYMENT
+DEPLOYMENT
 //////////////////////////////////////////////////////////////*/
 contract DeploymentTest is LendingPoolTest {
     function setUp() public override {
@@ -99,7 +99,7 @@ contract DeploymentTest is LendingPoolTest {
 }
 
 /*//////////////////////////////////////////////////////////////
-                        TRANCHES LOGIC
+TRANCHES LOGIC
 //////////////////////////////////////////////////////////////*/
 contract TranchesTest is LendingPoolTest {
     function setUp() public override {
@@ -228,7 +228,7 @@ contract TranchesTest is LendingPoolTest {
 }
 
 /*//////////////////////////////////////////////////////////////
-                PROTOCOL FEE CONFIGURATION
+PROTOCOL FEE CONFIGURATION
 //////////////////////////////////////////////////////////////*/
 contract ProtocolFeeTest is LendingPoolTest {
     function setUp() public override {
@@ -296,7 +296,7 @@ contract ProtocolFeeTest is LendingPoolTest {
 }
 
 /*//////////////////////////////////////////////////////////////
-                    DEPOSIT/WITHDRAWAL LOGIC
+DEPOSIT / WITHDRAWAL LOGIC
 //////////////////////////////////////////////////////////////*/
 contract DepositAndWithdrawalTest is LendingPoolTest {
     function setUp() public override {
@@ -433,7 +433,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
 }
 
 /*//////////////////////////////////////////////////////////////
-                    LENDING LOGIC
+LENDING LOGIC
 //////////////////////////////////////////////////////////////*/
 contract LendingLogicTest is LendingPoolTest {
     function setUp() public override {
@@ -841,7 +841,7 @@ contract LendingLogicTest is LendingPoolTest {
 }
 
 /*//////////////////////////////////////////////////////////////
-                            INTERESTS LOGIC
+INTERESTS LOGIC
 //////////////////////////////////////////////////////////////*/
 contract InterestsTest is LendingPoolTest {
     using stdStorage for StdStorage;
@@ -893,24 +893,32 @@ contract InterestsTest is LendingPoolTest {
     {
         // Given: deltaBlocks smaller than equal to 5 years,
         // realisedDebt smaller than equal to than 3402823669209384912995114146594816
-        vm.assume(deltaBlocks <= 13140000); //5 year
-        vm.assume(interestRate <= 10 * 10 ** 18); //1000%
-        vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
+        vm.assume(deltaBlocks <= 13140000);
+        //5 year
+        vm.assume(interestRate <= 10 * 10 ** 18);
+        //1000%
+        vm.assume(realisedDebt <= type(uint128).max / (10 ** 5));
+        //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
 
         // And: the interest rate is interestRate
         //uint256 interestRate = pool.interestRate();
-        uint256 loc = stdstore.target(address(pool)).sig(pool.interestRate.selector).find();
-        bytes32 slot = bytes32(loc);
-        //interestRate and lastSyncedBlock are packed in same slot -> encode packen and bitshift to the right
-        bytes32 value = bytes32(abi.encodePacked(uint24(block.number), interestRate));
-        value = value >> 168;
-        vm.store(address(pool), slot, value);
+
+        stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
+        stdstore.target(address(pool)).sig(pool.lastSyncedBlock.selector).checked_write(block.number);
+
+//    uint256 loc = stdstore.target(address(pool)).sig(pool.interestRate.selector).find();
+//        bytes32 slot = bytes32(loc);
+//        //interestRate and lastSyncedBlock are packed in same slot -> encode packen and bitshift to the right
+//        bytes32 value = bytes32(abi.encodePacked(uint24(block.number), interestRate));
+//        value = value >> 168;
+//        vm.store(address(pool), slot, value);
 
         // And: the vaultOwner takes realisedDebt debt
-        loc = stdstore.target(address(debt)).sig(debt.realisedDebt.selector).find();
-        slot = bytes32(loc);
-        value = bytes32(abi.encode(realisedDebt));
-        vm.store(address(debt), slot, value);
+        stdstore.target(address(debt)).sig(debt.realisedDebt.selector).checked_write(realisedDebt);
+//        loc = stdstore.target(address(debt)).sig(debt.realisedDebt.selector).find();
+//        slot = bytes32(loc);
+//        value = bytes32(abi.encode(realisedDebt));
+//        vm.store(address(debt), slot, value);
 
         // When: deltaBlocks have passed
         vm.roll(block.number + deltaBlocks);
@@ -941,6 +949,8 @@ contract InterestsTest is LendingPoolTest {
         vm.roll(block.number + deltaBlocks);
 
         // When: Intersts are synced
+
+        stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
         pool.syncInterests();
 
         //uint256 interestRate = pool.interestRate();
@@ -955,9 +965,11 @@ contract InterestsTest is LendingPoolTest {
 }
 
 /*//////////////////////////////////////////////////////////////
-                        ACCOUNTING LOGIC
+ACCOUNTING LOGIC
 //////////////////////////////////////////////////////////////*/
 contract AccountingTest is LendingPoolTest {
+    using stdStorage for StdStorage;
+
     function setUp() public override {
         super.setUp();
 
@@ -975,7 +987,7 @@ contract AccountingTest is LendingPoolTest {
 
     function testSuccess_totalAssets(uint128 realisedDebt, uint256 interestRate, uint24 deltaBlocks) public {
         // Given: all neccesary contracts are deployed on the setup
-        vm.assume(interestRate <= 10 ** 5); //1000%
+        vm.assume(interestRate <= 10e3 * 10e18); //1000%
         vm.assume(interestRate > 0);
         vm.assume(deltaBlocks <= 13140000); //5 year
 
@@ -986,6 +998,8 @@ contract AccountingTest is LendingPoolTest {
 
         vm.prank(vaultOwner);
         pool.borrow(realisedDebt, address(vault), vaultOwner);
+
+        stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
 
         vm.roll(block.number + deltaBlocks);
 
@@ -1003,9 +1017,9 @@ contract AccountingTest is LendingPoolTest {
         uint128 realisedDebt,
         uint128 initialLiquidity
     ) public {
-        // Given: all neccesary contracts are deployed on the setup
+        // Given: all necessary contracts are deployed on the setup
         vm.assume(deltaBlocks <= 13140000); //5 year
-        vm.assume(interestRate <= 10 * 10 ** 18); //1000%
+        vm.assume(interestRate <= 10e3 * 10 ** 18); //1000%
         vm.assume(interestRate > 0);
         vm.assume(initialLiquidity >= realisedDebt);
 
@@ -1019,7 +1033,7 @@ contract AccountingTest is LendingPoolTest {
         // When: deltaBlocks amount of time has passed
         vm.roll(block.number + deltaBlocks);
 
-        pool.syncInterests();
+        stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
 
         uint256 unrealisedDebt = calcUnrealisedDebtChecked(interestRate, deltaBlocks, realisedDebt);
         uint256 interest = unrealisedDebt * 50 / 90;
@@ -1041,7 +1055,7 @@ contract AccountingTest is LendingPoolTest {
 ////////////////////////////////////////////////////////////// */
 
 /*//////////////////////////////////////////////////////////////
-                    LIQUIDATION LOGIC
+LIQUIDATION LOGIC
 //////////////////////////////////////////////////////////////*/
 contract DefaultTest is LendingPoolTest {
     using stdStorage for StdStorage;
