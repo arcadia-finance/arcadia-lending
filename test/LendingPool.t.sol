@@ -893,12 +893,9 @@ contract InterestsTest is LendingPoolTest {
     {
         // Given: deltaBlocks smaller than equal to 5 years,
         // realisedDebt smaller than equal to than 3402823669209384912995114146594816
-        vm.assume(deltaBlocks <= 13140000);
-        //5 year
-        vm.assume(interestRate <= 10 * 10 ** 18);
-        //1000%
-        vm.assume(realisedDebt <= type(uint128).max / (10 ** 5));
-        //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
+        vm.assume(deltaBlocks <= 13140000); //5 year
+        vm.assume(interestRate <= 10 * 10 ** 18); //1000%
+        vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
 
         // And: the interest rate is interestRate
         //uint256 interestRate = pool.interestRate();
