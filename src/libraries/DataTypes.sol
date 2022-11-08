@@ -11,6 +11,6 @@ library DataTypes {
         uint256 baseRate; //18 decimals precision
         uint256 lowSlope; //18 decimals precision
         uint256 highSlope; //18 decimals precision
-        uint256 utilisationThreshold; //18 rn but make it 5 decimal precision
+        uint256 utilisationThreshold; //5 decimal precision
     }
 }

@@ -29,7 +29,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
-    uint256 public constant YEARLY_BLOCKS = 2628000;
+    uint256 public constant YEARLY_BLOCKS = 2_628_000;
 
     uint32 public lastSyncedBlock;
     uint256 public totalWeight;

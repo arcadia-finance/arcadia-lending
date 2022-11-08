@@ -39,7 +39,7 @@ contract InterestRateModuleTest is Test {
     ) public {
         // Given: utilisation is between 0 and 80, InterestRateConfiguration setted as config
         vm.assume(utilisation > 0);
-        vm.assume(utilisation <= 8000);
+        vm.assume(utilisation <= 0.8 * 10e5);
         vm.assume(baseRate_ < 10000);
         vm.assume(highSlope_ > lowSlope_);
 
@@ -47,7 +47,7 @@ contract InterestRateModuleTest is Test {
             baseRate: baseRate_,
             highSlope: highSlope_,
             lowSlope: lowSlope_,
-            utilisationThreshold: 8000
+            utilisationThreshold: 0.8 * 10e5
         });
 
         // When: creator calls setInterestConfig with config
