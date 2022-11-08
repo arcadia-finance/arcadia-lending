@@ -66,14 +66,16 @@ contract InterestRateModuleTest is Test {
     }
 
     function testSuccess_calculateInterestRate_OverOptimalUtilisation(
-        uint8 utilisation,
+        uint8 utilisationShift,
         uint8 baseRate_,
         uint8 highSlope_,
         uint8 lowSlope_
     ) public {
         // Given: utilisation is between 80 and 100, InterestRateConfiguration setted as config
-        vm.assume(utilisation > 0.8 * 10e5);
-        vm.assume(utilisation <= 1 * 10e5);
+//        vm.assume(utilisation > 0.8 * 10e5);
+//        vm.assume(utilisation <= 1 * 10e5);
+        vm.assume(utilisationShift < 0.2 * 10e5);
+        uint256 utilisation = 0.8 * 10e5 + uint256(utilisationShift);
         vm.assume(highSlope_ > lowSlope_);
 
         DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
