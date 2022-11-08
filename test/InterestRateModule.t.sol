@@ -12,9 +12,9 @@ import "../src/libraries/InterestRateModule.sol";
 contract InterestRateModuleMockUpTest is InterestRateModule {
     //Extensions to test internal functions
 
-    constructor(address creator) Owned(creator){}
+    constructor(address creator) Owned(creator) {}
 
-    function _calculateInterestRate(uint64 utilisation) public view returns(uint64){
+    function _calculateInterestRate(uint256 utilisation) public view returns (uint256) {
         return calculateInterestRate(utilisation);
     }
 }
@@ -29,87 +29,86 @@ contract InterestRateModuleTest is Test {
         vm.startPrank(creator);
         interest = new InterestRateModuleMockUpTest(address(creator));
         vm.stopPrank();
-
     }
 
     function testSuccess_calculateInterestRate_UnderOptimalUtilisation(
-        uint64 utilisation, 
+        uint256 utilisation,
         uint8 baseRate_,
         uint8 highSlope_,
         uint8 lowSlope_
-        ) public {
+    ) public {
         // Given: utilisation is between 0 and 80, InterestRateConfiguration setted as config
         vm.assume(utilisation > 0);
-        vm.assume(utilisation <= 80);
-        vm.assume(baseRate_ < 10);
+        vm.assume(utilisation <= 8000);
+        vm.assume(baseRate_ < 10000);
         vm.assume(highSlope_ > lowSlope_);
 
         DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
             baseRate: baseRate_,
             highSlope: highSlope_,
             lowSlope: lowSlope_,
-            utilisationThreshold: 80
+            utilisationThreshold: 8000
         });
 
         // When: creator calls setInterestConfig with config
         vm.startPrank(creator);
         interest.setInterestConfig(config);
-        
+
         // And: actualInterestRate is _calculateInterestRate with utilisation
-        uint64 actualInterestRate = interest._calculateInterestRate(utilisation);
+        uint256 actualInterestRate = interest._calculateInterestRate(utilisation);
         vm.stopPrank();
 
         // And: expectedInterestRate is lowSlope multiplied by utilisation and added to baseRate
-        uint64 expectedInterestRate = uint64(config.baseRate + config.lowSlope * utilisation);
+        uint256 expectedInterestRate = config.baseRate + ((config.lowSlope / 10 ** 5) * utilisation);
 
         // Then: actualInterestRate should be equal to expectedInterestRate
         assertEq(actualInterestRate, expectedInterestRate);
     }
 
     function testSuccess_calculateInterestRate_OverOptimalUtilisation(
-        uint64 utilisation, 
+        uint256 utilisation,
         uint8 baseRate_,
         uint8 highSlope_,
         uint8 lowSlope_
-        ) public {
+    ) public {
         // Given: utilisation is between 80 and 100, InterestRateConfiguration setted as config
-        vm.assume(utilisation > 80);
-        vm.assume(utilisation <= 100);
+        vm.assume(utilisation > 8000);
+        vm.assume(utilisation <= 10000);
         vm.assume(highSlope_ > lowSlope_);
 
         DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
             baseRate: baseRate_,
             highSlope: highSlope_,
             lowSlope: lowSlope_,
-            utilisationThreshold: 80
+            utilisationThreshold: 8000
         });
-        
+
         // When: creator calls setInterestConfig with config
         vm.startPrank(creator);
         interest.setInterestConfig(config);
-        
+
         // And: actualInterestRate is _calculateInterestRate with utilisation
-        uint64 actualInterestRate = interest._calculateInterestRate(utilisation);
+        uint256 actualInterestRate = interest._calculateInterestRate(utilisation);
         vm.stopPrank();
 
         // And: lowSlopeInterest is utilisationThreshold multiplied by lowSlope, highSlopeInterest is utilisation minus utilisationThreshold multiplied by highSlope
-        uint64 lowSlopeInterest = uint64(config.utilisationThreshold * config.lowSlope);
-        uint64 highSlopeInterest = uint64((utilisation - config.utilisationThreshold) * config.highSlope);
+        uint256 lowSlopeInterest = config.utilisationThreshold * (config.lowSlope / 10 ** 5);
+        uint256 highSlopeInterest = (utilisation - config.utilisationThreshold) * (config.highSlope / 10 ** 5);
 
         // And: expectedInterestRate is baseRate added to lowSlopeInterest added to highSlopeInterest
-        uint64 expectedInterestRate = uint64(config.baseRate + lowSlopeInterest + highSlopeInterest);
+        uint256 expectedInterestRate = config.baseRate + lowSlopeInterest + highSlopeInterest;
 
         // Then: actualInterestRate should be equal to expectedInterestRate
         assertEq(actualInterestRate, expectedInterestRate);
     }
-    
+
     function testRevert_setInterestConfig_NonOwner(
         address unprivilegedAddress,
         uint8 baseRate_,
         uint8 highSlope_,
         uint8 lowSlope_,
         uint8 utilisationThreshold_
-        ) public {
+    ) public {
         // Given: unprivilegedAddress is not creator, InterestRateConfiguration setted as config
         vm.assume(unprivilegedAddress != creator);
 
@@ -119,7 +118,7 @@ contract InterestRateModuleTest is Test {
             lowSlope: lowSlope_,
             utilisationThreshold: utilisationThreshold_
         });
-        
+
         vm.startPrank(unprivilegedAddress);
         // When: unprivilegedAddress calls setInterestConfig
         // Then: setInterestConfig should revert with UNAUTHORIZED

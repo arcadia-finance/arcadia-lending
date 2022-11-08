@@ -1,19 +1,16 @@
-
-/** 
-    Created by Arcadia Finance
-    https://www.arcadia.finance
-
-    SPDX-License-Identifier: BUSL-1.1
+/**
+ * Created by Arcadia Finance
+ *     https://www.arcadia.finance
+ * 
+ *     SPDX-License-Identifier: BUSL-1.1
  */
 pragma solidity ^0.8.13;
 
 library DataTypes {
-    // TODO: Optimize the variables
     struct InterestRateConfiguration {
-        uint64 baseRate;
-        uint64 lowSlope;
-        uint64 highSlope;
-        uint64 utilisationThreshold;
+        uint256 baseRate; //18 decimals precision
+        uint256 lowSlope; //18 decimals precision
+        uint256 highSlope; //18 decimals precision
+        uint256 utilisationThreshold; //18 rn but make it 5 decimal precision
     }
-
 }

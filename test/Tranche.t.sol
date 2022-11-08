@@ -515,7 +515,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address owner,
         address beneficiary
     ) public {
-        // Given: sharesMinted and sharesRedeemed bigger than 0, sharesMinted bigger than equal sharesRedeemed, sharesAllowed bigger than equal sharesRedeemed, 
+        // Given: sharesMinted and sharesRedeemed bigger than 0, sharesMinted bigger than equal sharesRedeemed, sharesAllowed bigger than equal sharesRedeemed,
         // receiver is not liquidityProvider, receiver is not pool, beneficiary is not owner
         vm.assume(sharesMinted > 0);
         vm.assume(sharesRedeemed > 0);

@@ -174,10 +174,8 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
             totalRealisedLiquidity += assets;
         }
 
-        uint64 _utilisation = uint64(realisedDebt / totalRealisedLiquidity);
-
         //Update interest rates
-        _updateInterestRate(_utilisation);
+        _updateInterestRate(realisedDebt, totalRealisedLiquidity);
     }
 
     /**
@@ -195,10 +193,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
 
         asset.safeTransfer(receiver, assets);
 
-        uint64 _utilisation = uint64(realisedDebt / totalRealisedLiquidity);
-
-        //Update interest rates
-        _updateInterestRate(_utilisation);
+        _updateInterestRate(realisedDebt, totalRealisedLiquidity);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -255,10 +250,8 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
             _deposit(amount, vault);
         }
 
-        uint64 _utilisation = uint64(realisedDebt / totalRealisedLiquidity);
-
         //Update interest rates
-        _updateInterestRate(_utilisation);
+        _updateInterestRate(realisedDebt, totalRealisedLiquidity);
     }
 
     /**
@@ -284,10 +277,8 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
         //Call vault to unlock collateral
         require(IVault(vault).decreaseMarginPosition(address(asset), transferAmount), "LP_R: Reverted");
 
-        uint64 _utilisation = uint64(realisedDebt / totalRealisedLiquidity);
-
         //Update interest rates
-        _updateInterestRate(_utilisation);
+        _updateInterestRate(realisedDebt, totalRealisedLiquidity);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -423,10 +414,13 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
                         INTEREST RATE LOGIC
     ////////////////////////////////////////////////////////////// */
 
+    /**
+     * @notice Updates the interest rate
+     */
     function updateInterestRate() external onlyOwner {
         _syncInterests();
-        uint64 _utilisation = uint64(realisedDebt / totalRealisedLiquidity);
-        _updateInterestRate(_utilisation);
+        //uint256 _utilisation = realisedDebt / totalRealisedLiquidity;
+        _updateInterestRate(realisedDebt, totalRealisedLiquidity);
     }
 
     /* //////////////////////////////////////////////////////////////
