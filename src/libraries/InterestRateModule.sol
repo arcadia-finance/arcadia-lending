@@ -12,15 +12,15 @@ import {DataTypes} from "./DataTypes.sol";
 abstract contract InterestRateModule is Owned {
     uint256 public interestRate; //18 decimals precision
 
-    DataTypes.InterestRateConfiguration internal interestRateConfig;
+    DataTypes.InterestRateConfiguration public interestRateConfig;
 
     /**
      * @notice Set's the configration parameters of InterestRateConfiguration struct
      * @param newConfig New set of configration parameters
      */
 
-    function setInterestConfig(DataTypes.InterestRateConfiguration memory newConfig) external onlyOwner {
-        config = newConfig;
+    function setInterestConfig(DataTypes.InterestRateConfiguration calldata newConfig) external onlyOwner {
+        interestRateConfig = newConfig;
     }
 
     /**
@@ -30,12 +30,12 @@ abstract contract InterestRateModule is Owned {
      * @return Interest rate
      */
     function calculateInterestRate(uint256 utilisation) internal view returns (uint256) {
-        if (utilisation >= config.utilisationThreshold) {
-            uint256 lowSlopeInterest = config.utilisationThreshold * (config.lowSlope / 10 ** 5);
-            uint256 highSlopeInterest = (utilisation - config.utilisationThreshold) * (config.highSlope / 10 ** 5);
-            return uint256(config.baseRate + lowSlopeInterest + highSlopeInterest);
+        if (utilisation >= interestRateConfig.utilisationThreshold) {
+            uint256 lowSlopeInterest = interestRateConfig.utilisationThreshold * (interestRateConfig.lowSlope / 10 ** 5);
+            uint256 highSlopeInterest = (utilisation - interestRateConfig.utilisationThreshold) * (interestRateConfig.highSlope / 10 ** 5);
+            return uint256(interestRateConfig.baseRate + lowSlopeInterest + highSlopeInterest);
         } else {
-            return uint256(config.baseRate + ((config.lowSlope / 10 ** 5) * utilisation));
+            return uint256(interestRateConfig.baseRate + ((interestRateConfig.lowSlope / 10 ** 5) * utilisation));
         }
     }
 
