@@ -975,8 +975,7 @@ contract AccountingTest is LendingPoolTest {
 
     function testSuccess_totalAssets(uint128 realisedDebt, uint256 interestRate, uint24 deltaBlocks) public {
         // Given: all neccesary contracts are deployed on the setup
-        vm.assume(realisedDebt > 0);
-        vm.assume(interestRate <= 10 * 10 ** 18); //1000%
+        vm.assume(interestRate <= 10 ** 5); //1000%
         vm.assume(interestRate > 0);
         vm.assume(deltaBlocks <= 13140000); //5 year
 
@@ -989,6 +988,7 @@ contract AccountingTest is LendingPoolTest {
         pool.borrow(realisedDebt, address(vault), vaultOwner);
 
         vm.roll(block.number + deltaBlocks);
+
         uint256 unrealisedDebt = calcUnrealisedDebtChecked(interestRate, deltaBlocks, realisedDebt);
         uint256 expectedValue = realisedDebt + unrealisedDebt;
 
@@ -997,7 +997,6 @@ contract AccountingTest is LendingPoolTest {
         assertEq(actualValue, expectedValue);
     }
 
-    //still got division by 0 error time to time
     function testSuccess_liquidityOf(
         uint256 interestRate,
         uint24 deltaBlocks,
@@ -1019,6 +1018,9 @@ contract AccountingTest is LendingPoolTest {
 
         // When: deltaBlocks amount of time has passed
         vm.roll(block.number + deltaBlocks);
+
+        pool.syncInterests();
+
         uint256 unrealisedDebt = calcUnrealisedDebtChecked(interestRate, deltaBlocks, realisedDebt);
         uint256 interest = unrealisedDebt * 50 / 90;
         if (interest * 90 < unrealisedDebt * 50) interest += 1; // interest for a tranche is rounded up

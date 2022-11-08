@@ -12,12 +12,13 @@ import {DataTypes} from "./DataTypes.sol";
 abstract contract InterestRateModule is Owned {
     uint256 public interestRate; //18 decimals precision
 
-    DataTypes.InterestRateConfiguration public config;
+    DataTypes.InterestRateConfiguration internal interestRateConfig;
 
     /**
      * @notice Set's the configration parameters of InterestRateConfiguration struct
      * @param newConfig New set of configration parameters
      */
+
     function setInterestConfig(DataTypes.InterestRateConfiguration memory newConfig) external onlyOwner {
         config = newConfig;
     }
