@@ -59,7 +59,7 @@ contract InterestRateModuleTest is Test {
         vm.stopPrank();
 
         // And: expectedInterestRate is lowSlope multiplied by utilisation and added to baseRate
-        uint256 expectedInterestRate = config.baseRate + ((config.lowSlope / 10 ** 5) * utilisation);
+        uint256 expectedInterestRate = config.baseRate + (config.lowSlope * utilisation / 100_000);
 
         // Then: actualInterestRate should be equal to expectedInterestRate
         assertEq(actualInterestRate, expectedInterestRate);
@@ -93,11 +93,11 @@ contract InterestRateModuleTest is Test {
         vm.stopPrank();
 
         // And: lowSlopeInterest is utilisationThreshold multiplied by lowSlope, highSlopeInterest is utilisation minus utilisationThreshold multiplied by highSlope
-        uint256 lowSlopeInterest = config.utilisationThreshold * (config.lowSlope / 10 ** 5);
-        uint256 highSlopeInterest = (utilisation - config.utilisationThreshold) * (config.highSlope / 10 ** 5);
+        uint256 lowSlopeInterest = config.utilisationThreshold * config.lowSlope;
+        uint256 highSlopeInterest = (utilisation - config.utilisationThreshold) * config.highSlope;
 
         // And: expectedInterestRate is baseRate added to lowSlopeInterest added to highSlopeInterest
-        uint256 expectedInterestRate = config.baseRate + lowSlopeInterest + highSlopeInterest;
+        uint256 expectedInterestRate = config.baseRate + ((lowSlopeInterest + highSlopeInterest) / 100_000);
 
         // Then: actualInterestRate should be equal to expectedInterestRate
         assertEq(actualInterestRate, expectedInterestRate);
