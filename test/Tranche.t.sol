@@ -488,7 +488,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         // Given: sharesMinted and sharesRedeemed bigger than 0, sharesMinted bigger than sharesRedeemed, receiver is not liquidityProvider, receiver is not pool
         vm.assume(sharesMinted > 0);
         vm.assume(sharesRedeemed > 0);
-        vm.assume(sharesMinted > sharesRedeemed);
+        vm.assume(sharesMinted >= sharesRedeemed);
         vm.assume(receiver != liquidityProvider);
         vm.assume(receiver != address(pool));
 
@@ -519,7 +519,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         // receiver is not liquidityProvider, receiver is not pool, beneficiary is not owner
         vm.assume(sharesMinted > 0);
         vm.assume(sharesRedeemed > 0);
-        vm.assume(sharesMinted > sharesRedeemed);
+        vm.assume(sharesMinted >= sharesRedeemed);
         vm.assume(sharesAllowed >= sharesRedeemed);
         vm.assume(receiver != liquidityProvider);
         vm.assume(receiver != address(pool));
@@ -556,7 +556,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         // Given: sharesMinted and sharesRedeemed bigger than 0, sharesMinted bigger sharesRedeemed, receiver is not liquidityProvider, receiver is not pool, beneficiary is not owner
         vm.assume(sharesMinted > 0);
         vm.assume(sharesRedeemed > 0);
-        vm.assume(sharesMinted > sharesRedeemed);
+        vm.assume(sharesMinted >= sharesRedeemed);
         vm.assume(receiver != liquidityProvider);
         vm.assume(receiver != address(pool));
         vm.assume(beneficiary != owner);
