@@ -1189,9 +1189,6 @@ contract DefaultTest is LendingPoolTest {
     ) public {
         // Given: defaultAmount, liquidityJunior and liquiditySenior bigger than 0,
         // srTranche calls depositInLendingPool for liquiditySenior, jrTranche calls depositInLendingPool for liquidityJunior
-        vm.assume(defaultAmount > 0);
-        vm.assume(liquidityJunior > 0);
-        vm.assume(liquiditySenior > 0);
         vm.assume(liquiditySenior <= type(uint256).max - liquidityJunior);
         uint256 totalAmount = uint256(liquiditySenior) + uint256(liquidityJunior);
         vm.assume(defaultAmount < liquidityJunior);
