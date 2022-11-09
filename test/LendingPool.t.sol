@@ -328,7 +328,6 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
 
     function testSuccess_deposit_FirstDepositByTranche(uint256 amount) public {
         // Given: liquidityProvider approve max value
-        vm.assume(amount > 0);
         vm.prank(liquidityProvider);
         asset.approve(address(pool), type(uint256).max);
 
@@ -336,7 +335,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         // When: srTranche deposit
         pool.depositInLendingPool(amount, liquidityProvider);
 
-        // Then: supplyBalances srTranche should be amount, totatlSupply should be amount, supplyBalances pool should be amount
+        // Then: supplyBalances srTranche should be amount, totalSupply should be amount, supplyBalances pool should be amount
         assertEq(pool.realisedLiquidityOf(address(srTranche)), amount);
         assertEq(pool.totalRealisedLiquidity(), amount);
         assertEq(asset.balanceOf(address(pool)), amount);
