@@ -307,7 +307,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
     ) public {
         // Given: assetsDeposited bigger than 0 and assetsWithdrawn, receiver is not pool or liquidityProvider
         vm.assume(assetsDeposited > 0);
-        vm.assume(assetsDeposited > assetsWithdrawn);
+        vm.assume(assetsDeposited >= assetsWithdrawn);
         vm.assume(receiver != liquidityProvider);
         vm.assume(receiver != address(pool));
 
@@ -337,7 +337,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         // Given: assetsDeposited bigger than 0 and assetsWithdrawn, sharesAllowed bigger than equal to assetsWithdrawn,
         // receiver is not pool or liquidityProvider, beneficiary is not owner
         vm.assume(assetsDeposited > 0);
-        vm.assume(assetsDeposited > assetsWithdrawn);
+        vm.assume(assetsDeposited >= assetsWithdrawn);
         vm.assume(sharesAllowed >= assetsWithdrawn);
         vm.assume(receiver != liquidityProvider);
         vm.assume(receiver != address(pool));
@@ -372,7 +372,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         // Given: assetsDeposited is bigger than 0 and assetsWithdrawn, receiver is not liquidityProvider,
         // receiver is not pool, beneficiary is not owner
         vm.assume(assetsDeposited > 0);
-        vm.assume(assetsDeposited > assetsWithdrawn);
+        vm.assume(assetsDeposited >= assetsWithdrawn);
         vm.assume(receiver != liquidityProvider);
         vm.assume(receiver != address(pool));
         vm.assume(beneficiary != owner);
