@@ -31,12 +31,16 @@ abstract contract InterestRateModule is Owned {
      */
     function calculateInterestRate(uint256 utilisation) internal view returns (uint256) {
         if (utilisation >= interestRateConfig.utilisationThreshold) {
-            uint256 lowSlopeInterest = interestRateConfig.utilisationThreshold * (interestRateConfig.lowSlope / 100_000);
+            // 1e18 = (uT * 1e5) * (ls * 1e18) / 1e5
+            uint256 lowSlopeInterest = interestRateConfig.utilisationThreshold * interestRateConfig.lowSlope / 100_000;
+            // 1e18 = ((uT - u) * 1e5) * (hs * 1e18) / 1e5
             uint256 highSlopeInterest =
                 (utilisation - interestRateConfig.utilisationThreshold) * (interestRateConfig.highSlope / 100_000);
+            // 1e18 = (bs * 1e18) + (lsIR * 1e18) + (hsIR * 1e18)
             return uint256(interestRateConfig.baseRate + lowSlopeInterest + highSlopeInterest);
         } else {
-            return uint256(interestRateConfig.baseRate + ((interestRateConfig.lowSlope / 100_000) * utilisation));
+            // 1e18 = br * 1e18 + (ls * 1e18) * (u * 1e5) / 1e5
+            return uint256(interestRateConfig.baseRate + ((interestRateConfig.lowSlope * utilisation) / 100_000));
         }
     }
 
