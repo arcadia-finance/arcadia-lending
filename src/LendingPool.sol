@@ -165,6 +165,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
      * (the origin of the underlying ERC-20 token, who deposits assets via a Tranche)
      */
     function depositInLendingPool(uint256 assets, address from) public onlyTranche {
+        _syncInterests();
         asset.transferFrom(from, address(this), assets);
 
         unchecked {
@@ -182,6 +183,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
      * @param receiver The address of the receiver of the underlying ERC-20 tokens
      */
     function withdrawFromLendingPool(uint256 assets, address receiver) public {
+        _syncInterests();
         require(realisedLiquidityOf[msg.sender] >= assets, "LP_WFLP: Amount exceeds balance");
 
         realisedLiquidityOf[msg.sender] -= assets;
@@ -236,6 +238,9 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
         //Call vault to check if there is sufficient collateral
         require(IVault(vault).increaseMarginPosition(address(asset), amount), "LP_B: Reverted");
 
+        //Process interests since last update
+        _syncInterests();
+
         //Transfer fails if there is insufficient liquidity in pool
         asset.safeTransfer(to, amount);
 
@@ -256,6 +261,9 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
      */
     function repay(uint256 amount, address vault) public {
         require(IFactory(vaultFactory).isVault(vault), "LP_R: Not a vault");
+
+        //Process interests since last update
+        _syncInterests();
 
         uint256 vaultDebt = maxWithdraw(vault);
         uint256 transferAmount = vaultDebt > amount ? amount : vaultDebt;
