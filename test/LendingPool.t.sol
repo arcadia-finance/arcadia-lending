@@ -28,6 +28,10 @@ contract LendingPoolExtension is LendingPool {
     function testProcessDefault(uint256 assets) public onlyOwner {
         _processDefault(assets);
     }
+
+    function testSyncInterests() public {
+        _syncInterests();
+    }
 }
 
 abstract contract LendingPoolTest is Test {
@@ -934,7 +938,7 @@ contract InterestsTest is LendingPoolTest {
         // When: Intersts are synced
 
         stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
-        pool.syncInterests();
+        pool.testSyncInterests();
 
         uint256 interests = calcUnrealisedDebtChecked(interestRate, deltaBlocks, realisedDebt);
 

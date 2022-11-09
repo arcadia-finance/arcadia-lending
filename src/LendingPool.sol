@@ -165,8 +165,6 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
      * (the origin of the underlying ERC-20 token, who deposits assets via a Tranche)
      */
     function depositInLendingPool(uint256 assets, address from) public onlyTranche {
-        _syncInterests();
-
         asset.transferFrom(from, address(this), assets);
 
         unchecked {
@@ -175,7 +173,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
         }
 
         //Update interest rates
-        _updateInterestRate(realisedDebt, totalRealisedLiquidity);
+        updateInterestRate();
     }
 
     /**
@@ -184,8 +182,6 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
      * @param receiver The address of the receiver of the underlying ERC-20 tokens
      */
     function withdrawFromLendingPool(uint256 assets, address receiver) public {
-        _syncInterests();
-
         require(realisedLiquidityOf[msg.sender] >= assets, "LP_WFLP: Amount exceeds balance");
 
         realisedLiquidityOf[msg.sender] -= assets;
@@ -193,7 +189,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
 
         asset.safeTransfer(receiver, assets);
 
-        _updateInterestRate(realisedDebt, totalRealisedLiquidity);
+        updateInterestRate();
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -261,9 +257,6 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     function repay(uint256 amount, address vault) public {
         require(IFactory(vaultFactory).isVault(vault), "LP_R: Not a vault");
 
-        //Process interests since last update
-        _syncInterests();
-
         uint256 vaultDebt = maxWithdraw(vault);
         uint256 transferAmount = vaultDebt > amount ? amount : vaultDebt;
 
@@ -275,12 +268,12 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
         require(IVault(vault).decreaseMarginPosition(address(asset), transferAmount), "LP_R: Reverted");
 
         //Update interest rates
-        _updateInterestRate(realisedDebt, totalRealisedLiquidity);
+        updateInterestRate();
     }
 
-    /*//////////////////////////////////////////////////////////////
+    /* //////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
-    //////////////////////////////////////////////////////////////*/
+    ////////////////////////////////////////////////////////////// */
 
     /**
      * @notice Returns the total amount of outstanding debt in the underlying asset
@@ -318,15 +311,6 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     /* //////////////////////////////////////////////////////////////
                             INTERESTS LOGIC
     ////////////////////////////////////////////////////////////// */
-
-    /**
-     * @notice Syncs all unrealised debt (= interest for LP and treasury).
-     * @dev Calculates the unrealised debt since last sync, and realises it by minting an aqual amount of
-     * debt tokens to all debt holders and interests to LPs and the treasury
-     */
-    function syncInterests() external {
-        _syncInterests();
-    }
 
     /**
      * @notice Syncs all unrealised debt (= interest for LP and treasury).
@@ -535,7 +519,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
      */
     function getOpenPosition(address vault) external override returns (uint128 openPosition) {
         //ToDo: When ERC-4626 is correctly implemented, It should not be necessary to first sync interests.
-        _syncInterests();
+        updateInterestRate();
         openPosition = uint128(maxWithdraw(vault));
     }
 }
