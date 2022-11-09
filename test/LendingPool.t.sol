@@ -343,8 +343,6 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
 
     function testSuccess_deposit_MultipleDepositsByTranches(uint256 amount0, uint256 amount1) public {
         // Given: totalAmount is amount0 added by amount1, liquidityProvider approve max value
-        vm.assume(amount0 > 0);
-        vm.assume(amount1 > 0);
         vm.assume(amount0 <= type(uint256).max - amount1);
 
         uint256 totalAmount = uint256(amount0) + uint256(amount1);
@@ -389,8 +387,6 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         public
     {
         // Given: assetsWithdrawn bigger than assetsDeposited, liquidityProvider approve max value
-        vm.assume(assetsDeposited > 0);
-        vm.assume(assetsWithdrawn > 0);
         vm.assume(assetsDeposited < assetsWithdrawn);
 
         vm.prank(liquidityProvider);
@@ -406,15 +402,12 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    //Ask
     function testSuccess_withdraw(uint256 assetsDeposited, uint256 assetsWithdrawn, address receiver) public {
         // Given: assetsWithdrawn less than assetsDeposited, receiver is not pool or liquidityProvider,
         // liquidityProvider approve max value, assetsDeposited and assetsWithdrawn are bigger than 0
         vm.assume(receiver != address(pool));
         vm.assume(receiver != liquidityProvider);
-        vm.assume(assetsDeposited > 0);
-        vm.assume(assetsWithdrawn > 0);
-        vm.assume(assetsDeposited > assetsWithdrawn);
+        vm.assume(assetsDeposited >= assetsWithdrawn);
 
         vm.prank(liquidityProvider);
         asset.approve(address(pool), type(uint256).max);
