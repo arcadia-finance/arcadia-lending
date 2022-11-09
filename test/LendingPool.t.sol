@@ -897,25 +897,11 @@ contract InterestsTest is LendingPoolTest {
         vm.assume(interestRate <= 10 * 10 ** 18); //1000%
         vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
 
-        // And: the interest rate is interestRate
-        //uint256 interestRate = pool.interestRate();
-
         stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
         stdstore.target(address(pool)).sig(pool.lastSyncedBlock.selector).checked_write(block.number);
 
-//    uint256 loc = stdstore.target(address(pool)).sig(pool.interestRate.selector).find();
-//        bytes32 slot = bytes32(loc);
-//        //interestRate and lastSyncedBlock are packed in same slot -> encode packen and bitshift to the right
-//        bytes32 value = bytes32(abi.encodePacked(uint24(block.number), interestRate));
-//        value = value >> 168;
-//        vm.store(address(pool), slot, value);
-
         // And: the vaultOwner takes realisedDebt debt
         stdstore.target(address(debt)).sig(debt.realisedDebt.selector).checked_write(realisedDebt);
-//        loc = stdstore.target(address(debt)).sig(debt.realisedDebt.selector).find();
-//        slot = bytes32(loc);
-//        value = bytes32(abi.encode(realisedDebt));
-//        vm.store(address(debt), slot, value);
 
         // When: deltaBlocks have passed
         vm.roll(block.number + deltaBlocks);
@@ -950,7 +936,6 @@ contract InterestsTest is LendingPoolTest {
         stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
         pool.syncInterests();
 
-        //uint256 interestRate = pool.interestRate();
         uint256 interests = calcUnrealisedDebtChecked(interestRate, deltaBlocks, realisedDebt);
 
         // Then: Total redeemable interest of LP providers and total open debt of borrowers should increase with interests
