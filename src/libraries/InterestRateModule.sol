@@ -25,8 +25,8 @@ abstract contract InterestRateModule is Owned {
 
     /**
      * @notice Calculates the interest rate
-     * @param utilisation Utilisation rate
-     * @dev This function is only be called by the function _updateInterestRate(uint256 realisedDebt_, uint256 totalRealisedLiquidity_)
+     * @param utilisation Utilisation rate in 5 decimal precision
+     * @dev This function can only be called by the function _updateInterestRate(uint256 realisedDebt_, uint256 totalRealisedLiquidity_)
      * @return Interest rate
      */
     function calculateInterestRate(uint256 utilisation) internal view returns (uint256) {
