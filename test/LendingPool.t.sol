@@ -1097,8 +1097,7 @@ contract DefaultTest is LendingPoolTest {
     }
 
     function testSuccess_liquidateVault(uint128 amountLoaned) public {
-        // Given: all neccesary contracts are deployed on the setup
-        vm.assume(amountLoaned > 0);
+        // Given: all necessary contracts are deployed on the setup
         // And: A vault has debt
         vault.setTotalValue(amountLoaned);
         vm.prank(liquidityProvider);
@@ -1142,7 +1141,6 @@ contract DefaultTest is LendingPoolTest {
 
     function testSuccess_settleLiquidation_ProcessDefault(uint256 defaultAmount, uint256 liquidity) public {
         // Given: provided liquidity is bigger than the default amount (Should always be true)
-        vm.assume(liquidity > 0);
         vm.assume(liquidity >= defaultAmount);
         // And: Liquidity is deposited in Lending Pool
         vm.prank(address(srTranche));
@@ -1169,8 +1167,6 @@ contract DefaultTest is LendingPoolTest {
         vm.assume(liquidity >= defaultAmount);
         // And: Available liquidity is bigger than the deficit amount (ToDo: unhappy flow!!!)
         vm.assume(liquidity >= deficitAmount);
-        // And: Liquidity is bigger than zero
-        vm.assume(liquidity > 0);
         // And: Liquidity is deposited in Lending Pool
         vm.prank(address(srTranche));
         pool.depositInLendingPool(liquidity, liquidityProvider);
@@ -1254,9 +1250,6 @@ contract DefaultTest is LendingPoolTest {
         vm.assume(liquiditySenior <= type(uint256).max - liquidityJunior);
         uint256 totalAmount = uint256(liquiditySenior) + uint256(liquidityJunior);
         vm.assume(defaultAmount >= totalAmount);
-        vm.assume(defaultAmount > 0);
-        vm.assume(liquidityJunior > 0);
-        vm.assume(liquiditySenior > 0);
 
         vm.prank(address(srTranche));
         pool.depositInLendingPool(liquiditySenior, liquidityProvider);
