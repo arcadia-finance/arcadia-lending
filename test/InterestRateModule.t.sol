@@ -41,7 +41,7 @@ contract InterestRateModuleTest is Test {
         uint8 baseRate_,
         uint8 highSlope_,
         uint8 lowSlope_
-        ) public {
+    ) public {
         vm.assume(totalRealisedLiquidity_ > 0);
         vm.assume(realisedDebt_ <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
         vm.assume(baseRate_ < 1 * 10 ** 5);
@@ -60,12 +60,12 @@ contract InterestRateModuleTest is Test {
         interest.updateInterestRateExtention(realisedDebt_, totalRealisedLiquidity_);
         uint256 actualInterestRate = interest.interestRate();
         vm.stopPrank();
-        
+
         uint256 expectedUtilisation = (100_000 * realisedDebt_) / totalRealisedLiquidity_;
 
         uint256 expectedInterestRate;
 
-        if (expectedUtilisation <= config.utilisationThreshold ){
+        if (expectedUtilisation <= config.utilisationThreshold) {
             expectedInterestRate = config.baseRate + (config.lowSlope * expectedUtilisation / 100_000);
         } else {
             uint256 lowSlopeInterest = config.utilisationThreshold * config.lowSlope;
@@ -85,7 +85,7 @@ contract InterestRateModuleTest is Test {
         uint8 baseRate_,
         uint8 highSlope_,
         uint8 lowSlope_
-        ) public {
+    ) public {
         vm.assume(totalRealisedLiquidity_ <= 0);
         vm.assume(realisedDebt_ <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
         vm.assume(baseRate_ < 1 * 10 ** 5);
@@ -104,12 +104,12 @@ contract InterestRateModuleTest is Test {
         interest.updateInterestRateExtention(realisedDebt_, totalRealisedLiquidity_);
         uint256 actualInterestRate = interest.interestRate();
         vm.stopPrank();
-        
+
         uint256 expectedUtilisation = 0;
 
         uint256 expectedInterestRate;
 
-        if (expectedUtilisation <= config.utilisationThreshold ){
+        if (expectedUtilisation <= config.utilisationThreshold) {
             expectedInterestRate = config.baseRate + (config.lowSlope * expectedUtilisation / 100_000);
         } else {
             uint256 lowSlopeInterest = config.utilisationThreshold * config.lowSlope;
