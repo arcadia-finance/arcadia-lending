@@ -56,7 +56,7 @@ contract InterestRateModuleTest is Test {
             utilisationThreshold: 0.8 * 10 ** 5
         });
 
-        // When: creator sets the config by calling setInterestConfig with config, 
+        // When: creator sets the config by calling setInterestConfig with config,
         // calls updateInterestRateExtention with realisedDebt_ and totalRealisedLiquidity_
         vm.startPrank(creator);
         interest.setInterestConfig(config);
@@ -74,7 +74,7 @@ contract InterestRateModuleTest is Test {
             // And: expectedInterestRate is lowSlope multiplied by expectedUtilisation, divided by 100000 and added to baseRate
             expectedInterestRate = config.baseRate + (config.lowSlope * expectedUtilisation / 100_000);
         } else {
-            // And: lowSlopeInterest is utilisationThreshold multiplied by lowSlope, 
+            // And: lowSlopeInterest is utilisationThreshold multiplied by lowSlope,
             // highSlopeInterest is expectedUtilisation minus utilisationThreshold multiplied by highSlope
             uint256 lowSlopeInterest = config.utilisationThreshold * config.lowSlope;
             uint256 highSlopeInterest = (expectedUtilisation - config.utilisationThreshold) * config.highSlope;
@@ -108,7 +108,7 @@ contract InterestRateModuleTest is Test {
             utilisationThreshold: 0.8 * 10 ** 5
         });
 
-        // When: creator sets the config by calling setInterestConfig with config, 
+        // When: creator sets the config by calling setInterestConfig with config,
         // calls updateInterestRateExtention with realisedDebt_ and totalRealisedLiquidity_
         vm.startPrank(creator);
         interest.setInterestConfig(config);
@@ -126,7 +126,7 @@ contract InterestRateModuleTest is Test {
             // And: expectedInterestRate is lowSlope multiplied by expectedUtilisation, divided by 100000 and added to baseRate
             expectedInterestRate = config.baseRate + (config.lowSlope * expectedUtilisation / 100_000);
         } else {
-            // And: lowSlopeInterest is utilisationThreshold multiplied by lowSlope, 
+            // And: lowSlopeInterest is utilisationThreshold multiplied by lowSlope,
             // highSlopeInterest is expectedUtilisation minus utilisationThreshold multiplied by highSlope
             uint256 lowSlopeInterest = config.utilisationThreshold * config.lowSlope;
             uint256 highSlopeInterest = (expectedUtilisation - config.utilisationThreshold) * config.highSlope;
