@@ -17,6 +17,10 @@ contract InterestRateModuleMockUpTest is InterestRateModule {
     function _calculateInterestRate(uint256 utilisation) public view returns (uint256) {
         return calculateInterestRate(utilisation);
     }
+
+    function updateInterestRateExtention(uint256 realisedDebt_, uint256 totalRealisedLiquidity_) public {
+        return _updateInterestRate(realisedDebt_, totalRealisedLiquidity_);
+    }
 }
 
 contract InterestRateModuleTest is Test {
@@ -29,6 +33,94 @@ contract InterestRateModuleTest is Test {
         vm.startPrank(creator);
         interest = new InterestRateModuleMockUpTest(address(creator));
         vm.stopPrank();
+    }
+
+    function testSuccess_updateInterestRate_totalRealisedLiquidityMoreThanZero(
+        uint256 realisedDebt_,
+        uint256 totalRealisedLiquidity_,
+        uint8 baseRate_,
+        uint8 highSlope_,
+        uint8 lowSlope_
+        ) public {
+        vm.assume(totalRealisedLiquidity_ > 0);
+        vm.assume(realisedDebt_ <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
+        vm.assume(baseRate_ < 1 * 10 ** 5);
+        vm.assume(highSlope_ > lowSlope_);
+
+        DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
+            baseRate: baseRate_,
+            highSlope: highSlope_,
+            lowSlope: lowSlope_,
+            utilisationThreshold: 0.8 * 10 ** 5
+        });
+
+        vm.startPrank(creator);
+        interest.setInterestConfig(config);
+
+        interest.updateInterestRateExtention(realisedDebt_, totalRealisedLiquidity_);
+        uint256 actualInterestRate = interest.interestRate();
+        vm.stopPrank();
+        
+        uint256 expectedUtilisation = (100_000 * realisedDebt_) / totalRealisedLiquidity_;
+
+        uint256 expectedInterestRate;
+
+        if (expectedUtilisation <= config.utilisationThreshold ){
+            expectedInterestRate = config.baseRate + (config.lowSlope * expectedUtilisation / 100_000);
+        } else {
+            uint256 lowSlopeInterest = config.utilisationThreshold * config.lowSlope;
+            uint256 highSlopeInterest = (expectedUtilisation - config.utilisationThreshold) * config.highSlope;
+
+            // And: expectedInterestRate is baseRate added to lowSlopeInterest added to highSlopeInterest
+            expectedInterestRate = config.baseRate + ((lowSlopeInterest + highSlopeInterest) / 100_000);
+        }
+
+        // Then: actualInterestRate should be equal to expectedInterestRate
+        assertEq(actualInterestRate, expectedInterestRate);
+    }
+
+    function testSuccess_updateInterestRate_totalRealisedLiquidityZero(
+        uint256 realisedDebt_,
+        uint256 totalRealisedLiquidity_,
+        uint8 baseRate_,
+        uint8 highSlope_,
+        uint8 lowSlope_
+        ) public {
+        vm.assume(totalRealisedLiquidity_ <= 0);
+        vm.assume(realisedDebt_ <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
+        vm.assume(baseRate_ < 1 * 10 ** 5);
+        vm.assume(highSlope_ > lowSlope_);
+
+        DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
+            baseRate: baseRate_,
+            highSlope: highSlope_,
+            lowSlope: lowSlope_,
+            utilisationThreshold: 0.8 * 10 ** 5
+        });
+
+        vm.startPrank(creator);
+        interest.setInterestConfig(config);
+
+        interest.updateInterestRateExtention(realisedDebt_, totalRealisedLiquidity_);
+        uint256 actualInterestRate = interest.interestRate();
+        vm.stopPrank();
+        
+        uint256 expectedUtilisation = 0;
+
+        uint256 expectedInterestRate;
+
+        if (expectedUtilisation <= config.utilisationThreshold ){
+            expectedInterestRate = config.baseRate + (config.lowSlope * expectedUtilisation / 100_000);
+        } else {
+            uint256 lowSlopeInterest = config.utilisationThreshold * config.lowSlope;
+            uint256 highSlopeInterest = (expectedUtilisation - config.utilisationThreshold) * config.highSlope;
+
+            // And: expectedInterestRate is baseRate added to lowSlopeInterest added to highSlopeInterest
+            expectedInterestRate = config.baseRate + ((lowSlopeInterest + highSlopeInterest) / 100_000);
+        }
+
+        // Then: actualInterestRate should be equal to expectedInterestRate
+        assertEq(actualInterestRate, expectedInterestRate);
     }
 
     function testSuccess_calculateInterestRate_UnderOptimalUtilisation(
