@@ -49,16 +49,13 @@ abstract contract InterestRateModule is Owned {
      * @param realisedDebt_ Realised debt that calculates after substracting unrealised debt from total debt
      * @param totalRealisedLiquidity_ Total realised liquidity
      * @dev This function is only be called by the function _updateInterestRate(uint256 realisedDebt_, uint256 totalRealisedLiquidity_),
-     * calculates the interest rate
+     * calculates the interest rate, if the totalRealisedLiquidity_ is zero then utilisation is zero
      */
     function _updateInterestRate(uint256 realisedDebt_, uint256 totalRealisedLiquidity_) internal {
         uint256 utilisation;
         if (totalRealisedLiquidity_ > 0) {
             utilisation = (100_000 * realisedDebt_) / totalRealisedLiquidity_;
-        } else {
-            utilisation = 0;
         }
-
         interestRate = calculateInterestRate(utilisation);
     }
 }
