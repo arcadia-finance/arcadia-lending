@@ -45,7 +45,6 @@ abstract contract TrancheTest is Test {
     function setUp() public virtual {
         vm.startPrank(creator);
         pool = new LendingPool(asset, treasury, address(factory));
-        pool.updateInterestRate(5 * 10 ** 16); //5% with 18 decimals precision
 
         tranche = new Tranche(address(pool), "Senior", "SR");
         pool.addTranche(address(tranche), 50);
@@ -306,7 +305,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address owner,
         address receiver
     ) public {
-        // Given: assetsDeposited bigger than 0, bigger than equal to assetsWithdrawn, receiver is not pool or liquidityProvider
+        // Given: assetsDeposited bigger than 0 and assetsWithdrawn, receiver is not pool or liquidityProvider
         vm.assume(assetsDeposited > 0);
         vm.assume(assetsDeposited >= assetsWithdrawn);
         vm.assume(receiver != liquidityProvider);
@@ -335,7 +334,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address owner,
         address beneficiary
     ) public {
-        // Given: assetsDeposited bigger than 0, bigger than equal to assetsWithdrawn, sharesAllowed bigger than equal to assetsWithdrawn,
+        // Given: assetsDeposited bigger than 0 and assetsWithdrawn, sharesAllowed bigger than equal to assetsWithdrawn,
         // receiver is not pool or liquidityProvider, beneficiary is not owner
         vm.assume(assetsDeposited > 0);
         vm.assume(assetsDeposited >= assetsWithdrawn);
@@ -370,7 +369,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address owner,
         address beneficiary
     ) public {
-        // Given: assetsDeposited is bigger than 0, bigger than equal to assetsWithdrawn, receiver is not liquidityProvider,
+        // Given: assetsDeposited is bigger than 0 and assetsWithdrawn, receiver is not liquidityProvider,
         // receiver is not pool, beneficiary is not owner
         vm.assume(assetsDeposited > 0);
         vm.assume(assetsDeposited >= assetsWithdrawn);
@@ -486,7 +485,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
     function testSuccess_redeem_ByOwner(uint128 sharesMinted, uint128 sharesRedeemed, address owner, address receiver)
         public
     {
-        // Given: sharesMinted and sharesRedeemed bigger than 0, sharesMinted bigger than equal sharesRedeemed, receiver is not liquidityProvider, receiver is not pool
+        // Given: sharesMinted and sharesRedeemed bigger than 0, sharesMinted bigger than sharesRedeemed, receiver is not liquidityProvider, receiver is not pool
         vm.assume(sharesMinted > 0);
         vm.assume(sharesRedeemed > 0);
         vm.assume(sharesMinted >= sharesRedeemed);
@@ -516,7 +515,8 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address owner,
         address beneficiary
     ) public {
-        // Given: sharesMinted and sharesRedeemed bigger than 0, sharesMinted and sharesAllowed bigger than equal sharesRedeemed, receiver is not liquidityProvider, receiver is not pool, beneficiary is not owner
+        // Given: sharesMinted and sharesRedeemed bigger than 0, sharesMinted bigger than equal sharesRedeemed, sharesAllowed bigger than equal sharesRedeemed,
+        // receiver is not liquidityProvider, receiver is not pool, beneficiary is not owner
         vm.assume(sharesMinted > 0);
         vm.assume(sharesRedeemed > 0);
         vm.assume(sharesMinted >= sharesRedeemed);
@@ -553,7 +553,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address owner,
         address beneficiary
     ) public {
-        // Given: sharesMinted and sharesRedeemed bigger than 0, sharesMinted bigger than equal sharesRedeemed, receiver is not liquidityProvider, receiver is not pool, beneficiary is not owner
+        // Given: sharesMinted and sharesRedeemed bigger than 0, sharesMinted bigger sharesRedeemed, receiver is not liquidityProvider, receiver is not pool, beneficiary is not owner
         vm.assume(sharesMinted > 0);
         vm.assume(sharesRedeemed > 0);
         vm.assume(sharesMinted >= sharesRedeemed);

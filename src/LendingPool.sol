@@ -18,19 +18,19 @@ import "./interfaces/IVault.sol";
 import "./interfaces/ILendingPool.sol";
 import {TrustedProtocol} from "./TrustedProtocol.sol";
 import {DebtToken} from "./DebtToken.sol";
+import {InterestRateModule} from "./libraries/InterestRateModule.sol";
 
 /**
  * @title Lending Pool
  * @author Arcadia Finance
  * @notice The Lending pool contains the main logic to provide liquidity and take or repay loans for a certain asset
  */
-contract LendingPool is Owned, TrustedProtocol, DebtToken {
+contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
-    uint256 public constant YEARLY_BLOCKS = 2628000;
+    uint256 public constant YEARLY_BLOCKS = 2_628_000;
 
-    uint64 public interestRate; //18 decimals precision
     uint32 public lastSyncedBlock;
     uint256 public totalWeight;
     uint256 public totalRealisedLiquidity;
@@ -166,7 +166,6 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
      */
     function depositInLendingPool(uint256 assets, address from) public onlyTranche {
         _syncInterests();
-
         asset.transferFrom(from, address(this), assets);
 
         unchecked {
@@ -174,7 +173,8 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
             totalRealisedLiquidity += assets;
         }
 
-        _updateInterestRate();
+        //Update interest rates
+        updateInterestRate();
     }
 
     /**
@@ -184,7 +184,6 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
      */
     function withdrawFromLendingPool(uint256 assets, address receiver) public {
         _syncInterests();
-
         require(realisedLiquidityOf[msg.sender] >= assets, "LP_WFLP: Amount exceeds balance");
 
         realisedLiquidityOf[msg.sender] -= assets;
@@ -192,7 +191,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
 
         asset.safeTransfer(receiver, assets);
 
-        _updateInterestRate();
+        updateInterestRate();
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -250,7 +249,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         }
 
         //Update interest rates
-        _updateInterestRate();
+        updateInterestRate();
     }
 
     /**
@@ -277,12 +276,12 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
         require(IVault(vault).decreaseMarginPosition(address(asset), transferAmount), "LP_R: Reverted");
 
         //Update interest rates
-        _updateInterestRate();
+        updateInterestRate();
     }
 
-    /*//////////////////////////////////////////////////////////////
+    /* //////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
-    //////////////////////////////////////////////////////////////*/
+    ////////////////////////////////////////////////////////////// */
 
     /**
      * @notice Returns the total amount of outstanding debt in the underlying asset
@@ -320,15 +319,6 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
     /* //////////////////////////////////////////////////////////////
                             INTERESTS LOGIC
     ////////////////////////////////////////////////////////////// */
-
-    /**
-     * @notice Syncs all unrealised debt (= interest for LP and treasury).
-     * @dev Calculates the unrealised debt since last sync, and realises it by minting an aqual amount of
-     * debt tokens to all debt holders and interests to LPs and the treasury
-     */
-    function syncInterests() external {
-        _syncInterests();
-    }
 
     /**
      * @notice Syncs all unrealised debt (= interest for LP and treasury).
@@ -413,13 +403,12 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
                         INTEREST RATE LOGIC
     ////////////////////////////////////////////////////////////// */
 
-    function updateInterestRate(uint64 _interestRate) external onlyOwner {
-        //Todo: Remove function after _updateInterestRate() is implemented
-        interestRate = _interestRate; //with 18 decimals precision
-    }
-
-    function _updateInterestRate() internal {
-        //ToDo
+    /**
+     * @notice Updates the interest rate
+     */
+    function updateInterestRate() internal {
+        _syncInterests();
+        _updateInterestRate(realisedDebt, totalRealisedLiquidity);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -538,7 +527,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken {
      */
     function getOpenPosition(address vault) external override returns (uint128 openPosition) {
         //ToDo: When ERC-4626 is correctly implemented, It should not be necessary to first sync interests.
-        _syncInterests();
+        updateInterestRate();
         openPosition = uint128(maxWithdraw(vault));
     }
 }
