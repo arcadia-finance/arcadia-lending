@@ -228,7 +228,6 @@ contract InterestRateModuleTest is Test {
         uint8 lowSlope_,
         uint8 utilisationThreshold_
     ) public {
-
         // Given: InterestRateConfiguration data type setted as config
         DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
             baseRate: baseRate_,
@@ -246,6 +245,6 @@ contract InterestRateModuleTest is Test {
         assertEq(config.baseRate, baseRate_);
         assertEq(config.highSlope, highSlope_);
         assertEq(config.lowSlope, lowSlope_);
-        assertEq(config.utilisationThreshold, utilisationThreshold_);    
+        assertEq(config.utilisationThreshold, utilisationThreshold_);
     }
 }
