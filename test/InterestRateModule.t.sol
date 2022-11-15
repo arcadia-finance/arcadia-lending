@@ -89,13 +89,12 @@ contract InterestRateModuleTest is Test {
 
     function testSuccess_updateInterestRate_totalRealisedLiquidityZero(
         uint256 realisedDebt_,
-        uint256 totalRealisedLiquidity_,
         uint8 baseRate_,
         uint8 highSlope_,
         uint8 lowSlope_
     ) public {
-        // Given: totalRealisedLiquidity_ is less than equal to 0, baseRate_ is less than 100000, highSlope_ is bigger than lowSlope_
-        vm.assume(totalRealisedLiquidity_ <= 0);
+        // Given: totalRealisedLiquidity_ is equal to 0, baseRate_ is less than 100000, highSlope_ is bigger than lowSlope_
+        uint256 totalRealisedLiquidity_ = 0;
         vm.assume(realisedDebt_ <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
         vm.assume(baseRate_ < 1 * 10 ** 5);
         vm.assume(highSlope_ > lowSlope_);
@@ -117,23 +116,7 @@ contract InterestRateModuleTest is Test {
         uint256 actualInterestRate = interest.interestRate();
         vm.stopPrank();
 
-        // And: expectedUtilisation is zero
-        uint256 expectedUtilisation = 0;
-
-        uint256 expectedInterestRate;
-
-        if (expectedUtilisation <= config.utilisationThreshold) {
-            // And: expectedInterestRate is lowSlope multiplied by expectedUtilisation, divided by 100000 and added to baseRate
-            expectedInterestRate = config.baseRate + (config.lowSlope * expectedUtilisation / 100_000);
-        } else {
-            // And: lowSlopeInterest is utilisationThreshold multiplied by lowSlope,
-            // highSlopeInterest is expectedUtilisation minus utilisationThreshold multiplied by highSlope
-            uint256 lowSlopeInterest = config.utilisationThreshold * config.lowSlope;
-            uint256 highSlopeInterest = (expectedUtilisation - config.utilisationThreshold) * config.highSlope;
-
-            // And: expectedInterestRate is baseRate added to lowSlopeInterest added to highSlopeInterest divided by 100000
-            expectedInterestRate = config.baseRate + ((lowSlopeInterest + highSlopeInterest) / 100_000);
-        }
+        uint256 expectedInterestRate = config.baseRate;
 
         // Then: actualInterestRate should be equal to expectedInterestRate
         assertEq(actualInterestRate, expectedInterestRate);
