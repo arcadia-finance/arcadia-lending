@@ -221,4 +221,31 @@ contract InterestRateModuleTest is Test {
         interest.setInterestConfig(config);
         vm.stopPrank();
     }
+
+    function testSuccess_setInterestConfig(
+        uint8 baseRate_,
+        uint8 highSlope_,
+        uint8 lowSlope_,
+        uint8 utilisationThreshold_
+    ) public {
+
+        // Given: InterestRateConfiguration data type setted as config
+        DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
+            baseRate: baseRate_,
+            highSlope: highSlope_,
+            lowSlope: lowSlope_,
+            utilisationThreshold: utilisationThreshold_
+        });
+
+        vm.startPrank(creator);
+        // When: creator calls setInterestConfig
+        interest.setInterestConfig(config);
+        vm.stopPrank();
+
+        // Then: config types should be equal to fuzzed types
+        assertEq(config.baseRate, baseRate_);
+        assertEq(config.highSlope, highSlope_);
+        assertEq(config.lowSlope, lowSlope_);
+        assertEq(config.utilisationThreshold, utilisationThreshold_);    
+    }
 }
