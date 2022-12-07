@@ -14,8 +14,8 @@ contract InterestRateModuleMockUpTest is InterestRateModule {
 
     constructor(address creator) Owned(creator) {}
 
-    function _calculateInterestRate(uint256 utilisation) public view returns (uint256) {
-        return calculateInterestRate(utilisation);
+    function calculateInterestRate(uint256 utilisation) public view returns (uint256) {
+        return _calculateInterestRate(utilisation);
     }
 
     function updateInterestRateExtention(uint256 realisedDebt_, uint256 totalRealisedLiquidity_) public {
@@ -146,8 +146,8 @@ contract InterestRateModuleTest is Test {
         vm.startPrank(creator);
         interest.setInterestConfig(config);
 
-        // And: actualInterestRate is _calculateInterestRate with utilisation
-        uint256 actualInterestRate = interest._calculateInterestRate(utilisation);
+        // And: actualInterestRate is calculateInterestRate with utilisation
+        uint256 actualInterestRate = interest.calculateInterestRate(utilisation);
         vm.stopPrank();
 
         // And: expectedInterestRate is lowSlope multiplied by utilisation divided by 100000 and added to baseRate
@@ -181,8 +181,8 @@ contract InterestRateModuleTest is Test {
         vm.startPrank(creator);
         interest.setInterestConfig(config);
 
-        // And: actualInterestRate is _calculateInterestRate with utilisation
-        uint256 actualInterestRate = interest._calculateInterestRate(utilisation);
+        // And: actualInterestRate is calculateInterestRate with utilisation
+        uint256 actualInterestRate = interest.calculateInterestRate(utilisation);
         vm.stopPrank();
 
         // And: lowSlopeInterest is utilisationThreshold multiplied by lowSlope, highSlopeInterest is utilisation minus utilisationThreshold multiplied by highSlope
