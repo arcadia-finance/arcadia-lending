@@ -50,7 +50,7 @@ contract InterestRateModuleTest is Test {
         interest.setInterestConfig(config);
 
         // Then: config types should be equal to fuzzed types
-        (uint256 baserate, uint256 highslope, uint256 lowslope, uint256 utilisationThreshold) = interest.interestRateConfig();
+        (uint256 baserate, uint256 lowslope, uint256 highslope, uint256 utilisationThreshold) = interest.interestRateConfig();
         assertEq(baserate, baseRate_);
         assertEq(highslope, highSlope_);
         assertEq(lowslope, lowSlope_);
