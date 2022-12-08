@@ -321,14 +321,6 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     ////////////////////////////////////////////////////////////// */
 
     /**
-     * @notice Set's the configration parameters of InterestRateConfiguration struct
-     * @param newConfig New set of configration parameters
-     */
-    function setInterestConfig(DataTypes.InterestRateConfiguration calldata newConfig) external onlyOwner {
-        _setInterestConfig(newConfig);
-    }
-
-    /**
      * @notice Syncs all unrealised debt (= interest for LP and treasury).
      * @dev Calculates the unrealised debt since last sync, and realises it by minting an aqual amount of
      * debt tokens to all debt holders and interests to LPs and the treasury
@@ -410,6 +402,14 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     /* //////////////////////////////////////////////////////////////
                         INTEREST RATE LOGIC
     ////////////////////////////////////////////////////////////// */
+
+    /**
+     * @notice Set's the configration parameters of InterestRateConfiguration struct
+     * @param newConfig New set of configration parameters
+     */
+    function setInterestConfig(DataTypes.InterestRateConfiguration calldata newConfig) external onlyOwner {
+        _setInterestConfig(newConfig);
+    }
 
     /**
      * @notice Updates the interest rate

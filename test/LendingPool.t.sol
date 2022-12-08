@@ -1031,6 +1031,60 @@ contract AccountingTest is LendingPoolTest {
 /* //////////////////////////////////////////////////////////////
                     INTEREST RATE LOGIC
 ////////////////////////////////////////////////////////////// */
+contract InterestRateTest is LendingPoolTest {
+    function setUp() public override {
+        super.setUp();
+    }
+
+    function testRevert_setInterestConfig_NonOwner(
+        address unprivilegedAddress,
+        uint8 baseRate_,
+        uint8 highSlope_,
+        uint8 lowSlope_,
+        uint8 utilisationThreshold_
+    ) public {
+        // Given: unprivilegedAddress is not creator, InterestRateConfiguration setted as config
+        vm.assume(unprivilegedAddress != creator);
+
+        // And: InterestRateConfiguration setted as config
+        DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
+            baseRate: baseRate_,
+            highSlope: highSlope_,
+            lowSlope: lowSlope_,
+            utilisationThreshold: utilisationThreshold_
+        });
+
+        vm.startPrank(unprivilegedAddress);
+        // When: unprivilegedAddress calls setInterestConfig
+        // Then: setInterestConfig should revert with UNAUTHORIZED
+        vm.expectRevert("UNAUTHORIZED");
+        pool.setInterestConfig(config);
+        vm.stopPrank();
+    }
+
+    function testSuccess_setInterestConfig(uint8 baseRate_, uint8 highSlope_, uint8 lowSlope_, uint8 utilisationThreshold_)
+        public
+    {
+        // Given: InterestRateConfiguration data type setted as config
+        DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
+            baseRate: baseRate_,
+            highSlope: highSlope_,
+            lowSlope: lowSlope_,
+            utilisationThreshold: utilisationThreshold_
+        });
+
+        vm.startPrank(creator);
+        // When: creator calls setInterestConfig
+        pool.setInterestConfig(config);
+        vm.stopPrank();
+
+        // Then: config types should be equal to fuzzed types
+        assertEq(config.baseRate, baseRate_);
+        assertEq(config.highSlope, highSlope_);
+        assertEq(config.lowSlope, lowSlope_);
+        assertEq(config.utilisationThreshold, utilisationThreshold_);
+    }
+}
 
 /* //////////////////////////////////////////////////////////////
                         LIQUIDATION LOGIC
