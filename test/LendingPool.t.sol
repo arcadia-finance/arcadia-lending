@@ -1073,16 +1073,11 @@ contract InterestRateTest is LendingPoolTest {
             utilisationThreshold: utilisationThreshold_
         });
 
-        vm.startPrank(creator);
         // When: creator calls setInterestConfig
+        vm.startPrank(creator);
+        // Then: config is sucesfully set
         pool.setInterestConfig(config);
         vm.stopPrank();
-
-        // Then: config types should be equal to fuzzed types
-        assertEq(config.baseRate, baseRate_);
-        assertEq(config.highSlope, highSlope_);
-        assertEq(config.lowSlope, lowSlope_);
-        assertEq(config.utilisationThreshold, utilisationThreshold_);
     }
 }
 
