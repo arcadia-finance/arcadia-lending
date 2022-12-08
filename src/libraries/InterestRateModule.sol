@@ -6,10 +6,9 @@
  */
 pragma solidity ^0.8.13;
 
-import {Owned} from "../../lib/solmate/src/auth/Owned.sol";
 import {DataTypes} from "./DataTypes.sol";
 
-abstract contract InterestRateModule is Owned {
+contract InterestRateModule {
     uint256 public interestRate; //18 decimals precision
 
     DataTypes.InterestRateConfiguration public interestRateConfig;
@@ -18,8 +17,7 @@ abstract contract InterestRateModule is Owned {
      * @notice Set's the configration parameters of InterestRateConfiguration struct
      * @param newConfig New set of configration parameters
      */
-
-    function setInterestConfig(DataTypes.InterestRateConfiguration calldata newConfig) external onlyOwner {
+    function _setInterestConfig(DataTypes.InterestRateConfiguration calldata newConfig) internal {
         interestRateConfig = newConfig;
     }
 
@@ -29,7 +27,7 @@ abstract contract InterestRateModule is Owned {
      * @dev This function can only be called by the function _updateInterestRate(uint256 realisedDebt_, uint256 totalRealisedLiquidity_)
      * @return Interest rate
      */
-    function calculateInterestRate(uint256 utilisation) internal view returns (uint256) {
+    function _calculateInterestRate(uint256 utilisation) internal view returns (uint256) {
         if (utilisation >= interestRateConfig.utilisationThreshold) {
             // 1e23 = (uT * 1e5) * (ls * 1e18)
             uint256 lowSlopeInterest = interestRateConfig.utilisationThreshold * interestRateConfig.lowSlope;
@@ -56,6 +54,6 @@ abstract contract InterestRateModule is Owned {
         if (totalRealisedLiquidity_ > 0) {
             utilisation = (100_000 * realisedDebt_) / totalRealisedLiquidity_;
         }
-        interestRate = calculateInterestRate(utilisation);
+        interestRate = _calculateInterestRate(utilisation);
     }
 }

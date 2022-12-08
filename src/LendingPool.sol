@@ -18,7 +18,7 @@ import "./interfaces/IVault.sol";
 import "./interfaces/ILendingPool.sol";
 import {TrustedProtocol} from "./TrustedProtocol.sol";
 import {DebtToken} from "./DebtToken.sol";
-import {InterestRateModule} from "./libraries/InterestRateModule.sol";
+import {InterestRateModule, DataTypes} from "./libraries/InterestRateModule.sol";
 
 /**
  * @title Lending Pool
@@ -402,6 +402,14 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     /* //////////////////////////////////////////////////////////////
                         INTEREST RATE LOGIC
     ////////////////////////////////////////////////////////////// */
+
+    /**
+     * @notice Set's the configration parameters of InterestRateConfiguration struct
+     * @param newConfig New set of configration parameters
+     */
+    function setInterestConfig(DataTypes.InterestRateConfiguration calldata newConfig) external onlyOwner {
+        _setInterestConfig(newConfig);
+    }
 
     /**
      * @notice Updates the interest rate
