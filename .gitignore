@@ -9,3 +9,7 @@ out/
 
 # OS generated
 .DS_STORE
+
+.env
+
+broadcast/
