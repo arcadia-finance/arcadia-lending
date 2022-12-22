@@ -1062,9 +1062,12 @@ contract InterestRateTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_setInterestConfig(uint8 baseRate_, uint8 highSlope_, uint8 lowSlope_, uint8 utilisationThreshold_)
-        public
-    {
+    function testSuccess_setInterestConfig(
+        uint8 baseRate_,
+        uint8 highSlope_,
+        uint8 lowSlope_,
+        uint8 utilisationThreshold_
+    ) public {
         // Given: InterestRateConfiguration data type setted as config
         DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
             baseRate: baseRate_,
