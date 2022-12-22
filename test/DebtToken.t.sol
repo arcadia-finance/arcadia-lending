@@ -87,8 +87,8 @@ contract DepositWithdrawalTest is DebtTokenTest {
 
         vm.startPrank(sender);
         // When: sender deposits assets
-        // Then: deposit should revert with DEPOSIT_NOT_SUPPORTED
-        vm.expectRevert("DEPOSIT_NOT_SUPPORTED");
+        // Then: deposit should revert with DT_D: DEPOSIT_NOT_SUPPORTED
+        vm.expectRevert("DT_D: DEPOSIT_NOT_SUPPORTED");
         debt.deposit(assets, receiver);
         vm.stopPrank();
     }
@@ -106,7 +106,7 @@ contract DepositWithdrawalTest is DebtTokenTest {
         stdstore.target(address(debt)).sig(debt.totalSupply.selector).checked_write(totalSupply);
         stdstore.target(address(debt)).sig(debt.realisedDebt.selector).checked_write(totalDebt);
 
-        vm.expectRevert("ZERO_SHARES");
+        vm.expectRevert("DT_D: ZERO_SHARES");
         debt.deposit_(assets, receiver);
     }
 
@@ -153,8 +153,8 @@ contract DepositWithdrawalTest is DebtTokenTest {
 
         vm.startPrank(sender);
         // When: sender mint shares
-        // Then: mint should revert with MINT_NOT_SUPPORTED
-        vm.expectRevert("MINT_NOT_SUPPORTED");
+        // Then: mint should revert with DT_M: MINT_NOT_SUPPORTED
+        vm.expectRevert("DT_M: MINT_NOT_SUPPORTED");
         debt.mint(shares, receiver);
         vm.stopPrank();
     }
@@ -164,8 +164,8 @@ contract DepositWithdrawalTest is DebtTokenTest {
 
         vm.startPrank(sender);
         // When: sender withdraw
-        // Then: withdraw should revert with WITHDRAW_NOT_SUPPORTED
-        vm.expectRevert("WITHDRAW_NOT_SUPPORTED");
+        // Then: withdraw should revert with DT_W: WITHDRAW_NOT_SUPPORTED
+        vm.expectRevert("DT_W: WITHDRAW_NOT_SUPPORTED");
         debt.withdraw(assets, receiver, owner);
         vm.stopPrank();
     }
@@ -206,8 +206,8 @@ contract DepositWithdrawalTest is DebtTokenTest {
 
         vm.startPrank(sender);
         // When: sender redeem shares
-        // Then: redeem should revert with REDEEM_NOT_SUPPORTED
-        vm.expectRevert("REDEEM_NOT_SUPPORTED");
+        // Then: redeem should revert with DT_R: REDEEM_NOT_SUPPORTED
+        vm.expectRevert("DT_R: REDEEM_NOT_SUPPORTED");
         debt.redeem(shares, receiver, owner);
         vm.stopPrank();
     }
@@ -227,8 +227,8 @@ contract TransferTest is DebtTokenTest {
 
         vm.startPrank(sender);
         // When: sender approve
-        // Then: approve should revert with APPROVE_NOT_SUPPORTED
-        vm.expectRevert("APPROVE_NOT_SUPPORTED");
+        // Then: approve should revert with DT_A: APPROVE_NOT_SUPPORTED
+        vm.expectRevert("DT_A: APPROVE_NOT_SUPPORTED");
         debt.approve(spender, amount);
         vm.stopPrank();
     }
@@ -238,8 +238,8 @@ contract TransferTest is DebtTokenTest {
 
         vm.startPrank(sender);
         // When: sender transfer
-        // Then: transfer should revert with TRANSFER_NOT_SUPPORTED
-        vm.expectRevert("TRANSFER_NOT_SUPPORTED");
+        // Then: transfer should revert with DT_T: TRANSFER_NOT_SUPPORTED
+        vm.expectRevert("DT_T: TRANSFER_NOT_SUPPORTED");
         debt.transfer(to, amount);
         vm.stopPrank();
     }
@@ -249,8 +249,8 @@ contract TransferTest is DebtTokenTest {
 
         vm.startPrank(sender);
         // When: sender transferFrom
-        // Then: transferFrom should revert with TRANSFERFROM_NOT_SUPPORTED
-        vm.expectRevert("TRANSFERFROM_NOT_SUPPORTED");
+        // Then: transferFrom should revert with DT_TF: TRANSFERFROM_NOT_SUPPORTED
+        vm.expectRevert("DT_TF: TRANSFERFROM_NOT_SUPPORTED");
         debt.transferFrom(from, to, amount);
         vm.stopPrank();
     }
@@ -269,8 +269,8 @@ contract TransferTest is DebtTokenTest {
 
         vm.startPrank(sender);
         // When: sender permit
-        // Then: permit should revert with PERMIT_NOT_SUPPORTED
-        vm.expectRevert("PERMIT_NOT_SUPPORTED");
+        // Then: permit should revert with DT_TP: PERMIT_NOT_SUPPORTED
+        vm.expectRevert("DT_TP: PERMIT_NOT_SUPPORTED");
         debt.permit(owner, spender, value, deadline, v, r, s);
         vm.stopPrank();
     }
