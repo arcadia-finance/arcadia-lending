@@ -13,45 +13,39 @@ import "../src/mocks/Factory.sol";
 import "../src/Tranche.sol";
 import "../src/DebtToken.sol";
 
+contract DebtTokenExtension is DebtToken {
+    constructor(ERC20 asset_) DebtToken(asset_) {}
+
+    function deposit_(uint256 assets, address receiver) public returns (uint256 shares) {
+        shares = _deposit(assets, receiver);
+    }
+
+    function withdraw_(uint256 assets, address receiver, address owner_) public returns (uint256 shares) {
+        shares = _withdraw(assets, receiver, owner_);
+    }
+
+    function totalAssets() public view override returns (uint256 totalDebt) {
+        totalDebt = realisedDebt;
+    }
+}
+
 abstract contract DebtTokenTest is Test {
     Asset asset;
-    Factory factory;
-    LendingPool pool;
-    Tranche tranche;
-    DebtToken debt;
-    Vault vault;
+    DebtTokenExtension debt;
 
     address creator = address(1);
     address tokenCreator = address(2);
-    address treasury = address(4);
-    address vaultOwner = address(5);
-    address liquidityProvider = address(6);
 
     //Before
     constructor() {
-        vm.startPrank(tokenCreator);
+        vm.prank(tokenCreator);
         asset = new Asset("Asset", "ASSET", 18);
-        asset.mint(liquidityProvider, type(uint256).max);
-        vm.stopPrank();
-
-        vm.startPrank(creator);
-        factory = new Factory();
-        vm.stopPrank();
     }
 
     //Before Each
     function setUp() public virtual {
-        vm.startPrank(creator);
-        pool = new LendingPool(asset, treasury, address(factory));
-
-        debt = DebtToken(address(pool));
-
-        tranche = new Tranche(address(pool), "Senior", "SR");
-        pool.addTranche(address(tranche), 50);
-        vm.stopPrank();
-
-        vm.prank(liquidityProvider);
-        asset.approve(address(pool), type(uint256).max);
+        vm.prank(creator);
+        debt = new DebtTokenExtension(asset);
     }
 }
 
@@ -74,7 +68,6 @@ contract DeploymentTest is DebtTokenTest {
         assertEq(debt.name(), string("Arcadia Asset Debt"));
         assertEq(debt.symbol(), string("darcASSET"));
         assertEq(debt.decimals(), 18);
-        assertEq(address(tranche.lendingPool()), address(pool));
     }
 }
 
@@ -83,6 +76,8 @@ contract DeploymentTest is DebtTokenTest {
 //////////////////////////////////////////////////////////////*/
 
 contract DepositWithdrawalTest is DebtTokenTest {
+    using stdStorage for StdStorage;
+
     function setUp() public override {
         super.setUp();
     }
@@ -94,8 +89,63 @@ contract DepositWithdrawalTest is DebtTokenTest {
         // When: sender deposits assets
         // Then: deposit should revert with DEPOSIT_NOT_SUPPORTED
         vm.expectRevert("DEPOSIT_NOT_SUPPORTED");
-        pool.deposit(assets, receiver);
+        debt.deposit(assets, receiver);
         vm.stopPrank();
+    }
+
+    function testRevert_deposit_ZeroShares(uint256 assets, address receiver, uint256 totalSupply, uint256 totalDebt)
+        public
+    {
+        vm.assume(assets <= totalDebt);
+        vm.assume(totalSupply > 0); //First mint new shares are issued equal to amount of assets -> error will not throw
+        vm.assume(assets <= type(uint256).max / totalSupply); //Avoid overflow in next assumption
+
+        //Will result in zero shares being created
+        vm.assume(totalDebt > assets * totalSupply);
+
+        stdstore.target(address(debt)).sig(debt.totalSupply.selector).checked_write(totalSupply);
+        stdstore.target(address(debt)).sig(debt.realisedDebt.selector).checked_write(totalDebt);
+
+        vm.expectRevert("ZERO_SHARES");
+        debt.deposit_(assets, receiver);
+    }
+
+    function testsuccess_deposit_FirstDeposit(uint256 assets, address receiver) public {
+        vm.assume(assets > 0);
+
+        debt.deposit_(assets, receiver);
+
+        assertEq(debt.balanceOf(receiver), assets);
+        assertEq(debt.totalSupply(), assets);
+        assertEq(debt.realisedDebt(), assets);
+    }
+
+    function testSuccess_deposit_NotFirstDeposit(
+        uint256 assets,
+        address receiver,
+        uint256 totalSupply,
+        uint256 totalDebt
+    ) public {
+        vm.assume(assets <= totalDebt);
+        vm.assume(assets <= type(uint256).max - totalDebt);
+        vm.assume(assets > 0);
+        vm.assume(totalSupply > 0); //Not first deposit
+        vm.assume(assets <= type(uint256).max / totalSupply); //Avoid overflow in next assumption
+
+        //One or more shares are created
+        vm.assume(totalDebt <= assets * totalSupply);
+
+        stdstore.target(address(debt)).sig(debt.totalSupply.selector).checked_write(totalSupply);
+        stdstore.target(address(debt)).sig(debt.realisedDebt.selector).checked_write(totalDebt);
+
+        uint256 shares = assets * totalSupply / totalDebt;
+        vm.assume(shares <= type(uint256).max - totalSupply);
+
+        debt.deposit_(assets, receiver);
+
+        assertEq(debt.balanceOf(receiver), shares);
+        assertEq(debt.totalSupply(), totalSupply + shares);
+        assertEq(debt.realisedDebt(), totalDebt + assets);
     }
 
     function testRevert_mint(uint256 shares, address receiver, address sender) public {
@@ -118,6 +168,37 @@ contract DepositWithdrawalTest is DebtTokenTest {
         vm.expectRevert("WITHDRAW_NOT_SUPPORTED");
         debt.withdraw(assets, receiver, owner);
         vm.stopPrank();
+    }
+
+    function testSuccess_withdraw(
+        uint256 assetsWithdrawn,
+        address owner,
+        uint256 initialShares,
+        uint256 totalSupply,
+        uint256 totalDebt
+    ) public {
+        vm.assume(assetsWithdrawn <= totalDebt);
+        vm.assume(totalDebt > 0);
+        vm.assume(initialShares <= totalSupply);
+        vm.assume(totalSupply > 0);
+        vm.assume(assetsWithdrawn <= type(uint256).max / totalSupply); //Avoid overflow in next assumption
+
+        uint256 sharesRedeemed = assetsWithdrawn * totalSupply / totalDebt;
+        if (sharesRedeemed * totalDebt < assetsWithdrawn * totalSupply) {
+            //Must round up
+            sharesRedeemed += 1;
+        }
+        vm.assume(sharesRedeemed <= initialShares);
+
+        stdstore.target(address(debt)).sig(debt.balanceOf.selector).with_key(owner).checked_write(initialShares);
+        stdstore.target(address(debt)).sig(debt.totalSupply.selector).checked_write(totalSupply);
+        stdstore.target(address(debt)).sig(debt.realisedDebt.selector).checked_write(totalDebt);
+
+        debt.withdraw_(assetsWithdrawn, owner, owner);
+
+        assertEq(debt.balanceOf(owner), initialShares - sharesRedeemed);
+        assertEq(debt.totalSupply(), totalSupply - sharesRedeemed);
+        assertEq(debt.realisedDebt(), totalDebt - assetsWithdrawn);
     }
 
     function testRevert_redeem(uint256 shares, address receiver, address owner, address sender) public {
