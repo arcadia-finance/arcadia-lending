@@ -89,8 +89,8 @@ contract LockingTest is TrancheTest {
         vm.startPrank(unprivilegedAddress);
         // When: unprivilegedAddress lock
 
-        // Then: lock reverts with "UNAUTHORIZED"
-        vm.expectRevert("UNAUTHORIZED");
+        // Then: lock reverts with "T_L: UNAUTHORIZED"
+        vm.expectRevert("T_L: UNAUTHORIZED");
         tranche.lock();
         vm.stopPrank();
     }
@@ -164,8 +164,8 @@ contract DepositAndWithdrawalTest is TrancheTest {
         vm.startPrank(liquidityProvider);
         // When: liquidityProvider deposit 0
 
-        // Then: deposit should revert with "ZERO_SHARES"
-        vm.expectRevert("ZERO_SHARES");
+        // Then: deposit should revert with "T_D: ZERO_SHARES"
+        vm.expectRevert("T_D: ZERO_SHARES");
         tranche.deposit(0, receiver);
         vm.stopPrank();
     }
@@ -185,7 +185,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         assertEq(asset.balanceOf(address(pool)), assets);
     }
 
-    function testRevert_mintLocked(uint128 shares, address receiver) public {
+    function testRevert_mint_Locked(uint128 shares, address receiver) public {
         // Given: pool lock
         vm.prank(address(pool));
         tranche.lock();
@@ -272,7 +272,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         // When: beneficiary withdraw
 
         // Then: withdraw should revert with stdError.arithmeticError
-        vm.expectRevert("LP_WFLP: Amount exceeds balance");
+        vm.expectRevert(stdError.arithmeticError);
         tranche.withdraw(sharesAllowed, receiver, owner);
         vm.stopPrank();
     }
@@ -294,7 +294,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         // When: owner withdraw
 
         // Then: withdraw should revert with stdError.arithmeticError
-        vm.expectRevert("LP_WFLP: Amount exceeds balance");
+        vm.expectRevert(stdError.arithmeticError);
         tranche.withdraw(assetsWithdrawn, receiver, owner);
         vm.stopPrank();
     }
@@ -402,12 +402,18 @@ contract DepositAndWithdrawalTest is TrancheTest {
         vm.prank(address(pool));
         tranche.lock();
 
-        vm.startPrank(liquidityProvider);
         // When: liquidityProvider redeem
-
         // Then: redeem should revert with "TRANCHE: LOCKED"
+        vm.startPrank(liquidityProvider);
         vm.expectRevert("TRANCHE: LOCKED");
         tranche.redeem(shares, receiver, owner);
+        vm.stopPrank();
+    }
+
+    function testRevert_redeem_ZeroAssets(address receiver, address owner) public {
+        vm.startPrank(liquidityProvider);
+        vm.expectRevert("T_R: ZERO_ASSETS");
+        tranche.redeem(0, receiver, owner);
         vm.stopPrank();
     }
 
@@ -580,5 +586,24 @@ contract DepositAndWithdrawalTest is TrancheTest {
         assertEq(tranche.allowance(owner, beneficiary), type(uint256).max);
         assertEq(asset.balanceOf(address(pool)), sharesMinted - sharesRedeemed);
         assertEq(asset.balanceOf(receiver), sharesRedeemed);
+    }
+}
+
+/*//////////////////////////////////////////////////////////////
+                        ACCOUNTING LOGIC
+//////////////////////////////////////////////////////////////*/
+contract AccountingTest is TrancheTest {
+    using stdStorage for StdStorage;
+
+    function setUp() public override {
+        super.setUp();
+    }
+
+    function testSuccess_totalAssets(uint128 assets) public {
+        stdstore.target(address(pool)).sig(pool.realisedLiquidityOf.selector).with_key(address(tranche)).checked_write(
+            assets
+        );
+
+        assertEq(tranche.totalAssets(), assets);
     }
 }

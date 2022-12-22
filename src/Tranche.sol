@@ -55,7 +55,7 @@ contract Tranche is ERC4626, Owned {
      * @dev Only the Lending Pool can call this function, only trigger is a severe default event.
      */
     function lock() public {
-        require(msg.sender == address(lendingPool), "UNAUTHORIZED");
+        require(msg.sender == address(lendingPool), "T_L: UNAUTHORIZED");
         locked = true;
     }
 
@@ -82,10 +82,11 @@ contract Tranche is ERC4626, Owned {
      * Hence the sender should not give this contract an allowance to transfer the underlying asset but the Lending Pool.
      */
     function deposit(uint256 assets, address receiver) public override notLocked returns (uint256 shares) {
+        //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
         // Check for rounding error since we round down in previewDeposit.
-        require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
+        require((shares = previewDeposit(assets)) != 0, "T_D: ZERO_SHARES");
 
-        // Need to transfer (via lendingPool.deposit()) before minting or ERC777s could reenter.
+        // Need to transfer (via lendingPool.depositInLendingPool()) before minting or ERC777s could reenter.
         lendingPool.depositInLendingPool(assets, msg.sender);
 
         _mint(receiver, shares);
@@ -103,9 +104,10 @@ contract Tranche is ERC4626, Owned {
      * Hence the sender should not give this contract an allowance to transfer the underlying asset but the Lending Pool.
      */
     function mint(uint256 shares, address receiver) public override notLocked returns (uint256 assets) {
+        //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
         assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
 
-        // Need to transfer (via lendingPool.deposit()) before minting or ERC777s could reenter.
+        // Need to transfer (via lendingPool.depositInLendingPool()) before minting or ERC777s could reenter.
         lendingPool.depositInLendingPool(assets, msg.sender);
 
         _mint(receiver, shares);
@@ -126,6 +128,7 @@ contract Tranche is ERC4626, Owned {
         notLocked
         returns (uint256 shares)
     {
+        //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
         shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
 
         if (msg.sender != owner_) {
@@ -136,11 +139,11 @@ contract Tranche is ERC4626, Owned {
             }
         }
 
-        lendingPool.withdrawFromLendingPool(assets, receiver);
-
         _burn(owner_, shares);
 
         emit Withdraw(msg.sender, receiver, owner_, assets, shares);
+
+        lendingPool.withdrawFromLendingPool(assets, receiver);
     }
 
     /**
@@ -164,8 +167,9 @@ contract Tranche is ERC4626, Owned {
             }
         }
 
+        //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
         // Check for rounding error since we round down in previewRedeem.
-        require((assets = previewRedeem(shares)) != 0, "ZERO_ASSETS");
+        require((assets = previewRedeem(shares)) != 0, "T_R: ZERO_ASSETS");
 
         _burn(owner_, shares);
 
