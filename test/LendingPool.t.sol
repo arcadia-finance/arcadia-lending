@@ -17,19 +17,19 @@ contract LendingPoolExtension is LendingPool {
     //Extensions to test internal functions
     constructor(ERC20 _asset, address _treasury, address _vaultFactory) LendingPool(_asset, _treasury, _vaultFactory) {}
 
-    function testPopTranche(uint256 index, address tranche) public {
+    function popTranche(uint256 index, address tranche) public {
         _popTranche(index, tranche);
     }
 
-    function testSyncInterestsToLendingPool(uint256 assets) public onlyOwner {
+    function syncInterestsToLendingPool(uint256 assets) public {
         _syncInterestsToLiquidityProviders(assets);
     }
 
-    function testProcessDefault(uint256 assets) public onlyOwner {
+    function processDefault(uint256 assets) public {
         _processDefault(assets);
     }
 
-    function testSyncInterests() public {
+    function syncInterests() public {
         _syncInterests();
     }
 }
@@ -217,8 +217,8 @@ contract TranchesTest is LendingPoolTest {
         pool.addTranche(address(jrTranche), 40);
         vm.stopPrank();
 
-        // And: calls testPopTranche with 1 and jrTranche
-        pool.testPopTranche(1, address(jrTranche));
+        // And: calls popTranche with 1 and jrTranche
+        pool.popTranche(1, address(jrTranche));
 
         // Then: pool totalWeight should be equal to 50, weights index 0 should be equal to 50,
         // tranches index 0 should be equal to srTranche, isTranche should return true for srTranche,
@@ -310,10 +310,14 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         pool.addTranche(address(srTranche), 50);
         pool.addTranche(address(jrTranche), 40);
         vm.stopPrank();
+
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
     }
 
-    //deposit (without debt -> ignore _syncInterests() and _updateInterestRate())
-    function testRevert_deposit_ByNonTranche(address unprivilegedAddress, uint128 assets, address from) public {
+    function testRevert_depositInLendingPool_NonTranche(address unprivilegedAddress, uint128 assets, address from)
+        public
+    {
         // Given: all neccesary contracts are deployed on the setup
         vm.assume(unprivilegedAddress != address(jrTranche));
         vm.assume(unprivilegedAddress != address(srTranche));
@@ -326,11 +330,21 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_deposit_FirstDepositByTranche(uint256 amount) public {
-        // Given: liquidityProvider approve max value
+    function testRevert_depositInLendingPool_NotApproved(uint256 amount) public {
+        vm.assume(amount > 0);
+        // Given: liquidityProvider has not approved pool
         vm.prank(liquidityProvider);
-        asset.approve(address(pool), type(uint256).max);
+        asset.approve(address(pool), 0);
 
+        // When: srTranche deposits
+        // Then: deposit should revert with stdError.arithmeticError
+        vm.startPrank(address(srTranche));
+        vm.expectRevert(stdError.arithmeticError);
+        pool.depositInLendingPool(amount, liquidityProvider);
+        vm.stopPrank();
+    }
+
+    function testSuccess_depositInLendingPool_FirstDepositByTranche(uint256 amount) public {
         vm.prank(address(srTranche));
         // When: srTranche deposit
         pool.depositInLendingPool(amount, liquidityProvider);
@@ -341,14 +355,11 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         assertEq(asset.balanceOf(address(pool)), amount);
     }
 
-    function testSuccess_deposit_MultipleDepositsByTranches(uint256 amount0, uint256 amount1) public {
+    function testSuccess_depositInLendingPool_MultipleDepositsByTranches(uint256 amount0, uint256 amount1) public {
         // Given: totalAmount is amount0 added by amount1, liquidityProvider approve max value
         vm.assume(amount0 <= type(uint256).max - amount1);
 
         uint256 totalAmount = uint256(amount0) + uint256(amount1);
-
-        vm.prank(liquidityProvider);
-        asset.approve(address(pool), type(uint256).max);
 
         vm.prank(address(srTranche));
         // When: srTranche deposit amount0, jrTranche deposit amount1
@@ -362,35 +373,33 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         assertEq(asset.balanceOf(address(pool)), totalAmount);
     }
 
-    function testRevert_withdraw_Unauthorised(uint256 assetsWithdrawn, address receiver, address unprivilegedAddress)
-        public
-    {
+    function testRevert_withdrawFromLendingPool_Unauthorised(
+        uint256 assetsWithdrawn,
+        address receiver,
+        address unprivilegedAddress
+    ) public {
         // Given: unprivilegedAddress is not srTranche, liquidityProvider approve max value
         vm.assume(unprivilegedAddress != address(srTranche));
         vm.assume(assetsWithdrawn > 0);
-
-        vm.prank(liquidityProvider);
-        asset.approve(address(pool), type(uint256).max);
 
         vm.prank(address(srTranche));
         // When: srTranche deposit assetsWithdrawn
         pool.depositInLendingPool(assetsWithdrawn, liquidityProvider);
 
         vm.startPrank(unprivilegedAddress);
-        // Then: withdraw by unprivilegedAddress should revert with LP_W: UNAUTHORIZED
+        // Then: withdraw by unprivilegedAddress should revert with LP_WFLP: Amount exceeds balance
         vm.expectRevert("LP_WFLP: Amount exceeds balance");
         pool.withdrawFromLendingPool(assetsWithdrawn, receiver);
         vm.stopPrank();
     }
 
-    function testRevert_withdraw_InsufficientAssets(uint256 assetsDeposited, uint256 assetsWithdrawn, address receiver)
-        public
-    {
+    function testRevert_withdrawFromLendingPool_InsufficientAssets(
+        uint256 assetsDeposited,
+        uint256 assetsWithdrawn,
+        address receiver
+    ) public {
         // Given: assetsWithdrawn bigger than assetsDeposited, liquidityProvider approve max value
         vm.assume(assetsDeposited < assetsWithdrawn);
-
-        vm.prank(liquidityProvider);
-        asset.approve(address(pool), type(uint256).max);
 
         vm.startPrank(address(srTranche));
         // When: srTranche deposit assetsDeposited
@@ -402,15 +411,14 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_withdraw(uint256 assetsDeposited, uint256 assetsWithdrawn, address receiver) public {
+    function testSuccess_withdrawFromLendingPool(uint256 assetsDeposited, uint256 assetsWithdrawn, address receiver)
+        public
+    {
         // Given: assetsWithdrawn less than assetsDeposited, receiver is not pool or liquidityProvider,
         // liquidityProvider approve max value, assetsDeposited and assetsWithdrawn are bigger than 0
         vm.assume(receiver != address(pool));
         vm.assume(receiver != liquidityProvider);
         vm.assume(assetsDeposited >= assetsWithdrawn);
-
-        vm.prank(liquidityProvider);
-        asset.approve(address(pool), type(uint256).max);
 
         vm.startPrank(address(srTranche));
         // When: srTranche deposit and withdraw
@@ -443,6 +451,9 @@ contract LendingLogicTest is LendingPoolTest {
         vm.startPrank(vaultOwner);
         vault = Vault(factory.createVault(1));
         vm.stopPrank();
+
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
     }
 
     //approveBeneficiary
@@ -562,8 +573,6 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(liquidity > 0);
         vm.assume(to != address(0));
 
-        vm.prank(liquidityProvider);
-        asset.approve(address(pool), type(uint256).max);
         vm.prank(address(srTranche));
         pool.depositInLendingPool(liquidity, liquidityProvider);
         vault.setTotalValue(collateralValue);
@@ -632,8 +641,6 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(to != liquidityProvider);
 
         vault.setTotalValue(collateralValue);
-        vm.prank(liquidityProvider);
-        asset.approve(address(pool), type(uint256).max);
         vm.prank(address(srTranche));
         pool.depositInLendingPool(liquidity, liquidityProvider);
         vm.prank(vaultOwner);
@@ -671,8 +678,6 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(to != liquidityProvider);
 
         vault.setTotalValue(collateralValue);
-        vm.prank(liquidityProvider);
-        asset.approve(address(pool), type(uint256).max);
         vm.prank(address(srTranche));
         pool.depositInLendingPool(liquidity, liquidityProvider);
         vm.prank(vaultOwner);
@@ -713,10 +718,8 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(sender != vaultOwner);
 
         vault.setTotalValue(amountLoaned);
-        vm.startPrank(liquidityProvider);
-        asset.approve(address(pool), type(uint256).max);
+        vm.prank(liquidityProvider);
         asset.transfer(sender, availablefunds);
-        vm.stopPrank();
         vm.prank(address(srTranche));
         pool.depositInLendingPool(amountLoaned, liquidityProvider);
         vm.prank(vaultOwner);
@@ -744,10 +747,8 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(sender != address(pool));
 
         vault.setTotalValue(amountLoaned);
-        vm.startPrank(liquidityProvider);
-        asset.approve(address(pool), type(uint256).max);
+        vm.prank(liquidityProvider);
         asset.transfer(sender, amountRepaid);
-        vm.stopPrank();
         vm.prank(address(srTranche));
         pool.depositInLendingPool(amountLoaned, liquidityProvider);
         vm.prank(vaultOwner);
@@ -777,10 +778,8 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(sender != address(pool));
 
         vault.setTotalValue(amountLoaned);
-        vm.startPrank(liquidityProvider);
-        asset.approve(address(pool), type(uint256).max);
+        vm.prank(liquidityProvider);
         asset.transfer(sender, amountLoaned);
-        vm.stopPrank();
         vm.prank(address(srTranche));
         pool.depositInLendingPool(amountLoaned, liquidityProvider);
         vm.prank(vaultOwner);
@@ -813,10 +812,8 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(sender != address(pool));
 
         vault.setTotalValue(amountLoaned);
-        vm.startPrank(liquidityProvider);
-        asset.approve(address(pool), type(uint256).max);
+        vm.prank(liquidityProvider);
         asset.transfer(sender, availablefunds);
-        vm.stopPrank();
         vm.prank(address(srTranche));
         pool.depositInLendingPool(amountLoaned, liquidityProvider);
         vm.prank(vaultOwner);
@@ -833,112 +830,6 @@ contract LendingLogicTest is LendingPoolTest {
         assertEq(asset.balanceOf(address(pool)), amountLoaned);
         assertEq(asset.balanceOf(sender), availablefunds - amountLoaned);
         assertEq(debt.balanceOf(address(vault)), 0);
-    }
-}
-
-/* //////////////////////////////////////////////////////////////
-                        INTERESTS LOGIC
-////////////////////////////////////////////////////////////// */
-contract InterestsTest is LendingPoolTest {
-    using stdStorage for StdStorage;
-
-    function setUp() public override {
-        super.setUp();
-
-        vm.startPrank(creator);
-        pool.setFeeWeight(10);
-        pool.addTranche(address(srTranche), 50);
-        pool.addTranche(address(jrTranche), 40);
-        vm.stopPrank();
-
-        vm.startPrank(vaultOwner);
-        vault = Vault(factory.createVault(1));
-        vm.stopPrank();
-    }
-
-    function testSuccess_syncInterestsToLiquidityProviders_Exact() public {
-        // Given: all necessary contracts are deployed on the setup
-        vm.prank(creator);
-        // When: creator testSyncInterestsToLendingPool with 100
-        pool.testSyncInterestsToLendingPool(100);
-
-        // Then: supplyBalances srTranche should be equal to 50, supplyBalances jrTranche should be equal to 40,
-        // supplyBalances treasury should be equal to 10, totalSupply should be equal to 100
-        assertEq(pool.realisedLiquidityOf(address(srTranche)), 50);
-        assertEq(pool.realisedLiquidityOf(address(jrTranche)), 40);
-        assertEq(pool.realisedLiquidityOf(address(treasury)), 10);
-        assertEq(pool.totalRealisedLiquidity(), 100);
-    }
-
-    function testSuccess_syncInterestsToLiquidityProviders_Rounded() public {
-        // Given: all necessary contracts are deployed on the setup
-        vm.prank(creator);
-        // When: creator testSyncInterestsToLendingPool with 99
-        pool.testSyncInterestsToLendingPool(99);
-
-        // Then: supplyBalances srTranche should be equal to 50, supplyBalances jrTranche should be equal to 40,
-        // supplyBalances treasury should be equal to 9, totalRealisedLiquidity should be equal to 99
-        assertEq(pool.realisedLiquidityOf(address(srTranche)), 50);
-        assertEq(pool.realisedLiquidityOf(address(jrTranche)), 40);
-        assertEq(pool.realisedLiquidityOf(address(treasury)), 9);
-        assertEq(pool.totalRealisedLiquidity(), 99);
-    }
-
-    function testSuccess_calcUnrealisedDebt_Unchecked(uint24 deltaBlocks, uint128 realisedDebt, uint256 interestRate)
-        public
-    {
-        // Given: deltaBlocks smaller than equal to 5 years,
-        // realisedDebt smaller than equal to than 3402823669209384912995114146594816
-        vm.assume(deltaBlocks <= 13140000); //5 year
-        vm.assume(interestRate <= 10 * 10 ** 18); //1000%
-        vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
-
-        stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
-        stdstore.target(address(pool)).sig(pool.lastSyncedBlock.selector).checked_write(block.number);
-
-        // And: the vaultOwner takes realisedDebt debt
-        stdstore.target(address(debt)).sig(debt.realisedDebt.selector).checked_write(realisedDebt);
-
-        // When: deltaBlocks have passed
-        vm.roll(block.number + deltaBlocks);
-
-        // Then: Unrealised debt should never overflow (-> calcUnrealisedDebtChecked does never error and same calculation unched are always equal)
-        uint256 expectedValue = calcUnrealisedDebtChecked(interestRate, deltaBlocks, realisedDebt);
-        uint256 actualValue = pool.calcUnrealisedDebt();
-        assertEq(expectedValue, actualValue);
-    }
-
-    function testSucces_syncInterests(uint24 deltaBlocks, uint128 realisedDebt, uint256 interestRate) public {
-        // Given: deltaBlocks than 5 years, realisedDebt than 3402823669209384912995114146594816 and bigger than 0
-        vm.assume(deltaBlocks <= 13140000); //5 year
-        vm.assume(interestRate <= 10 * 10 ** 18); //1000%
-        vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
-        vm.assume(realisedDebt > 0);
-
-        // And: the vaultOwner takes realisedDebt debt
-        vault.setTotalValue(realisedDebt);
-        vm.prank(liquidityProvider);
-        asset.approve(address(pool), type(uint256).max);
-        vm.prank(address(srTranche));
-        pool.depositInLendingPool(realisedDebt, liquidityProvider);
-        vm.prank(vaultOwner);
-        pool.borrow(realisedDebt, address(vault), address(vault));
-
-        // And: deltaBlocks have passed
-        vm.roll(block.number + deltaBlocks);
-
-        // When: Intersts are synced
-
-        stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
-        pool.testSyncInterests();
-
-        uint256 interests = calcUnrealisedDebtChecked(interestRate, deltaBlocks, realisedDebt);
-
-        // Then: Total redeemable interest of LP providers and total open debt of borrowers should increase with interests
-        assertEq(pool.totalRealisedLiquidity(), realisedDebt + interests);
-        assertEq(debt.maxWithdraw(address(vault)), realisedDebt + interests);
-        assertEq(debt.maxRedeem(address(vault)), realisedDebt);
-        assertEq(debt.totalAssets(), realisedDebt + interests);
     }
 }
 
@@ -1024,16 +915,135 @@ contract AccountingTest is LendingPoolTest {
         assertEq(actualValue, expectedValue);
     }
 }
+
 /* //////////////////////////////////////////////////////////////
                         INTERESTS LOGIC
 ////////////////////////////////////////////////////////////// */
+contract InterestsTest is LendingPoolTest {
+    using stdStorage for StdStorage;
+
+    function setUp() public override {
+        super.setUp();
+
+        vm.startPrank(creator);
+        pool.setFeeWeight(10);
+        pool.addTranche(address(srTranche), 50);
+        pool.addTranche(address(jrTranche), 40);
+        vm.stopPrank();
+
+        vm.startPrank(vaultOwner);
+        vault = Vault(factory.createVault(1));
+        vm.stopPrank();
+    }
+
+    function testSuccess_calcUnrealisedDebt_Unchecked(uint24 deltaBlocks, uint128 realisedDebt, uint256 interestRate)
+        public
+    {
+        // Given: deltaBlocks smaller than equal to 5 years,
+        // realisedDebt smaller than equal to than 3402823669209384912995114146594816
+        vm.assume(deltaBlocks <= 13140000); //5 year
+        vm.assume(interestRate <= 10 * 10 ** 18); //1000%
+        vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
+
+        stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
+        stdstore.target(address(pool)).sig(pool.lastSyncedBlock.selector).checked_write(block.number);
+
+        // And: the vaultOwner takes realisedDebt debt
+        stdstore.target(address(debt)).sig(debt.realisedDebt.selector).checked_write(realisedDebt);
+
+        // When: deltaBlocks have passed
+        vm.roll(block.number + deltaBlocks);
+
+        // Then: Unrealised debt should never overflow (-> calcUnrealisedDebtChecked does never error and same calculation unched are always equal)
+        uint256 expectedValue = calcUnrealisedDebtChecked(interestRate, deltaBlocks, realisedDebt);
+        uint256 actualValue = pool.calcUnrealisedDebt();
+        assertEq(expectedValue, actualValue);
+    }
+
+    function testSucces_syncInterests(
+        uint24 deltaBlocks,
+        uint128 realisedDebt,
+        uint128 realisedLiquidity,
+        uint256 interestRate
+    ) public {
+        // Given: deltaBlocks than 5 years, realisedDebt than 3402823669209384912995114146594816 and bigger than 0
+        vm.assume(deltaBlocks <= 13140000); //5 year
+        vm.assume(interestRate <= 10 * 10 ** 18); //1000%
+        vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
+        vm.assume(realisedDebt > 0);
+        vm.assume(realisedDebt <= realisedLiquidity);
+
+        // And: the vaultOwner takes realisedDebt debt
+        vault.setTotalValue(realisedDebt);
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(realisedLiquidity, liquidityProvider);
+        vm.prank(vaultOwner);
+        pool.borrow(realisedDebt, address(vault), address(vault));
+
+        // And: deltaBlocks have passed
+        vm.roll(block.number + deltaBlocks);
+
+        // When: Intersts are synced
+        stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
+        pool.syncInterests();
+
+        uint256 interests = calcUnrealisedDebtChecked(interestRate, deltaBlocks, realisedDebt);
+
+        // Then: Total redeemable interest of LP providers and total open debt of borrowers should increase with interests
+        assertEq(pool.totalRealisedLiquidity(), realisedLiquidity + interests);
+        assertEq(debt.maxWithdraw(address(vault)), realisedDebt + interests);
+        assertEq(debt.maxRedeem(address(vault)), realisedDebt);
+        assertEq(debt.totalAssets(), realisedDebt + interests);
+        assertEq(pool.lastSyncedBlock(), 1 + deltaBlocks);
+    }
+
+    function testSuccess_syncInterestsToLiquidityProviders(
+        uint128 interests,
+        uint8 weightSr,
+        uint8 weightJr,
+        uint8 weightTreasury
+    ) public {
+        uint256 totalWeight = uint256(weightSr) + uint256(weightJr) + uint256(weightTreasury);
+        vm.assume(totalWeight > 0);
+        // Given: all necessary contracts are deployed on the setup
+        vm.startPrank(creator);
+        pool.setWeight(0, weightSr);
+        pool.setWeight(1, weightJr);
+        pool.setFeeWeight(weightTreasury);
+        vm.stopPrank();
+
+        // When: creator syncInterestsToLendingPool with amount
+        pool.syncInterestsToLendingPool(interests);
+
+        // Then: supplyBalances srTranche, jrTranche and treasury should be correct
+        // TotalSupply should be equal to interest
+        uint256 interestSr = uint256(interests) * weightSr / totalWeight;
+        uint256 interestJr = uint256(interests) * weightJr / totalWeight;
+        uint256 interestTreasury = interests - interestSr - interestJr;
+
+        assertEq(pool.realisedLiquidityOf(address(srTranche)), interestSr);
+        assertEq(pool.realisedLiquidityOf(address(jrTranche)), interestJr);
+        assertEq(pool.realisedLiquidityOf(address(treasury)), interestTreasury);
+        assertEq(pool.totalRealisedLiquidity(), interests);
+    }
+}
 
 /* //////////////////////////////////////////////////////////////
                     INTEREST RATE LOGIC
 ////////////////////////////////////////////////////////////// */
 contract InterestRateTest is LendingPoolTest {
+    using stdStorage for StdStorage;
+
     function setUp() public override {
         super.setUp();
+
+        vm.startPrank(creator);
+        pool.setFeeWeight(10);
+        pool.addTranche(address(srTranche), 50);
+        pool.addTranche(address(jrTranche), 40);
+        vm.stopPrank();
     }
 
     function testRevert_setInterestConfig_NonOwner(
@@ -1077,10 +1087,59 @@ contract InterestRateTest is LendingPoolTest {
         });
 
         // When: creator calls setInterestConfig
-        vm.startPrank(creator);
-        // Then: config is sucesfully set
+        vm.prank(creator);
         pool.setInterestConfig(config);
-        vm.stopPrank();
+
+        // Then: config is sucesfully set
+        (uint256 baserate, uint256 lowslope, uint256 highslope, uint256 utilisationThreshold) =
+            pool.interestRateConfig();
+        assertEq(baserate, baseRate_);
+        assertEq(highslope, highSlope_);
+        assertEq(lowslope, lowSlope_);
+        assertEq(utilisationThreshold, utilisationThreshold_);
+    }
+
+    function testSuccess_updateInterestRate(
+        address sender,
+        uint24 deltaBlocks,
+        uint128 realisedDebt,
+        uint128 realisedLiquidity,
+        uint256 interestRate
+    ) public {
+        // Given: deltaBlocks smaller than equal to 5 years,
+        // realisedDebt smaller than equal to than 3402823669209384912995114146594816
+        vm.assume(deltaBlocks <= 13140000); //5 year
+        vm.assume(interestRate <= 10 * 10 ** 18); //1000%
+        vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
+        vm.assume(realisedDebt <= realisedLiquidity);
+
+        // And: There is realisedLiquidity liquidity
+        stdstore.target(address(pool)).sig(pool.totalRealisedLiquidity.selector).checked_write(realisedLiquidity);
+        // And: There is realisedDebt debt
+        stdstore.target(address(debt)).sig(debt.realisedDebt.selector).checked_write(realisedDebt);
+
+        stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
+        stdstore.target(address(pool)).sig(pool.lastSyncedBlock.selector).checked_write(block.number);
+
+        // And: deltaBlocks have passed
+        vm.roll(block.number + deltaBlocks);
+
+        // When: Interests are updated
+        vm.prank(sender);
+        pool.updateInterestRate();
+
+        // Then interests should be up to date
+        uint256 interest = calcUnrealisedDebtChecked(interestRate, deltaBlocks, realisedDebt);
+        uint256 interestSr = interest * 50 / 100;
+        uint256 interestJr = interest * 40 / 100;
+        uint256 interestTreasury = interest - interestSr - interestJr;
+
+        assertEq(debt.totalAssets(), realisedDebt + interest);
+        assertEq(pool.lastSyncedBlock(), 1 + deltaBlocks);
+        assertEq(pool.realisedLiquidityOf(address(srTranche)), interestSr);
+        assertEq(pool.realisedLiquidityOf(address(jrTranche)), interestJr);
+        assertEq(pool.realisedLiquidityOf(address(treasury)), interestTreasury);
+        assertEq(pool.totalRealisedLiquidity(), realisedLiquidity + interest);
     }
 }
 
@@ -1112,10 +1171,9 @@ contract DefaultTest is LendingPoolTest {
         // Given: unprivilegedAddress is not the Owner
         vm.assume(unprivilegedAddress != creator);
 
-        vm.startPrank(unprivilegedAddress);
-
         // When: unprivilegedAddress sets the Liquidator
         // Then: setLiquidator should revert with "UNAUTHORIZED"
+        vm.startPrank(unprivilegedAddress);
         vm.expectRevert("UNAUTHORIZED");
         pool.setLiquidator(liquidator_);
         vm.stopPrank();
@@ -1139,10 +1197,9 @@ contract DefaultTest is LendingPoolTest {
         vm.prank(creator);
         pool.setLiquidator(liquidator);
 
-        vm.startPrank(unprivilegedAddress);
-
         // When: unprivilegedAddress liquidates a vault
         // Then: setLiquidator should revert with "UNAUTHORIZED"
+        vm.startPrank(unprivilegedAddress);
         vm.expectRevert("UNAUTHORIZED");
         pool.liquidateVault(address(vault), amountLoaned);
         vm.stopPrank();
@@ -1182,10 +1239,9 @@ contract DefaultTest is LendingPoolTest {
         // And: unprivilegedAddress is not the liquidator
         vm.assume(unprivilegedAddress != liquidator);
 
-        vm.startPrank(unprivilegedAddress);
-
         // When: unprivilegedAddress settles a liquidation
         // Then: settleLiquidation should revert with "UNAUTHORIZED"
+        vm.startPrank(unprivilegedAddress);
         vm.expectRevert("UNAUTHORIZED");
         pool.settleLiquidation(defaultAmount, deficitAmount);
         vm.stopPrank();
@@ -1251,8 +1307,8 @@ contract DefaultTest is LendingPoolTest {
         pool.depositInLendingPool(liquidityJunior, liquidityProvider);
 
         vm.prank(creator);
-        // When: creator calls testProcessDefault with defaultAmount
-        pool.testProcessDefault(defaultAmount);
+        // When: creator calls processDefault with defaultAmount
+        pool.processDefault(defaultAmount);
 
         // Then: realisedLiquidityOf for srTranche should be liquiditySenior, realisedLiquidityOf jrTranche should be liquidityJunior minus defaultAmount,
         // totalRealisedLiquidity should be equal to totalAmount minus defaultAmount
@@ -1278,8 +1334,8 @@ contract DefaultTest is LendingPoolTest {
         pool.depositInLendingPool(liquidityJunior, liquidityProvider);
 
         vm.prank(creator);
-        // When: creator calls testProcessDefault with defaultAmount
-        pool.testProcessDefault(defaultAmount);
+        // When: creator calls processDefault with defaultAmount
+        pool.processDefault(defaultAmount);
 
         // Then: supplyBalances srTranche should be totalAmount minus defaultAmount, supplyBalances jrTranche should be 0,
         // totalSupply should be equal to totalAmount minus defaultAmount, isTranche for jrTranche should return false
@@ -1306,8 +1362,8 @@ contract DefaultTest is LendingPoolTest {
         pool.depositInLendingPool(liquidityJunior, liquidityProvider);
 
         vm.prank(creator);
-        // When: creator testProcessDefault defaultAmount
-        pool.testProcessDefault(defaultAmount);
+        // When: creator processDefault defaultAmount
+        pool.processDefault(defaultAmount);
 
         // Then: realisedLiquidityOf srTranche should be 0, realisedLiquidityOf jrTranche should be 0,
         // totalRealisedLiquidity should be equal to 0, isTranche for jrTranche and srTranche should return false

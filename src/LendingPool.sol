@@ -60,20 +60,28 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
         _;
     }
 
+    modifier processInterests() {
+        _syncInterests();
+        _;
+        //_updateInterestRate() modifies the state (effect), but can safely be called after interactions
+        //Cannot be exploited by re-entrancy attack
+        _updateInterestRate(realisedDebt, totalRealisedLiquidity);
+    }
+
     /**
      * @notice The constructor for a lending pool
-     * @param _asset The underlying ERC-20 token of the Lending Pool
-     * @param _treasury The address of the protocol treasury
-     * @param _vaultFactory The address of the vault factory
+     * @param asset_ The underlying ERC-20 token of the Lending Pool
+     * @param treasury_ The address of the protocol treasury
+     * @param vaultFactory_ The address of the vault factory
      * @dev The name and symbol of the pool are automatically generated, based on the name and symbol of the underlying token
      */
-    constructor(ERC20 _asset, address _treasury, address _vaultFactory)
+    constructor(ERC20 asset_, address treasury_, address vaultFactory_)
         Owned(msg.sender)
         TrustedProtocol()
-        DebtToken(_asset)
+        DebtToken(asset_)
     {
-        treasury = _treasury;
-        vaultFactory = _vaultFactory;
+        treasury = treasury_;
+        vaultFactory = vaultFactory_;
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -145,10 +153,10 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
 
     /**
      * @notice Sets new treasury address
-     * @param _treasury The new address of the treasury
+     * @param treasury_ The new address of the treasury
      */
-    function setTreasury(address _treasury) external onlyOwner {
-        treasury = _treasury;
+    function setTreasury(address treasury_) external onlyOwner {
+        treasury = treasury_;
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -164,17 +172,15 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
      * (this is always msg.sender, a tranche), the second parameter is 'from':
      * (the origin of the underlying ERC-20 token, who deposits assets via a Tranche)
      */
-    function depositInLendingPool(uint256 assets, address from) public onlyTranche {
-        _syncInterests();
+    function depositInLendingPool(uint256 assets, address from) public onlyTranche processInterests {
+        // Need to transfer before minting or ERC777s could reenter.
+        // Address(this) is trusted -> no risk on re-entrancy attack after transfer
         asset.transferFrom(from, address(this), assets);
 
         unchecked {
             realisedLiquidityOf[msg.sender] += assets;
             totalRealisedLiquidity += assets;
         }
-
-        //Update interest rates
-        updateInterestRate();
     }
 
     /**
@@ -182,16 +188,13 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
      * @param assets the amount of assets of the underlying ERC-20 token being withdrawn
      * @param receiver The address of the receiver of the underlying ERC-20 tokens
      */
-    function withdrawFromLendingPool(uint256 assets, address receiver) public {
-        _syncInterests();
+    function withdrawFromLendingPool(uint256 assets, address receiver) public processInterests {
         require(realisedLiquidityOf[msg.sender] >= assets, "LP_WFLP: Amount exceeds balance");
 
         realisedLiquidityOf[msg.sender] -= assets;
         totalRealisedLiquidity -= assets;
 
         asset.safeTransfer(receiver, assets);
-
-        updateInterestRate();
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -218,13 +221,13 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     }
 
     /**
-     * @notice Takes out a loan backed by collateral of an Arcadia Vault
+     * @notice Takes out a loan backed by collateral in an Arcadia Vault
      * @param amount The amount of underlying ERC-20 tokens to be lent out
      * @param vault The address of the Arcadia Vault backing the loan
      * @param to The address who receives the lended out underlying tokens
      * @dev The sender might be different as the owner if they have the proper allowances
      */
-    function borrow(uint256 amount, address vault, address to) public {
+    function borrow(uint256 amount, address vault, address to) public processInterests {
         require(IFactory(vaultFactory).isVault(vault), "LP_B: Not a vault");
 
         //Check allowances to send underlying to to
@@ -235,21 +238,17 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
             }
         }
 
-        //Call vault to check if there is sufficient collateral
+        //Call vault to check if there is sufficient collateral.
+        //If so calculate and store the liquidation threshhold.
         require(IVault(vault).increaseMarginPosition(address(asset), amount), "LP_B: Reverted");
 
-        //Process interests since last update
-        _syncInterests();
-
-        //Transfer fails if there is insufficient liquidity in pool
-        asset.safeTransfer(to, amount);
-
+        //Mint debt tokens to the vault
         if (amount != 0) {
             _deposit(amount, vault);
         }
 
-        //Update interest rates
-        updateInterestRate();
+        //Transfer fails if there is insufficient liquidity in the pool
+        asset.safeTransfer(to, amount);
     }
 
     /**
@@ -259,24 +258,21 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
      * @dev ToDo: should it be possible to trigger a repay on behalf of an other account,
      * If so, work with allowances
      */
-    function repay(uint256 amount, address vault) public {
+    function repay(uint256 amount, address vault) public processInterests {
         require(IFactory(vaultFactory).isVault(vault), "LP_R: Not a vault");
-
-        //Process interests since last update
-        _syncInterests();
 
         uint256 vaultDebt = maxWithdraw(vault);
         uint256 transferAmount = vaultDebt > amount ? amount : vaultDebt;
 
+        // Need to transfer before burning debt or ERC777s could reenter.
+        // Address(this) is trusted -> no risk on re-entrancy attack after transfer
         asset.transferFrom(msg.sender, address(this), transferAmount);
 
         _withdraw(transferAmount, vault, vault);
 
         //Call vault to unlock collateral
+        //ToDo: can be removed for Trusted Protocols
         require(IVault(vault).decreaseMarginPosition(address(asset), transferAmount), "LP_R: Reverted");
-
-        //Update interest rates
-        updateInterestRate();
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -299,20 +295,20 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
 
     /**
      * @notice Returns the redeemable amount of liquidity in the underlying asset of an address
-     * @param _of The address of the liquidity provider
-     * @dev For this implementation, _of is or an address of a tranche, or an address of a treasury
-     * @return liquidityOf_ The redeemable amount of liquidity
+     * @param owner_ The address of the liquidity provider
+     * @dev For this implementation, owner_ is or an address of a tranche, or an address of a treasury
+     * @return assets The redeemable amount of liquidity in the underlying asset
      */
-    function liquidityOf(address _of) public view returns (uint256 liquidityOf_) {
+    function liquidityOf(address owner_) public view returns (uint256 assets) {
         // Avoid a second calculation of unrealised debt (expensive)
         // if interersts are already synced this block.
         if (lastSyncedBlock != uint32(block.number)) {
             // The total liquidity of a tranche equals the sum of the realised liquidity
             // of the tranche, and its pending interests
-            uint256 interest = calcUnrealisedDebt().mulDivUp(weight[_of], totalWeight);
-            liquidityOf_ = realisedLiquidityOf[_of] + interest;
+            uint256 interest = calcUnrealisedDebt().mulDivUp(weight[owner_], totalWeight);
+            assets = realisedLiquidityOf[owner_] + interest;
         } else {
-            liquidityOf_ = realisedLiquidityOf[_of];
+            assets = realisedLiquidityOf[owner_];
         }
     }
 
@@ -376,15 +372,13 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
      * @notice Syncs interest payments to the Lending providers and the treasury.
      * @param assets The total amount of underlying assets to be paid out as interests.
      * @dev The weight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
-     * @dev The Shares for each Tranche are rounded up, if the treasury receives the remaining shares and will hence loose
-     * part of their yield due to rounding errors (neglectable small).
      */
     function _syncInterestsToLiquidityProviders(uint256 assets) internal {
         uint256 remainingAssets = assets;
 
         uint256 trancheShare;
         for (uint256 i; i < tranches.length;) {
-            trancheShare = assets.mulDivUp(weights[i], totalWeight);
+            trancheShare = assets.mulDivDown(weights[i], totalWeight);
             unchecked {
                 realisedLiquidityOf[tranches[i]] += trancheShare;
                 remainingAssets -= trancheShare;
@@ -414,10 +408,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     /**
      * @notice Updates the interest rate
      */
-    function updateInterestRate() internal {
-        _syncInterests();
-        _updateInterestRate(realisedDebt, totalRealisedLiquidity);
-    }
+    function updateInterestRate() external processInterests {}
 
     /* //////////////////////////////////////////////////////////////
                         LIQUIDATION LOGIC
@@ -425,17 +416,17 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
 
     /**
      * @notice Set's the contract address of the liquidator.
-     * @param _liquidator The contract address of the liquidator
+     * @param liquidator_ The contract address of the liquidator
      */
-    function setLiquidator(address _liquidator) public onlyOwner {
-        liquidator = _liquidator;
+    function setLiquidator(address liquidator_) public onlyOwner {
+        liquidator = liquidator_;
     }
 
     /**
-     * @notice Starts the liquidation of a vault.
+     * @notice Called by the liquidator when liquidation of a vault starts.
      * @param vault The contract address of the liquidator.
      * @param debt The amount of debt that was issued.
-     * @dev At the start of the liquidation the debt tokens are already burned,
+     * @dev At the start of the liquidation the debt tokens are burned,
      * as such interests are not accrued during the liquidation.
      * @dev After the liquidation is finished, there are two options:
      * 1) the collateral is auctioned for more than the debt position
@@ -533,9 +524,9 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     /**
      * @inheritdoc TrustedProtocol
      */
-    function getOpenPosition(address vault) external override returns (uint128 openPosition) {
+    function getOpenPosition(address vault) external view override returns (uint128 openPosition) {
         //ToDo: When ERC-4626 is correctly implemented, It should not be necessary to first sync interests.
-        updateInterestRate();
+        //updateInterestRate();
         openPosition = uint128(maxWithdraw(vault));
     }
 }
