@@ -1407,7 +1407,43 @@ contract VaultTest is LendingPoolTest {
         pool.setLiquidator(liquidator);
     }
 
-    function testRevert_openMarginAccount_NonVault(address unprivilegedAddress) public {
+    function testRevert_addVaultVersion_NonOwner(address unprivilegedAddress, uint256 vaultVersion) public {
+        vm.assume(unprivilegedAddress != creator);
+
+        vm.startPrank(unprivilegedAddress);
+        vm.expectRevert("UNAUTHORIZED");
+        pool.addVaultVersion(vaultVersion);
+        vm.stopPrank();
+    }
+
+    function testSuccess_addVaultVersion(uint256 vaultVersion) public {
+        vm.prank(creator);
+        pool.addVaultVersion(vaultVersion);
+
+        assertTrue(pool.isValidVersion(vaultVersion));
+    }
+
+    function testRevert_removeVaultVersion_NonOwner(address unprivilegedAddress, uint256 vaultVersion) public {
+        vm.assume(unprivilegedAddress != creator);
+
+        stdstore.target(address(pool)).sig(pool.isValidVersion.selector).with_key(vaultVersion).checked_write(true);
+
+        vm.startPrank(unprivilegedAddress);
+        vm.expectRevert("UNAUTHORIZED");
+        pool.removeVaultVersion(vaultVersion);
+        vm.stopPrank();
+    }
+
+    function testSuccess_removeVaultVersion(uint256 vaultVersion) public {
+        stdstore.target(address(pool)).sig(pool.isValidVersion.selector).with_key(vaultVersion).checked_write(true);
+
+        vm.prank(creator);
+        pool.removeVaultVersion(vaultVersion);
+
+        assertTrue(!pool.isValidVersion(vaultVersion));
+    }
+
+    function testRevert_openMarginAccount_NonVault(address unprivilegedAddress, uint256 vaultVersion) public {
         // Given: sender is not a vault
         vm.assume(unprivilegedAddress != address(vault));
 
@@ -1415,16 +1451,33 @@ contract VaultTest is LendingPoolTest {
         // Then: openMarginAccount should revert with "LP_OMA: Not a vault"
         vm.startPrank(unprivilegedAddress);
         vm.expectRevert("LP_OMA: Not a vault");
-        pool.openMarginAccount();
+        pool.openMarginAccount(vaultVersion);
         vm.stopPrank();
     }
 
-    function testSuccess_openMarginAccount() public {
+    function testSuccess_openMarginAccount_InvalidVaultVersion(uint256 vaultVersion) public {
         // Given: sender is a vault
         vm.startPrank(address(vault));
 
         // When: vault opens a margin account
-        (bool success, address basecurrency, address liquidator_) = pool.openMarginAccount();
+        (bool success, address basecurrency, address liquidator_) = pool.openMarginAccount(vaultVersion);
+
+        // Then: openMarginAccount should return succes and correct contract addresses
+        assertTrue(!success);
+        assertEq(address(0), basecurrency);
+        assertEq(address(0), liquidator_);
+    }
+
+    function testSuccess_openMarginAccount_ValidVaultVersion(uint256 vaultVersion) public {
+        // Given: vaultVersion is valid
+        vm.prank(creator);
+        pool.addVaultVersion(vaultVersion);
+
+        // And: sender is a vault
+        vm.startPrank(address(vault));
+
+        // When: vault opens a margin account
+        (bool success, address basecurrency, address liquidator_) = pool.openMarginAccount(vaultVersion);
 
         // Then: openMarginAccount should return succes and correct contract addresses
         assertTrue(success);
