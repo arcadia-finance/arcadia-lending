@@ -506,19 +506,38 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     ////////////////////////////////////////////////////////////// */
 
     /**
+     * @notice Sets a vault version to valid
+     * @param vaultVersion The version current version of the vault
+     */
+    function addVaultVersion(uint256 vaultVersion) external onlyOwner {
+        _addVaultVersion(vaultVersion);
+    }
+
+    /**
+     * @notice Sets a vault version to invalid
+     * @param vaultVersion The version current version of the vault
+     */
+    function removeVaultVersion(uint256 vaultVersion) external onlyOwner {
+        _removeVaultVersion(vaultVersion);
+    }
+
+    /**
      * @inheritdoc TrustedProtocol
      */
-    function openMarginAccount()
+    function openMarginAccount(uint256 vaultVersion)
         external
         view
         override
         returns (bool success, address baseCurrency, address liquidator_)
     {
+        //ToDo: Remove first check? view function that not interacts with other contracts -> doesn't matter that sender is not a vault
         require(IFactory(vaultFactory).isVault(msg.sender), "LP_OMA: Not a vault");
-        //Todo: Check if vaultversion etc is ok
-        success = true;
-        baseCurrency = address(asset);
-        liquidator_ = liquidator;
+
+        if (isValidVersion[vaultVersion]) {
+            success = true;
+            baseCurrency = address(asset);
+            liquidator_ = liquidator;
+        }
     }
 
     /**
