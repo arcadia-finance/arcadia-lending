@@ -1440,7 +1440,7 @@ contract VaultTest is LendingPoolTest {
         pool.borrow(amountLoaned, address(vault), vaultOwner);
 
         // When: The vault fetches its open position
-        uint128 openPosition = pool.getOpenPosition(address(vault));
+        uint256 openPosition = pool.getOpenPosition(address(vault));
 
         // Then: The open position should equal the amount loaned
         assertEq(amountLoaned, openPosition);

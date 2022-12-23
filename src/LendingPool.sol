@@ -524,9 +524,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     /**
      * @inheritdoc TrustedProtocol
      */
-    function getOpenPosition(address vault) external view override returns (uint128 openPosition) {
-        //ToDo: When ERC-4626 is correctly implemented, It should not be necessary to first sync interests.
-        //updateInterestRate();
-        openPosition = uint128(maxWithdraw(vault));
+    function getOpenPosition(address vault) external view override returns (uint256 openPosition) {
+        openPosition = maxWithdraw(vault);
     }
 }

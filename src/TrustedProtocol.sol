@@ -28,5 +28,5 @@ abstract contract TrustedProtocol {
      * @param vault The vault address.
      * @return openPosition The open position of the vault.
      */
-    function getOpenPosition(address vault) external virtual returns (uint128 openPosition);
+    function getOpenPosition(address vault) external view virtual returns (uint256 openPosition);
 }
