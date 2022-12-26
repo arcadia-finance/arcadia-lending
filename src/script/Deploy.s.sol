@@ -1,7 +1,7 @@
-/** 
-    Created by Arcadia Finance
-    https://www.arcadia.finance
-    SPDX-License-Identifier: BUSL-1.1
+/**
+ * Created by Arcadia Finance
+ *     https://www.arcadia.finance
+ *     SPDX-License-Identifier: BUSL-1.1
  */
 pragma solidity ^0.8.13;
 
@@ -19,9 +19,7 @@ import "../mocks/Factory.sol";
 
 import "./interfaces/IERC20.sol";
 
-
 contract DeployScript is DSTest, Script {
-
     ERC20 asset;
     Factory factory;
     LendingPool pool;
@@ -35,7 +33,7 @@ contract DeployScript is DSTest, Script {
     }
 
     //Before Each
-    function run() public  {
+    function run() public {
         vm.startBroadcast();
         factory = new Factory();
         pool = new LendingPool(ERC20(asset), 0x12e463251Bc79677FD980aA6c301d5Fb85101cCb, address(factory));
@@ -47,6 +45,4 @@ contract DeployScript is DSTest, Script {
         pool.setFeeWeight(10);
         vm.stopPrank();
     }
-
 }
-
