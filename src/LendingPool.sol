@@ -424,7 +424,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
 
     /**
      * @notice Called by the liquidator when liquidation of a vault starts.
-     * @param vault The contract address of the liquidator.
+     * @param vault The contract address of the vault in liquidation.
      * @param debt The amount of debt that was issued.
      * @dev At the start of the liquidation the debt tokens are burned,
      * as such interests are not accrued during the liquidation.
