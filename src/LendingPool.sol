@@ -506,19 +506,12 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     ////////////////////////////////////////////////////////////// */
 
     /**
-     * @notice Sets a vault version to valid
+     * @notice Sets the validity of vault version to valid
      * @param vaultVersion The version current version of the vault
+     * @param valid The validity of the respective vaultVersion
      */
-    function addVaultVersion(uint256 vaultVersion) external onlyOwner {
-        _addVaultVersion(vaultVersion);
-    }
-
-    /**
-     * @notice Sets a vault version to invalid
-     * @param vaultVersion The version current version of the vault
-     */
-    function removeVaultVersion(uint256 vaultVersion) external onlyOwner {
-        _removeVaultVersion(vaultVersion);
+    function setVaultVersion(uint256 vaultVersion, bool valid) external onlyOwner {
+        _setVaultVersion(vaultVersion, valid);
     }
 
     /**

@@ -1407,38 +1407,27 @@ contract VaultTest is LendingPoolTest {
         pool.setLiquidator(liquidator);
     }
 
-    function testRevert_addVaultVersion_NonOwner(address unprivilegedAddress, uint256 vaultVersion) public {
+    function testRevert_setVaultVersion_NonOwner(address unprivilegedAddress, uint256 vaultVersion, bool valid) public {
         vm.assume(unprivilegedAddress != creator);
 
         vm.startPrank(unprivilegedAddress);
         vm.expectRevert("UNAUTHORIZED");
-        pool.addVaultVersion(vaultVersion);
+        pool.setVaultVersion(vaultVersion, valid);
         vm.stopPrank();
     }
 
-    function testSuccess_addVaultVersion(uint256 vaultVersion) public {
+    function testSuccess_setVaultVersion_setValid(uint256 vaultVersion) public {
         vm.prank(creator);
-        pool.addVaultVersion(vaultVersion);
+        pool.setVaultVersion(vaultVersion, true);
 
         assertTrue(pool.isValidVersion(vaultVersion));
     }
 
-    function testRevert_removeVaultVersion_NonOwner(address unprivilegedAddress, uint256 vaultVersion) public {
-        vm.assume(unprivilegedAddress != creator);
-
-        stdstore.target(address(pool)).sig(pool.isValidVersion.selector).with_key(vaultVersion).checked_write(true);
-
-        vm.startPrank(unprivilegedAddress);
-        vm.expectRevert("UNAUTHORIZED");
-        pool.removeVaultVersion(vaultVersion);
-        vm.stopPrank();
-    }
-
-    function testSuccess_removeVaultVersion(uint256 vaultVersion) public {
+    function testSuccess_setVaultVersion_setInvalid(uint256 vaultVersion) public {
         stdstore.target(address(pool)).sig(pool.isValidVersion.selector).with_key(vaultVersion).checked_write(true);
 
         vm.prank(creator);
-        pool.removeVaultVersion(vaultVersion);
+        pool.setVaultVersion(vaultVersion, false);
 
         assertTrue(!pool.isValidVersion(vaultVersion));
     }
@@ -1471,7 +1460,7 @@ contract VaultTest is LendingPoolTest {
     function testSuccess_openMarginAccount_ValidVaultVersion(uint256 vaultVersion) public {
         // Given: vaultVersion is valid
         vm.prank(creator);
-        pool.addVaultVersion(vaultVersion);
+        pool.setVaultVersion(vaultVersion, true);
 
         // And: sender is a vault
         vm.startPrank(address(vault));

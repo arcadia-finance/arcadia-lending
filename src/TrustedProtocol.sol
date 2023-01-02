@@ -18,19 +18,12 @@ abstract contract TrustedProtocol {
     constructor() {}
 
     /**
-     * @notice Sets a vault version to valid
+     * @notice Sets the validity of vault version to valid
      * @param vaultVersion The version current version of the vault
+     * @param valid The validity of the respective vaultVersion
      */
-    function _addVaultVersion(uint256 vaultVersion) internal {
-        isValidVersion[vaultVersion] = true;
-    }
-
-    /**
-     * @notice Sets a vault version to invalid
-     * @param vaultVersion The version current version of the vault
-     */
-    function _removeVaultVersion(uint256 vaultVersion) internal {
-        isValidVersion[vaultVersion] = false;
+    function _setVaultVersion(uint256 vaultVersion, bool valid) internal {
+        isValidVersion[vaultVersion] = valid;
     }
 
     /**
