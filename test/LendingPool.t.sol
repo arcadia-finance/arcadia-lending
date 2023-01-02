@@ -1407,7 +1407,9 @@ contract VaultTest is LendingPoolTest {
         pool.setLiquidator(liquidator);
     }
 
-    function testRevert_setVaultVersion_NonOwner(address unprivilegedAddress, uint256 vaultVersion, bool valid) public {
+    function testRevert_setVaultVersion_NonOwner(address unprivilegedAddress, uint256 vaultVersion, bool valid)
+        public
+    {
         vm.assume(unprivilegedAddress != creator);
 
         vm.startPrank(unprivilegedAddress);
