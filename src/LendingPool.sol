@@ -506,27 +506,37 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     ////////////////////////////////////////////////////////////// */
 
     /**
-     * @inheritdoc TrustedProtocol
+     * @notice Sets the validity of vault version to valid
+     * @param vaultVersion The version current version of the vault
+     * @param valid The validity of the respective vaultVersion
      */
-    function openMarginAccount()
-        external
-        view
-        override
-        returns (bool success, address baseCurrency, address liquidator_)
-    {
-        require(IFactory(vaultFactory).isVault(msg.sender), "LP_OMA: Not a vault");
-        //Todo: Check if vaultversion etc is ok
-        success = true;
-        baseCurrency = address(asset);
-        liquidator_ = liquidator;
+    function setVaultVersion(uint256 vaultVersion, bool valid) external onlyOwner {
+        _setVaultVersion(vaultVersion, valid);
     }
 
     /**
      * @inheritdoc TrustedProtocol
      */
-    function getOpenPosition(address vault) external view override returns (uint128 openPosition) {
-        //ToDo: When ERC-4626 is correctly implemented, It should not be necessary to first sync interests.
-        //updateInterestRate();
-        openPosition = uint128(maxWithdraw(vault));
+    function openMarginAccount(uint256 vaultVersion)
+        external
+        view
+        override
+        returns (bool success, address baseCurrency, address liquidator_)
+    {
+        //ToDo: Remove first check? view function that not interacts with other contracts -> doesn't matter that sender is not a vault
+        require(IFactory(vaultFactory).isVault(msg.sender), "LP_OMA: Not a vault");
+
+        if (isValidVersion[vaultVersion]) {
+            success = true;
+            baseCurrency = address(asset);
+            liquidator_ = liquidator;
+        }
+    }
+
+    /**
+     * @inheritdoc TrustedProtocol
+     */
+    function getOpenPosition(address vault) external view override returns (uint256 openPosition) {
+        openPosition = maxWithdraw(vault);
     }
 }
