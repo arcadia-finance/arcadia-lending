@@ -269,10 +269,6 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
         asset.transferFrom(msg.sender, address(this), transferAmount);
 
         _withdraw(transferAmount, vault, vault);
-
-        //Call vault to unlock collateral
-        //ToDo: can be removed for Trusted Protocols
-        require(IVault(vault).decreaseMarginPosition(address(asset), transferAmount), "LP_R: Reverted");
     }
 
     /* //////////////////////////////////////////////////////////////

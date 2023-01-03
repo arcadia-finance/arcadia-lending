@@ -10,6 +10,4 @@ interface IVault {
     function owner() external view returns (address);
 
     function increaseMarginPosition(address baseCurrency, uint256 amount) external returns (bool);
-
-    function decreaseMarginPosition(address baseCurrency, uint256 amount) external returns (bool);
 }
