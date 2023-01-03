@@ -272,6 +272,45 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     }
 
     /* //////////////////////////////////////////////////////////////
+                            LEVERAGE LOGIC
+    ////////////////////////////////////////////////////////////// */
+
+    /**
+     * @notice Takes a leveraged position backed by collateral in an Arcadia Vault
+     * @param amount The amount of underlying ERC-20 tokens to be lent out
+     * @param vault The address of the Arcadia Vault backing the loan
+     * @dev The sender might be different as the owner if they have the proper allowances
+     */
+    function takeLeverage(uint256 amount, address vault) public processInterests {
+        require(IFactory(vaultFactory).isVault(vault), "LP_B: Not a vault");
+
+        //Check allowances to send underlying to to
+        if (IVault(vault).owner() != msg.sender) {
+            uint256 allowed = creditAllowance[vault][msg.sender];
+            if (allowed != type(uint256).max) {
+                creditAllowance[vault][msg.sender] = allowed - amount;
+            }
+        }
+
+        //Deposit underlying assets in owners vault
+        asset.approve(vault, amount);
+        address[] memory assetAddresses = new address[](1);
+        assetAddresses[0] = asset;
+        uint256[] memory assetAmounts = new uint256[](1);
+        assetAmounts[0] = amount;
+        IVault(vault).deposit(assetAddresses, new uint256[](1), assetAmounts, new uint256[](1));
+
+        //Call vault to check if there is sufficient collateral.
+        //If so calculate and store the liquidation threshhold.
+        require(IVault(vault).increaseMarginPosition(address(asset), amount), "LP_B: Reverted");
+
+        //Mint debt tokens to the vault
+        if (amount != 0) {
+            _deposit(amount, vault);
+        }
+    }
+
+    /* //////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
     ////////////////////////////////////////////////////////////// */
 
