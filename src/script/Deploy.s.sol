@@ -13,7 +13,7 @@ import "../../lib/forge-std/src/Vm.sol";
 import "../DebtToken.sol";
 import "../LendingPool.sol";
 import "../Tranche.sol";
-import "../TrustedProtocol.sol";
+import "../TrustedCreditor.sol";
 
 import "../mocks/Factory.sol";
 

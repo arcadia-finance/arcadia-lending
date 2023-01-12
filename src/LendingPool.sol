@@ -16,7 +16,7 @@ import "./interfaces/ITranche.sol";
 import "./interfaces/IFactory.sol";
 import "./interfaces/IVault.sol";
 import "./interfaces/ILendingPool.sol";
-import {TrustedProtocol} from "./TrustedProtocol.sol";
+import {TrustedCreditor} from "./TrustedCreditor.sol";
 import {DebtToken} from "./DebtToken.sol";
 import {InterestRateModule, DataTypes} from "./libraries/InterestRateModule.sol";
 
@@ -25,7 +25,7 @@ import {InterestRateModule, DataTypes} from "./libraries/InterestRateModule.sol"
  * @author Arcadia Finance
  * @notice The Lending pool contains the main logic to provide liquidity and take or repay loans for a certain asset
  */
-contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
+contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
@@ -77,7 +77,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
      */
     constructor(ERC20 asset_, address treasury_, address vaultFactory_)
         Owned(msg.sender)
-        TrustedProtocol()
+        TrustedCreditor()
         DebtToken(asset_)
     {
         treasury = treasury_;
@@ -272,6 +272,45 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     }
 
     /* //////////////////////////////////////////////////////////////
+                            LEVERAGE LOGIC
+    ////////////////////////////////////////////////////////////// */
+
+    /**
+     * @notice Takes a leveraged position backed by collateral in an Arcadia Vault
+     * @param amount The amount of underlying ERC-20 tokens to be lent out
+     * @param vault The address of the Arcadia Vault backing the loan
+     * @dev The sender might be different as the owner if they have the proper allowances
+     */
+    function takeLeverage(uint256 amount, address vault) public processInterests {
+        require(IFactory(vaultFactory).isVault(vault), "LP_B: Not a vault");
+
+        //Check allowances to send underlying to to
+        if (IVault(vault).owner() != msg.sender) {
+            uint256 allowed = creditAllowance[vault][msg.sender];
+            if (allowed != type(uint256).max) {
+                creditAllowance[vault][msg.sender] = allowed - amount;
+            }
+        }
+
+        //Deposit underlying assets in owners vault
+        asset.approve(vault, amount);
+        address[] memory assetAddresses = new address[](1);
+        assetAddresses[0] = asset;
+        uint256[] memory assetAmounts = new uint256[](1);
+        assetAmounts[0] = amount;
+        IVault(vault).deposit(assetAddresses, new uint256[](1), assetAmounts, new uint256[](1));
+
+        //Call vault to check if there is sufficient collateral.
+        //If so calculate and store the liquidation threshhold.
+        require(IVault(vault).increaseMarginPosition(address(asset), amount), "LP_B: Reverted");
+
+        //Mint debt tokens to the vault
+        if (amount != 0) {
+            _deposit(amount, vault);
+        }
+    }
+
+    /* //////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
     ////////////////////////////////////////////////////////////// */
 
@@ -433,15 +472,15 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
      * In this case the liquidator will call settleLiquidation() to settle the deficit.
      * the Liquidator will transfer any remaining funds to the Lending Pool.
      */
-    function liquidateVault(address vault, uint256 debt) public onlyLiquidator {
+    function liquidateVault(address vault, uint256 debt) public override onlyLiquidator {
         _withdraw(debt, vault, vault);
     }
 
     /**
      * @notice Settles bad debt of liquidations.
      * @param default_ The amount of debt.that was not recouped by the auction
-     * @param deficit The amount of debt that has to be repaid to the liquidator,
-     * if the liquidation fee was bigger than the auction proceeds
+     * @param deficit The amount of debt that has to be repaid to the liquidation initiator,
+     * in the edge case that the liquidation fee was bigger than the auction proceeds
      * @dev This function is called by the Liquidator after a liquidation is finished,
      * but only if there is bad debt.
      * @dev The liquidator will transfer the auction proceeds (the underlying asset)
@@ -511,7 +550,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     }
 
     /**
-     * @inheritdoc TrustedProtocol
+     * @inheritdoc TrustedCreditor
      */
     function openMarginAccount(uint256 vaultVersion)
         external
@@ -530,7 +569,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     }
 
     /**
-     * @inheritdoc TrustedProtocol
+     * @inheritdoc TrustedCreditor
      */
     function getOpenPosition(address vault) external view override returns (uint256 openPosition) {
         openPosition = maxWithdraw(vault);
