@@ -9,7 +9,7 @@ pragma solidity ^0.8.13;
 import {DataTypes} from "./DataTypes.sol";
 
 contract InterestRateModule {
-    uint256 public interestRate; //18 decimals precision
+    uint256 public interestRatePerYear; //18 decimals precision
 
     DataTypes.InterestRateConfiguration public interestRateConfig;
 
@@ -30,15 +30,15 @@ contract InterestRateModule {
     function _calculateInterestRate(uint256 utilisation) internal view returns (uint256) {
         if (utilisation >= interestRateConfig.utilisationThreshold) {
             // 1e23 = (uT * 1e5) * (ls * 1e18)
-            uint256 lowSlopeInterest = interestRateConfig.utilisationThreshold * interestRateConfig.lowSlope;
+            uint256 lowSlopeInterest = interestRateConfig.utilisationThreshold * interestRateConfig.lowSlopePerYear;
             // 1e23 = ((uT - u) * 1e5) * (hs * 1e18)
             uint256 highSlopeInterest =
-                (utilisation - interestRateConfig.utilisationThreshold) * interestRateConfig.highSlope;
+                (utilisation - interestRateConfig.utilisationThreshold) * interestRateConfig.highSlopePerYear;
             // 1e18 = (bs * 1e18) + ((lsIR * 1e23) + (hsIR * 1e23) / 1e5)
-            return uint256(interestRateConfig.baseRate + ((lowSlopeInterest + highSlopeInterest) / 100_000));
+            return uint256(interestRateConfig.baseRatePerYear + ((lowSlopeInterest + highSlopeInterest) / 100_000));
         } else {
             // 1e18 = br * 1e18 + (ls * 1e18) * (u * 1e5) / 1e5
-            return uint256(interestRateConfig.baseRate + ((interestRateConfig.lowSlope * utilisation) / 100_000));
+            return uint256(interestRateConfig.baseRatePerYear + ((interestRateConfig.lowSlopePerYear * utilisation) / 100_000));
         }
     }
 
@@ -54,6 +54,6 @@ contract InterestRateModule {
         if (totalRealisedLiquidity_ > 0) {
             utilisation = (100_000 * realisedDebt_) / totalRealisedLiquidity_;
         }
-        interestRate = _calculateInterestRate(utilisation);
+        interestRatePerYear = _calculateInterestRate(utilisation);
     }
 }

@@ -29,9 +29,10 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
-    uint256 public constant YEARLY_BLOCKS = 2_628_000;
+    // @dev based on 365 days * 24 hours * 60 minutes * 60 seconds, leap years ignored
+    uint256 public constant YEARLY_SECONDS = 31_536_000;
 
-    uint32 public lastSyncedBlock;
+    uint32 public lastSyncedBlockTimestamp;
     uint256 public totalWeight;
     uint256 public totalRealisedLiquidity;
     uint256 public feeWeight;
@@ -282,7 +283,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     function totalAssets() public view override returns (uint256 totalDebt) {
         // Avoid a second calculation of unrealised debt (expensive)
         // if interersts are already synced this block.
-        if (lastSyncedBlock != uint32(block.number)) {
+        if (lastSyncedBlockTimestamp != uint32(block.timestamp)) {
             totalDebt = realisedDebt + calcUnrealisedDebt();
         } else {
             totalDebt = realisedDebt;
@@ -298,7 +299,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
     function liquidityOf(address owner_) public view returns (uint256 assets) {
         // Avoid a second calculation of unrealised debt (expensive)
         // if interersts are already synced this block.
-        if (lastSyncedBlock != uint32(block.number)) {
+        if (lastSyncedBlockTimestamp != uint32(block.timestamp)) {
             // The total liquidity of a tranche equals the sum of the realised liquidity
             // of the tranche, and its pending interests
             uint256 interest = calcUnrealisedDebt().mulDivUp(weight[owner_], totalWeight);
@@ -319,9 +320,9 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
      */
     function _syncInterests() internal {
         // Only Sync interests once per block
-        if (lastSyncedBlock != uint32(block.number)) {
+        if (lastSyncedBlockTimestamp != uint32(block.timestamp)) {
             uint256 unrealisedDebt = calcUnrealisedDebt();
-            lastSyncedBlock = uint32(block.number);
+            lastSyncedBlockTimestamp = uint32(block.timestamp);
 
             //Sync interests for borrowers
             unchecked {
@@ -349,12 +350,12 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
 
         unchecked {
             //gas: can't overflow for reasonable interest rates
-            base = 1e18 + interestRate;
+            base = 1e18 + interestRatePerYear;
 
-            //gas: only overflows when blocks.number > 894262060268226281981748468
+            //gas: only overflows when blocks.timestamp > 894262060268226281981748468
             //in practice: assumption that delta of blocks < 341640000 (150 years)
             //as foreseen in LogExpMath lib
-            exponent = ((block.number - lastSyncedBlock) * 1e18) / YEARLY_BLOCKS;
+            exponent = ((block.timestamp - lastSyncedBlockTimestamp) * 1e18) / YEARLY_SECONDS;
 
             //gas: taking an imaginary worst-case scenario with max interest of 1000%
             //over a period of 5 years
