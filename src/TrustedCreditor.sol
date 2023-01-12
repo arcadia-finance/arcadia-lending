@@ -7,15 +7,30 @@
 pragma solidity ^0.8.13;
 
 /**
- * @title Trusted Protocol implementation
+ * @title Trusted Creditor implementation
  * @author Arcadia Finance
- * @notice This contract contains the minimum functionality a Trusted Protocol, interacting with Arcadia Vaults, needs to implement.
+ * @notice This contract contains the minimum functionality a Trusted Creditor, interacting with Arcadia Vaults, needs to implement.
  * @dev For the implementation of Arcadia Vaults, see: https://github.com/arcadia-finance/arcadia-vaults
  */
-abstract contract TrustedProtocol {
+abstract contract TrustedCreditor {
     mapping(uint256 => bool) public isValidVersion;
 
     constructor() {}
+
+    /* //////////////////////////////////////////////////////////////
+                        LIQUIDATION LOGIC
+    ////////////////////////////////////////////////////////////// */
+
+    /**
+     * @notice Called by the vault when an amount of collateral is liquidated to repay debt.
+     * @param vault The contract address of the vault in liquidation.
+     * @param debt The amount of debt that will be repaid after the auction.
+     */
+    function liquidateVault(address vault, uint256 debt) public virtual;
+
+    /* //////////////////////////////////////////////////////////////
+                            VAULT LOGIC
+    ////////////////////////////////////////////////////////////// */
 
     /**
      * @notice Sets the validity of vault version to valid
