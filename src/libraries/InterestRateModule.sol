@@ -38,7 +38,9 @@ contract InterestRateModule {
             return uint256(interestRateConfig.baseRatePerYear + ((lowSlopeInterest + highSlopeInterest) / 100_000));
         } else {
             // 1e18 = br * 1e18 + (ls * 1e18) * (u * 1e5) / 1e5
-            return uint256(interestRateConfig.baseRatePerYear + ((interestRateConfig.lowSlopePerYear * utilisation) / 100_000));
+            return uint256(
+                interestRateConfig.baseRatePerYear + ((interestRateConfig.lowSlopePerYear * utilisation) / 100_000)
+            );
         }
     }
 
