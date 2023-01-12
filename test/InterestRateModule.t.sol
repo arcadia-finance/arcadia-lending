@@ -41,20 +41,20 @@ contract InterestRateModuleTest is Test {
     ) public {
         // Given: A certain InterestRateConfiguration
         DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
-            baseRate: baseRate_,
-            highSlope: highSlope_,
-            lowSlope: lowSlope_,
+            baseRatePerYear: baseRate_,
+            highSlopePerYear: highSlope_,
+            lowSlopePerYear: lowSlope_,
             utilisationThreshold: utilisationThreshold_
         });
         // When: The InterestConfiguration is set
         interest.setInterestConfig(config);
 
         // Then: config types should be equal to fuzzed types
-        (uint256 baserate, uint256 lowslope, uint256 highslope, uint256 utilisationThreshold) =
+        (uint256 baseRatePerYear, uint256 lowSlopePerYear, uint256 highSlopePerYear, uint256 utilisationThreshold) =
             interest.interestRateConfig();
-        assertEq(baserate, baseRate_);
-        assertEq(highslope, highSlope_);
-        assertEq(lowslope, lowSlope_);
+        assertEq(baseRatePerYear, baseRate_);
+        assertEq(highSlopePerYear, highSlope_);
+        assertEq(lowSlopePerYear, lowSlope_);
         assertEq(utilisationThreshold, utilisationThreshold_);
     }
 
@@ -73,9 +73,9 @@ contract InterestRateModuleTest is Test {
 
         // And: A certain InterestRateConfiguration
         DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
-            baseRate: baseRate_,
-            highSlope: highSlope_,
-            lowSlope: lowSlope_,
+            baseRatePerYear: baseRate_,
+            highSlopePerYear: highSlope_,
+            lowSlopePerYear: lowSlope_,
             utilisationThreshold: 0.8 * 10 ** 5
         });
 
@@ -84,7 +84,7 @@ contract InterestRateModuleTest is Test {
         // And: The interest is set for a certain combination of realisedDebt_ and totalRealisedLiquidity_
         interest.updateInterestRate(realisedDebt_, totalRealisedLiquidity_);
         // And: actualInterestRate is interestRate from InterestRateModule contract
-        uint256 actualInterestRate = interest.interestRate();
+        uint256 actualInterestRate = interest.interestRatePerYear();
 
         // And: expectedUtilisation is 100_000 multiplied by realisedDebt_ and divided by totalRealisedLiquidity_
         uint256 expectedUtilisation = (100_000 * realisedDebt_) / totalRealisedLiquidity_;
@@ -93,15 +93,15 @@ contract InterestRateModuleTest is Test {
 
         if (expectedUtilisation <= config.utilisationThreshold) {
             // And: expectedInterestRate is lowSlope multiplied by expectedUtilisation, divided by 100000 and added to baseRate
-            expectedInterestRate = config.baseRate + (config.lowSlope * expectedUtilisation / 100_000);
+            expectedInterestRate = config.baseRatePerYear + (config.lowSlopePerYear * expectedUtilisation / 100_000);
         } else {
             // And: lowSlopeInterest is utilisationThreshold multiplied by lowSlope,
             // highSlopeInterest is expectedUtilisation minus utilisationThreshold multiplied by highSlope
-            uint256 lowSlopeInterest = config.utilisationThreshold * config.lowSlope;
-            uint256 highSlopeInterest = (expectedUtilisation - config.utilisationThreshold) * config.highSlope;
+            uint256 lowSlopeInterest = config.utilisationThreshold * config.lowSlopePerYear;
+            uint256 highSlopeInterest = (expectedUtilisation - config.utilisationThreshold) * config.highSlopePerYear;
 
             // And: expectedInterestRate is baseRate added to lowSlopeInterest added to highSlopeInterest divided by 100000
-            expectedInterestRate = config.baseRate + ((lowSlopeInterest + highSlopeInterest) / 100_000);
+            expectedInterestRate = config.baseRatePerYear + ((lowSlopeInterest + highSlopeInterest) / 100_000);
         }
 
         // Then: actualInterestRate should be equal to expectedInterestRate
@@ -122,9 +122,9 @@ contract InterestRateModuleTest is Test {
 
         // And: a certain InterestRateConfiguration
         DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
-            baseRate: baseRate_,
-            highSlope: highSlope_,
-            lowSlope: lowSlope_,
+            baseRatePerYear: baseRate_,
+            highSlopePerYear: highSlope_,
+            lowSlopePerYear: lowSlope_,
             utilisationThreshold: 0.8 * 10 ** 5
         });
 
@@ -133,9 +133,9 @@ contract InterestRateModuleTest is Test {
         // And: The interest is set for a certain combination of realisedDebt_ and totalRealisedLiquidity_
         interest.updateInterestRate(realisedDebt_, totalRealisedLiquidity_);
         // And: actualInterestRate is interestRate from InterestRateModule contract
-        uint256 actualInterestRate = interest.interestRate();
+        uint256 actualInterestRate = interest.interestRatePerYear();
 
-        uint256 expectedInterestRate = config.baseRate;
+        uint256 expectedInterestRate = config.baseRatePerYear;
 
         // Then: actualInterestRate should be equal to expectedInterestRate
         assertEq(actualInterestRate, expectedInterestRate);
@@ -155,9 +155,9 @@ contract InterestRateModuleTest is Test {
 
         // And: a certain InterestRateConfiguration
         DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
-            baseRate: baseRate_,
-            highSlope: highSlope_,
-            lowSlope: lowSlope_,
+            baseRatePerYear: baseRate_,
+            highSlopePerYear: highSlope_,
+            lowSlopePerYear: lowSlope_,
             utilisationThreshold: 0.8 * 10 ** 5
         });
 
@@ -168,7 +168,7 @@ contract InterestRateModuleTest is Test {
         uint256 actualInterestRate = interest.calculateInterestRate(utilisation);
 
         // And: expectedInterestRate is lowSlope multiplied by utilisation divided by 100000 and added to baseRate
-        uint256 expectedInterestRate = config.baseRate + (config.lowSlope * utilisation / 100_000);
+        uint256 expectedInterestRate = config.baseRatePerYear + (config.lowSlopePerYear * utilisation / 100_000);
 
         // Then: actualInterestRate should be equal to expectedInterestRate
         assertEq(actualInterestRate, expectedInterestRate);
@@ -188,9 +188,9 @@ contract InterestRateModuleTest is Test {
 
         // And: a certain InterestRateConfiguration
         DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
-            baseRate: baseRate_,
-            highSlope: highSlope_,
-            lowSlope: lowSlope_,
+            baseRatePerYear: baseRate_,
+            highSlopePerYear: highSlope_,
+            lowSlopePerYear: lowSlope_,
             utilisationThreshold: 0.8 * 10 ** 5
         });
 
@@ -201,11 +201,11 @@ contract InterestRateModuleTest is Test {
         uint256 actualInterestRate = interest.calculateInterestRate(utilisation);
 
         // And: lowSlopeInterest is utilisationThreshold multiplied by lowSlope, highSlopeInterest is utilisation minus utilisationThreshold multiplied by highSlope
-        uint256 lowSlopeInterest = config.utilisationThreshold * config.lowSlope;
-        uint256 highSlopeInterest = (utilisation - config.utilisationThreshold) * config.highSlope;
+        uint256 lowSlopeInterest = config.utilisationThreshold * config.lowSlopePerYear;
+        uint256 highSlopeInterest = (utilisation - config.utilisationThreshold) * config.highSlopePerYear;
 
         // And: expectedInterestRate is baseRate added to lowSlopeInterest added to highSlopeInterest divided by divided by 100000
-        uint256 expectedInterestRate = config.baseRate + ((lowSlopeInterest + highSlopeInterest) / 100_000);
+        uint256 expectedInterestRate = config.baseRatePerYear + ((lowSlopeInterest + highSlopeInterest) / 100_000);
 
         // Then: actualInterestRate should be equal to expectedInterestRate
         assertEq(actualInterestRate, expectedInterestRate);
