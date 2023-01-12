@@ -458,22 +458,28 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
     }
 
     /**
-     * @notice Called by the liquidator when liquidation of a vault starts.
-     * @param vault The contract address of the vault in liquidation.
-     * @param debt The amount of debt that was issued.
+     * @notice Called by a vault when it is being liquidated (auctioned) to repay an amount of debt.
+     * @param debt The amount of debt that will be repaid.
      * @dev At the start of the liquidation the debt tokens are burned,
      * as such interests are not accrued during the liquidation.
      * @dev After the liquidation is finished, there are two options:
      * 1) the collateral is auctioned for more than the debt position
-     * and liquidator reward In this case the liquidator will transfer an equal amount
+     * and liquidationInitiator reward. In this case the liquidator will transfer an equal amount
      * as the debt position to the Lending Pool.
      * 2) the collateral is auctioned for less than the debt position
-     * and keeper fee -> the vault became under-collateralised and we have a default event.
+     * and liquidationInitiator reward fee -> the vault became under-collateralised and we have a default event.
      * In this case the liquidator will call settleLiquidation() to settle the deficit.
      * the Liquidator will transfer any remaining funds to the Lending Pool.
      */
-    function liquidateVault(address vault, uint256 debt) public override onlyLiquidator {
-        _withdraw(debt, vault, vault);
+    function liquidateVault(uint256 debt) public override {
+        //Function can only be called by Vaults with debt.
+        //Since DebtTokens are non-transferrable, only vaults can have debt.
+        //Hence by checking that the balance of msg.sender is not 0, we know the sender is
+        //indeed a vault and has debt.
+        require(balanceOf[msg.sender] != 0, "LP_LV: Not a Vault with debt");
+
+        //Remove debt from Vault (burn DebtTokens)
+        _withdraw(debt, msg.sender, msg.sender);
     }
 
     /**
