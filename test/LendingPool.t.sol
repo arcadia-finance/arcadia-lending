@@ -985,7 +985,8 @@ contract InterestsTest is LendingPoolTest {
         pool.borrow(realisedDebt, address(vault), address(vault));
 
         // And: deltaBlocksTimestamp have passed
-        vm.warp(block.timestamp + deltaBlocksTimestamp);
+        uint256 start_timestamp = block.timestamp;
+        vm.warp(start_timestamp + deltaBlocksTimestamp);
 
         // When: Intersts are synced
         stdstore.target(address(pool)).sig(pool.interestRatePerYear.selector).checked_write(interestRate);
@@ -998,7 +999,7 @@ contract InterestsTest is LendingPoolTest {
         assertEq(debt.maxWithdraw(address(vault)), realisedDebt + interests);
         assertEq(debt.maxRedeem(address(vault)), realisedDebt);
         assertEq(debt.totalAssets(), realisedDebt + interests);
-        assertEq(pool.lastSyncedBlockTimestamp(), 1 + deltaBlocksTimestamp);
+        assertEq(pool.lastSyncedBlockTimestamp(), start_timestamp + deltaBlocksTimestamp);
     }
 
     function testSuccess_syncInterestsToLiquidityProviders(
@@ -1124,7 +1125,8 @@ contract InterestRateTest is LendingPoolTest {
         stdstore.target(address(pool)).sig(pool.lastSyncedBlockTimestamp.selector).checked_write(block.number);
 
         // And: deltaBlocksTimestamp have passed
-        vm.warp(block.timestamp + deltaBlocksTimestamp);
+        uint256 start_timestamp = block.timestamp;
+        vm.warp(start_timestamp + deltaBlocksTimestamp);
 
         // When: Interests are updated
         vm.prank(sender);
@@ -1137,7 +1139,7 @@ contract InterestRateTest is LendingPoolTest {
         uint256 interestTreasury = interest - interestSr - interestJr;
 
         assertEq(debt.totalAssets(), realisedDebt + interest);
-        assertEq(pool.lastSyncedBlockTimestamp(), 1 + deltaBlocksTimestamp);
+        assertEq(pool.lastSyncedBlockTimestamp(), start_timestamp + deltaBlocksTimestamp);
         assertEq(pool.realisedLiquidityOf(address(srTranche)), interestSr);
         assertEq(pool.realisedLiquidityOf(address(jrTranche)), interestJr);
         assertEq(pool.realisedLiquidityOf(address(treasury)), interestTreasury);
