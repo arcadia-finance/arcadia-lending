@@ -340,9 +340,8 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
      * The base of the exponential: 1 + r, is a 18 decimals fixed point number
      * with r the yearly interest rate.
      * The exponent of the exponential: x, is a 18 decimals fixed point number.
-     * The exponent x is calculated as: the amount of blocks since last sync divided by the average of
-     * blocks produced over a year (using a 12s average block time).
-     * _yearlyInterestRate = 1 + r expressed as 18 decimals fixed point number
+     * The exponent x is calculated as: the amount of seconds passed since last sync timestamp divided by the average of
+     * seconds per year. _yearlyInterestRate = 1 + r expressed as 18 decimals fixed point number
      */
     function calcUnrealisedDebt() public view returns (uint256 unrealisedDebt) {
         uint256 base;
@@ -353,7 +352,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
             base = 1e18 + interestRatePerYear;
 
             //gas: only overflows when blocks.timestamp > 894262060268226281981748468
-            //in practice: assumption that delta of blocks < 341640000 (150 years)
+            //in practice: assumption that maximum timestamp value is 2147483647 ( 2 ** 31 - 1 )
             //as foreseen in LogExpMath lib
             exponent = ((block.timestamp - lastSyncedTimestamp) * 1e18) / YEARLY_SECONDS;
 
