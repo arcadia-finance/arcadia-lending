@@ -351,9 +351,10 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
             //gas: can't overflow for reasonable interest rates
             base = 1e18 + interestRatePerYear;
 
-            //gas: only overflows when blocks.timestamp > 894262060268226281981748468
-            //in practice: assumption that maximum timestamp value is 2147483647 ( 2 ** 31 - 1 )
-            //as foreseen in LogExpMath lib
+            //gas: only overflows when (block.timestamp - lastSyncedBlockTimestamp) > 1e59
+            //in practice: exponent in LogExpMath lib is limited to 130e18,
+            //Corresponding to a delta of timestamps of 4099680000 (or 130 years),
+            //much bigger than any realistic time difference between two syncs.
             exponent = ((block.timestamp - lastSyncedTimestamp) * 1e18) / YEARLY_SECONDS;
 
             //gas: taking an imaginary worst-case scenario with max interest of 1000%
