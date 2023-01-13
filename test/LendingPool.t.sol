@@ -949,7 +949,7 @@ contract InterestsTest is LendingPoolTest {
         vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
 
         stdstore.target(address(pool)).sig(pool.interestRatePerYear.selector).checked_write(interestRate);
-        stdstore.target(address(pool)).sig(pool.lastSyncedBlockTimestamp.selector).checked_write(block.number);
+        stdstore.target(address(pool)).sig(pool.lastSyncedTimestamp.selector).checked_write(block.number);
 
         // And: the vaultOwner takes realisedDebt debt
         stdstore.target(address(debt)).sig(debt.realisedDebt.selector).checked_write(realisedDebt);
@@ -1000,7 +1000,7 @@ contract InterestsTest is LendingPoolTest {
         assertEq(debt.maxWithdraw(address(vault)), realisedDebt + interests);
         assertEq(debt.maxRedeem(address(vault)), realisedDebt);
         assertEq(debt.totalAssets(), realisedDebt + interests);
-        assertEq(pool.lastSyncedBlockTimestamp(), start_timestamp + deltaTimestamp);
+        assertEq(pool.lastSyncedTimestamp(), start_timestamp + deltaTimestamp);
     }
 
     function testSuccess_syncInterestsToLiquidityProviders(
@@ -1123,7 +1123,7 @@ contract InterestRateTest is LendingPoolTest {
         stdstore.target(address(debt)).sig(debt.realisedDebt.selector).checked_write(realisedDebt);
 
         stdstore.target(address(pool)).sig(pool.interestRatePerYear.selector).checked_write(interestRate);
-        stdstore.target(address(pool)).sig(pool.lastSyncedBlockTimestamp.selector).checked_write(block.number);
+        stdstore.target(address(pool)).sig(pool.lastSyncedTimestamp.selector).checked_write(block.number);
 
         // And: deltaTimestamp have passed
         uint256 start_timestamp = block.timestamp;
@@ -1140,7 +1140,7 @@ contract InterestRateTest is LendingPoolTest {
         uint256 interestTreasury = interest - interestSr - interestJr;
 
         assertEq(debt.totalAssets(), realisedDebt + interest);
-        assertEq(pool.lastSyncedBlockTimestamp(), start_timestamp + deltaTimestamp);
+        assertEq(pool.lastSyncedTimestamp(), start_timestamp + deltaTimestamp);
         assertEq(pool.realisedLiquidityOf(address(srTranche)), interestSr);
         assertEq(pool.realisedLiquidityOf(address(jrTranche)), interestJr);
         assertEq(pool.realisedLiquidityOf(address(treasury)), interestTreasury);
