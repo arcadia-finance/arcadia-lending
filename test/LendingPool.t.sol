@@ -937,11 +937,9 @@ contract InterestsTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_calcUnrealisedDebt_Unchecked(
-        uint24 deltaTimestamp,
-        uint128 realisedDebt,
-        uint256 interestRate
-    ) public {
+    function testSuccess_calcUnrealisedDebt_Unchecked(uint24 deltaTimestamp, uint128 realisedDebt, uint256 interestRate)
+        public
+    {
         // Given: deltaTimestamp smaller than equal to 5 years,
         // realisedDebt smaller than equal to than 3402823669209384912995114146594816
         vm.assume(deltaTimestamp <= 5 * 365 * 24 * 60 * 60); //5 year
