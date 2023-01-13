@@ -676,6 +676,7 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(beneficiary != vaultOwner);
         vm.assume(to != address(0));
         vm.assume(to != liquidityProvider);
+        vm.assume(to != address(pool));
 
         vault.setTotalValue(collateralValue);
         vm.prank(address(srTranche));
