@@ -855,11 +855,11 @@ contract AccountingTest is LendingPoolTest {
         asset.approve(address(pool), type(uint256).max);
     }
 
-    function testSuccess_totalAssets(uint128 realisedDebt, uint256 interestRate, uint24 deltaBlocksTimestamp) public {
+    function testSuccess_totalAssets(uint128 realisedDebt, uint256 interestRate, uint24 deltaTimestamp) public {
         // Given: all neccesary contracts are deployed on the setup
         vm.assume(interestRate <= 10e3 * 10e18); //1000%
         vm.assume(interestRate > 0);
-        vm.assume(deltaBlocksTimestamp <= 5 * 365 * 24 * 60 * 60); //5 year
+        vm.assume(deltaTimestamp <= 5 * 365 * 24 * 60 * 60); //5 year
 
         vm.prank(address(srTranche));
         pool.depositInLendingPool(type(uint128).max, liquidityProvider);
@@ -871,9 +871,9 @@ contract AccountingTest is LendingPoolTest {
 
         stdstore.target(address(pool)).sig(pool.interestRatePerYear.selector).checked_write(interestRate);
 
-        vm.warp(block.timestamp + deltaBlocksTimestamp);
+        vm.warp(block.timestamp + deltaTimestamp);
 
-        uint256 unrealisedDebt = calcUnrealisedDebtChecked(interestRate, deltaBlocksTimestamp, realisedDebt);
+        uint256 unrealisedDebt = calcUnrealisedDebtChecked(interestRate, deltaTimestamp, realisedDebt);
         uint256 expectedValue = realisedDebt + unrealisedDebt;
 
         uint256 actualValue = debt.totalAssets();
@@ -883,12 +883,12 @@ contract AccountingTest is LendingPoolTest {
 
     function testSuccess_liquidityOf(
         uint256 interestRate,
-        uint24 deltaBlocksTimestamp,
+        uint24 deltaTimestamp,
         uint128 realisedDebt,
         uint128 initialLiquidity
     ) public {
         // Given: all necessary contracts are deployed on the setup
-        vm.assume(deltaBlocksTimestamp <= 5 * 365 * 24 * 60 * 60); //5 year
+        vm.assume(deltaTimestamp <= 5 * 365 * 24 * 60 * 60); //5 year
         vm.assume(interestRate <= 10e3 * 10 ** 18); //1000%
         vm.assume(interestRate > 0);
         vm.assume(initialLiquidity >= realisedDebt);
@@ -900,12 +900,12 @@ contract AccountingTest is LendingPoolTest {
         vm.prank(vaultOwner);
         pool.borrow(realisedDebt, address(vault), vaultOwner);
 
-        // When: deltaBlocksTimestamp amount of time has passed
-        vm.warp(block.timestamp + deltaBlocksTimestamp);
+        // When: deltaTimestamp amount of time has passed
+        vm.warp(block.timestamp + deltaTimestamp);
 
         stdstore.target(address(pool)).sig(pool.interestRatePerYear.selector).checked_write(interestRate);
 
-        uint256 unrealisedDebt = calcUnrealisedDebtChecked(interestRate, deltaBlocksTimestamp, realisedDebt);
+        uint256 unrealisedDebt = calcUnrealisedDebtChecked(interestRate, deltaTimestamp, realisedDebt);
         uint256 interest = unrealisedDebt * 50 / 90;
         if (interest * 90 < unrealisedDebt * 50) interest += 1; // interest for a tranche is rounded up
         uint256 expectedValue = initialLiquidity + interest;
@@ -938,13 +938,13 @@ contract InterestsTest is LendingPoolTest {
     }
 
     function testSuccess_calcUnrealisedDebt_Unchecked(
-        uint24 deltaBlocksTimestamp,
+        uint24 deltaTimestamp,
         uint128 realisedDebt,
         uint256 interestRate
     ) public {
-        // Given: deltaBlocksTimestamp smaller than equal to 5 years,
+        // Given: deltaTimestamp smaller than equal to 5 years,
         // realisedDebt smaller than equal to than 3402823669209384912995114146594816
-        vm.assume(deltaBlocksTimestamp <= 5 * 365 * 24 * 60 * 60); //5 year
+        vm.assume(deltaTimestamp <= 5 * 365 * 24 * 60 * 60); //5 year
         vm.assume(interestRate <= 10 * 10 ** 18); //1000%
         vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
 
@@ -954,23 +954,23 @@ contract InterestsTest is LendingPoolTest {
         // And: the vaultOwner takes realisedDebt debt
         stdstore.target(address(debt)).sig(debt.realisedDebt.selector).checked_write(realisedDebt);
 
-        // When: deltaBlocksTimestamp have passed
-        vm.warp(block.timestamp + deltaBlocksTimestamp);
+        // When: deltaTimestamp have passed
+        vm.warp(block.timestamp + deltaTimestamp);
 
         // Then: Unrealised debt should never overflow (-> calcUnrealisedDebtChecked does never error and same calculation unched are always equal)
-        uint256 expectedValue = calcUnrealisedDebtChecked(interestRate, deltaBlocksTimestamp, realisedDebt);
+        uint256 expectedValue = calcUnrealisedDebtChecked(interestRate, deltaTimestamp, realisedDebt);
         uint256 actualValue = pool.calcUnrealisedDebt();
         assertEq(expectedValue, actualValue);
     }
 
     function testSucces_syncInterests(
-        uint24 deltaBlocksTimestamp,
+        uint24 deltaTimestamp,
         uint128 realisedDebt,
         uint128 realisedLiquidity,
         uint256 interestRate
     ) public {
-        // Given: deltaBlocksTimestamp than 5 years, realisedDebt than 3402823669209384912995114146594816 and bigger than 0
-        vm.assume(deltaBlocksTimestamp <= 5 * 365 * 24 * 60 * 60); //5 year
+        // Given: deltaTimestamp than 5 years, realisedDebt than 3402823669209384912995114146594816 and bigger than 0
+        vm.assume(deltaTimestamp <= 5 * 365 * 24 * 60 * 60); //5 year
         vm.assume(interestRate <= 10 * 10 ** 18); //1000%
         vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
         vm.assume(realisedDebt > 0);
@@ -985,22 +985,22 @@ contract InterestsTest is LendingPoolTest {
         vm.prank(vaultOwner);
         pool.borrow(realisedDebt, address(vault), address(vault));
 
-        // And: deltaBlocksTimestamp have passed
+        // And: deltaTimestamp have passed
         uint256 start_timestamp = block.timestamp;
-        vm.warp(start_timestamp + deltaBlocksTimestamp);
+        vm.warp(start_timestamp + deltaTimestamp);
 
         // When: Intersts are synced
         stdstore.target(address(pool)).sig(pool.interestRatePerYear.selector).checked_write(interestRate);
         pool.syncInterests();
 
-        uint256 interests = calcUnrealisedDebtChecked(interestRate, deltaBlocksTimestamp, realisedDebt);
+        uint256 interests = calcUnrealisedDebtChecked(interestRate, deltaTimestamp, realisedDebt);
 
         // Then: Total redeemable interest of LP providers and total open debt of borrowers should increase with interests
         assertEq(pool.totalRealisedLiquidity(), realisedLiquidity + interests);
         assertEq(debt.maxWithdraw(address(vault)), realisedDebt + interests);
         assertEq(debt.maxRedeem(address(vault)), realisedDebt);
         assertEq(debt.totalAssets(), realisedDebt + interests);
-        assertEq(pool.lastSyncedBlockTimestamp(), start_timestamp + deltaBlocksTimestamp);
+        assertEq(pool.lastSyncedBlockTimestamp(), start_timestamp + deltaTimestamp);
     }
 
     function testSuccess_syncInterestsToLiquidityProviders(
@@ -1105,14 +1105,14 @@ contract InterestRateTest is LendingPoolTest {
 
     function testSuccess_updateInterestRate(
         address sender,
-        uint24 deltaBlocksTimestamp,
+        uint24 deltaTimestamp,
         uint128 realisedDebt,
         uint128 realisedLiquidity,
         uint256 interestRate
     ) public {
         // Given: deltaBlocks smaller than equal to 5 years,
         // realisedDebt smaller than equal to than 3402823669209384912995114146594816
-        vm.assume(deltaBlocksTimestamp <= 5 * 365 * 24 * 60 * 60); //5 year
+        vm.assume(deltaTimestamp <= 5 * 365 * 24 * 60 * 60); //5 year
         vm.assume(interestRate <= 10 * 10 ** 18); //1000%
         vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
         vm.assume(realisedDebt <= realisedLiquidity);
@@ -1125,22 +1125,22 @@ contract InterestRateTest is LendingPoolTest {
         stdstore.target(address(pool)).sig(pool.interestRatePerYear.selector).checked_write(interestRate);
         stdstore.target(address(pool)).sig(pool.lastSyncedBlockTimestamp.selector).checked_write(block.number);
 
-        // And: deltaBlocksTimestamp have passed
+        // And: deltaTimestamp have passed
         uint256 start_timestamp = block.timestamp;
-        vm.warp(start_timestamp + deltaBlocksTimestamp);
+        vm.warp(start_timestamp + deltaTimestamp);
 
         // When: Interests are updated
         vm.prank(sender);
         pool.updateInterestRate();
 
         // Then interests should be up to date
-        uint256 interest = calcUnrealisedDebtChecked(interestRate, deltaBlocksTimestamp, realisedDebt);
+        uint256 interest = calcUnrealisedDebtChecked(interestRate, deltaTimestamp, realisedDebt);
         uint256 interestSr = interest * 50 / 100;
         uint256 interestJr = interest * 40 / 100;
         uint256 interestTreasury = interest - interestSr - interestJr;
 
         assertEq(debt.totalAssets(), realisedDebt + interest);
-        assertEq(pool.lastSyncedBlockTimestamp(), start_timestamp + deltaBlocksTimestamp);
+        assertEq(pool.lastSyncedBlockTimestamp(), start_timestamp + deltaTimestamp);
         assertEq(pool.realisedLiquidityOf(address(srTranche)), interestSr);
         assertEq(pool.realisedLiquidityOf(address(jrTranche)), interestJr);
         assertEq(pool.realisedLiquidityOf(address(treasury)), interestTreasury);
