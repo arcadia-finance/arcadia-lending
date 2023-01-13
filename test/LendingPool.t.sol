@@ -869,7 +869,7 @@ contract AccountingTest is LendingPoolTest {
         vm.prank(vaultOwner);
         pool.borrow(realisedDebt, address(vault), vaultOwner);
 
-        stdstore.target(address(pool)).sig(pool.interestRatePerYear.selector).checked_write(interestRate);
+        stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
 
         vm.warp(block.timestamp + deltaTimestamp);
 
@@ -903,7 +903,7 @@ contract AccountingTest is LendingPoolTest {
         // When: deltaTimestamp amount of time has passed
         vm.warp(block.timestamp + deltaTimestamp);
 
-        stdstore.target(address(pool)).sig(pool.interestRatePerYear.selector).checked_write(interestRate);
+        stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
 
         uint256 unrealisedDebt = calcUnrealisedDebtChecked(interestRate, deltaTimestamp, realisedDebt);
         uint256 interest = unrealisedDebt * 50 / 90;
@@ -946,7 +946,7 @@ contract InterestsTest is LendingPoolTest {
         vm.assume(interestRate <= 10 * 10 ** 18); //1000%
         vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
 
-        stdstore.target(address(pool)).sig(pool.interestRatePerYear.selector).checked_write(interestRate);
+        stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
         stdstore.target(address(pool)).sig(pool.lastSyncedTimestamp.selector).checked_write(block.number);
 
         // And: the vaultOwner takes realisedDebt debt
@@ -988,7 +988,7 @@ contract InterestsTest is LendingPoolTest {
         vm.warp(start_timestamp + deltaTimestamp);
 
         // When: Intersts are synced
-        stdstore.target(address(pool)).sig(pool.interestRatePerYear.selector).checked_write(interestRate);
+        stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
         pool.syncInterests();
 
         uint256 interests = calcUnrealisedDebtChecked(interestRate, deltaTimestamp, realisedDebt);
@@ -1120,7 +1120,7 @@ contract InterestRateTest is LendingPoolTest {
         // And: There is realisedDebt debt
         stdstore.target(address(debt)).sig(debt.realisedDebt.selector).checked_write(realisedDebt);
 
-        stdstore.target(address(pool)).sig(pool.interestRatePerYear.selector).checked_write(interestRate);
+        stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
         stdstore.target(address(pool)).sig(pool.lastSyncedTimestamp.selector).checked_write(block.number);
 
         // And: deltaTimestamp have passed

@@ -84,7 +84,7 @@ contract InterestRateModuleTest is Test {
         // And: The interest is set for a certain combination of realisedDebt_ and totalRealisedLiquidity_
         interest.updateInterestRate(realisedDebt_, totalRealisedLiquidity_);
         // And: actualInterestRate is interestRate from InterestRateModule contract
-        uint256 actualInterestRate = interest.interestRatePerYear();
+        uint256 actualInterestRate = interest.interestRate();
 
         // And: expectedUtilisation is 100_000 multiplied by realisedDebt_ and divided by totalRealisedLiquidity_
         uint256 expectedUtilisation = (100_000 * realisedDebt_) / totalRealisedLiquidity_;
@@ -133,7 +133,7 @@ contract InterestRateModuleTest is Test {
         // And: The interest is set for a certain combination of realisedDebt_ and totalRealisedLiquidity_
         interest.updateInterestRate(realisedDebt_, totalRealisedLiquidity_);
         // And: actualInterestRate is interestRate from InterestRateModule contract
-        uint256 actualInterestRate = interest.interestRatePerYear();
+        uint256 actualInterestRate = interest.interestRate();
 
         uint256 expectedInterestRate = config.baseRatePerYear;
 

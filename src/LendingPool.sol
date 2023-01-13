@@ -349,7 +349,7 @@ contract LendingPool is Owned, TrustedProtocol, DebtToken, InterestRateModule {
 
         unchecked {
             //gas: can't overflow for reasonable interest rates
-            base = 1e18 + interestRatePerYear;
+            base = 1e18 + interestRate;
 
             //gas: only overflows when (block.timestamp - lastSyncedBlockTimestamp) > 1e59
             //in practice: exponent in LogExpMath lib is limited to 130e18,

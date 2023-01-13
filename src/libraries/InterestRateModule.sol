@@ -9,7 +9,7 @@ pragma solidity ^0.8.13;
 import {DataTypes} from "./DataTypes.sol";
 
 contract InterestRateModule {
-    uint256 public interestRatePerYear; //18 decimals precision
+    uint256 public interestRate; //18 decimals precision
 
     DataTypes.InterestRateConfiguration public interestRateConfig;
 
@@ -56,6 +56,6 @@ contract InterestRateModule {
         if (totalRealisedLiquidity_ > 0) {
             utilisation = (100_000 * realisedDebt_) / totalRealisedLiquidity_;
         }
-        interestRatePerYear = _calculateInterestRate(utilisation);
+        interestRate = _calculateInterestRate(utilisation);
     }
 }
