@@ -473,6 +473,7 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
      */
     function liquidateVault(uint256 debt) public override {
         //Function can only be called by Vaults with debt.
+        //Only Vaults can have debt, debtTokens are non-transferrable, and only Vaults can call borrow().
         //Since DebtTokens are non-transferrable, only vaults can have debt.
         //Hence by checking that the balance of msg.sender is not 0, we know the sender is
         //indeed a vault and has debt.

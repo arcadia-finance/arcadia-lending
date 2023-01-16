@@ -1198,7 +1198,7 @@ contract DefaultTest is LendingPoolTest {
         pool.setLiquidator(liquidator);
 
         // When: unprivilegedAddress liquidates a vault
-        // Then: liquidateVault should revert with "UNAUTHORIZED"
+        // Then: liquidateVault should revert with "LP_LV: Not a Vault with debt"
         vm.startPrank(unprivilegedAddress);
         vm.expectRevert("LP_LV: Not a Vault with debt");
         pool.liquidateVault(amountLoaned);
