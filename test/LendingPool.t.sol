@@ -1201,16 +1201,17 @@ contract DefaultTest is LendingPoolTest {
         pool.setLiquidator(liquidator);
 
         // When: unprivilegedAddress liquidates a vault
-        // Then: setLiquidator should revert with "UNAUTHORIZED"
+        // Then: liquidateVault should revert with "LP_LV: Not a Vault with debt"
         vm.startPrank(unprivilegedAddress);
-        vm.expectRevert("UNAUTHORIZED");
-        pool.liquidateVault(address(vault), amountLoaned);
+        vm.expectRevert("LP_LV: Not a Vault with debt");
+        pool.liquidateVault(amountLoaned);
         vm.stopPrank();
     }
 
     function testSuccess_liquidateVault(uint128 amountLoaned) public {
         // Given: all necessary contracts are deployed on the setup
         // And: A vault has debt
+        vm.assume(amountLoaned > 0);
         vault.setTotalValue(amountLoaned);
         vm.prank(liquidityProvider);
         asset.approve(address(pool), type(uint256).max);
@@ -1222,9 +1223,9 @@ contract DefaultTest is LendingPoolTest {
         vm.prank(creator);
         pool.setLiquidator(liquidator);
 
-        // When: liquidator liquidates a vault
-        vm.prank(liquidator);
-        pool.liquidateVault(address(vault), amountLoaned);
+        // When: Vault calls liquidateVault
+        vm.prank(address(vault));
+        pool.liquidateVault(amountLoaned);
 
         // Then: The debt of the vault should be zero
         assertEq(debt.balanceOf(address(vault)), 0);
