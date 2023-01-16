@@ -29,9 +29,10 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
-    uint256 public constant YEARLY_BLOCKS = 2_628_000;
+    // @dev based on 365 days * 24 hours * 60 minutes * 60 seconds, leap years ignored
+    uint256 public constant YEARLY_SECONDS = 31_536_000;
 
-    uint32 public lastSyncedBlock;
+    uint32 public lastSyncedTimestamp;
     uint256 public totalWeight;
     uint256 public totalRealisedLiquidity;
     uint256 public feeWeight;
@@ -275,40 +276,40 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
                             LEVERAGE LOGIC
     ////////////////////////////////////////////////////////////// */
 
-    /**
-     * @notice Takes a leveraged position backed by collateral in an Arcadia Vault
-     * @param amount The amount of underlying ERC-20 tokens to be lent out
-     * @param vault The address of the Arcadia Vault backing the loan
-     * @dev The sender might be different as the owner if they have the proper allowances
-     */
-    function takeLeverage(uint256 amount, address vault) public processInterests {
-        require(IFactory(vaultFactory).isVault(vault), "LP_B: Not a vault");
+    // /**
+    //  * @notice Takes a leveraged position backed by collateral in an Arcadia Vault
+    //  * @param amount The amount of underlying ERC-20 tokens to be lent out
+    //  * @param vault The address of the Arcadia Vault backing the loan
+    //  * @dev The sender might be different as the owner if they have the proper allowances
+    //  */
+    // function takeLeverage(uint256 amount, address vault) public processInterests {
+    //     require(IFactory(vaultFactory).isVault(vault), "LP_B: Not a vault");
 
-        //Check allowances to send underlying to to
-        if (IVault(vault).owner() != msg.sender) {
-            uint256 allowed = creditAllowance[vault][msg.sender];
-            if (allowed != type(uint256).max) {
-                creditAllowance[vault][msg.sender] = allowed - amount;
-            }
-        }
+    //     //Check allowances to send underlying to to
+    //     if (IVault(vault).owner() != msg.sender) {
+    //         uint256 allowed = creditAllowance[vault][msg.sender];
+    //         if (allowed != type(uint256).max) {
+    //             creditAllowance[vault][msg.sender] = allowed - amount;
+    //         }
+    //     }
 
-        //Deposit underlying assets in owners vault
-        asset.approve(vault, amount);
-        address[] memory assetAddresses = new address[](1);
-        assetAddresses[0] = asset;
-        uint256[] memory assetAmounts = new uint256[](1);
-        assetAmounts[0] = amount;
-        IVault(vault).deposit(assetAddresses, new uint256[](1), assetAmounts, new uint256[](1));
+    //     //Deposit underlying assets in owners vault
+    //     asset.approve(vault, amount);
+    //     address[] memory assetAddresses = new address[](1);
+    //     assetAddresses[0] = asset;
+    //     uint256[] memory assetAmounts = new uint256[](1);
+    //     assetAmounts[0] = amount;
+    //     IVault(vault).deposit(assetAddresses, new uint256[](1), assetAmounts, new uint256[](1));
 
-        //Call vault to check if there is sufficient collateral.
-        //If so calculate and store the liquidation threshhold.
-        require(IVault(vault).increaseMarginPosition(address(asset), amount), "LP_B: Reverted");
+    //     //Call vault to check if there is sufficient collateral.
+    //     //If so calculate and store the liquidation threshhold.
+    //     require(IVault(vault).increaseMarginPosition(address(asset), amount), "LP_B: Reverted");
 
-        //Mint debt tokens to the vault
-        if (amount != 0) {
-            _deposit(amount, vault);
-        }
-    }
+    //     //Mint debt tokens to the vault
+    //     if (amount != 0) {
+    //         _deposit(amount, vault);
+    //     }
+    // }
 
     /* //////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
@@ -321,7 +322,7 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
     function totalAssets() public view override returns (uint256 totalDebt) {
         // Avoid a second calculation of unrealised debt (expensive)
         // if interersts are already synced this block.
-        if (lastSyncedBlock != uint32(block.number)) {
+        if (lastSyncedTimestamp != uint32(block.timestamp)) {
             totalDebt = realisedDebt + calcUnrealisedDebt();
         } else {
             totalDebt = realisedDebt;
@@ -337,7 +338,7 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
     function liquidityOf(address owner_) public view returns (uint256 assets) {
         // Avoid a second calculation of unrealised debt (expensive)
         // if interersts are already synced this block.
-        if (lastSyncedBlock != uint32(block.number)) {
+        if (lastSyncedTimestamp != uint32(block.timestamp)) {
             // The total liquidity of a tranche equals the sum of the realised liquidity
             // of the tranche, and its pending interests
             uint256 interest = calcUnrealisedDebt().mulDivUp(weight[owner_], totalWeight);
@@ -358,9 +359,9 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
      */
     function _syncInterests() internal {
         // Only Sync interests once per block
-        if (lastSyncedBlock != uint32(block.number)) {
+        if (lastSyncedTimestamp != uint32(block.timestamp)) {
             uint256 unrealisedDebt = calcUnrealisedDebt();
-            lastSyncedBlock = uint32(block.number);
+            lastSyncedTimestamp = uint32(block.timestamp);
 
             //Sync interests for borrowers
             unchecked {
@@ -378,9 +379,8 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
      * The base of the exponential: 1 + r, is a 18 decimals fixed point number
      * with r the yearly interest rate.
      * The exponent of the exponential: x, is a 18 decimals fixed point number.
-     * The exponent x is calculated as: the amount of blocks since last sync divided by the average of
-     * blocks produced over a year (using a 12s average block time).
-     * _yearlyInterestRate = 1 + r expressed as 18 decimals fixed point number
+     * The exponent x is calculated as: the amount of seconds passed since last sync timestamp divided by the average of
+     * seconds per year. _yearlyInterestRate = 1 + r expressed as 18 decimals fixed point number
      */
     function calcUnrealisedDebt() public view returns (uint256 unrealisedDebt) {
         uint256 base;
@@ -390,10 +390,11 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
             //gas: can't overflow for reasonable interest rates
             base = 1e18 + interestRate;
 
-            //gas: only overflows when blocks.number > 894262060268226281981748468
-            //in practice: assumption that delta of blocks < 341640000 (150 years)
-            //as foreseen in LogExpMath lib
-            exponent = ((block.number - lastSyncedBlock) * 1e18) / YEARLY_BLOCKS;
+            //gas: only overflows when (block.timestamp - lastSyncedBlockTimestamp) > 1e59
+            //in practice: exponent in LogExpMath lib is limited to 130e18,
+            //Corresponding to a delta of timestamps of 4099680000 (or 130 years),
+            //much bigger than any realistic time difference between two syncs.
+            exponent = ((block.timestamp - lastSyncedTimestamp) * 1e18) / YEARLY_SECONDS;
 
             //gas: taking an imaginary worst-case scenario with max interest of 1000%
             //over a period of 5 years
@@ -458,22 +459,29 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
     }
 
     /**
-     * @notice Called by the liquidator when liquidation of a vault starts.
-     * @param vault The contract address of the vault in liquidation.
-     * @param debt The amount of debt that was issued.
+     * @notice Called by a vault when it is being liquidated (auctioned) to repay an amount of debt.
+     * @param debt The amount of debt that will be repaid.
      * @dev At the start of the liquidation the debt tokens are burned,
      * as such interests are not accrued during the liquidation.
      * @dev After the liquidation is finished, there are two options:
      * 1) the collateral is auctioned for more than the debt position
-     * and liquidator reward In this case the liquidator will transfer an equal amount
+     * and liquidationInitiator reward. In this case the liquidator will transfer an equal amount
      * as the debt position to the Lending Pool.
      * 2) the collateral is auctioned for less than the debt position
-     * and keeper fee -> the vault became under-collateralised and we have a default event.
+     * and liquidationInitiator reward fee -> the vault became under-collateralised and we have a default event.
      * In this case the liquidator will call settleLiquidation() to settle the deficit.
      * the Liquidator will transfer any remaining funds to the Lending Pool.
      */
-    function liquidateVault(address vault, uint256 debt) public override onlyLiquidator {
-        _withdraw(debt, vault, vault);
+    function liquidateVault(uint256 debt) public override {
+        //Function can only be called by Vaults with debt.
+        //Only Vaults can have debt, debtTokens are non-transferrable, and only Vaults can call borrow().
+        //Since DebtTokens are non-transferrable, only vaults can have debt.
+        //Hence by checking that the balance of msg.sender is not 0, we know the sender is
+        //indeed a vault and has debt.
+        require(balanceOf[msg.sender] != 0, "LP_LV: Not a Vault with debt");
+
+        //Remove debt from Vault (burn DebtTokens)
+        _withdraw(debt, msg.sender, msg.sender);
     }
 
     /**
