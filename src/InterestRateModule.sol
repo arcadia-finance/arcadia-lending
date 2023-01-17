@@ -6,7 +6,7 @@
  */
 pragma solidity ^0.8.13;
 
-import {DataTypes} from "./DataTypes.sol";
+import {DataTypes} from "./libraries/DataTypes.sol";
 
 contract InterestRateModule {
     uint256 public interestRate; //18 decimals precision

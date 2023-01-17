@@ -18,7 +18,8 @@ import "./interfaces/IVault.sol";
 import "./interfaces/ILendingPool.sol";
 import {TrustedCreditor} from "./TrustedCreditor.sol";
 import {DebtToken} from "./DebtToken.sol";
-import {InterestRateModule, DataTypes} from "./libraries/InterestRateModule.sol";
+import {DataTypes} from "./libraries/DataTypes.sol";
+import {InterestRateModule} from "./InterestRateModule.sol";
 
 /**
  * @title Lending Pool
