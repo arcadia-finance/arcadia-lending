@@ -55,7 +55,7 @@ contract Tranche is ERC4626, Owned {
      * @dev Only the Lending Pool can call this function, only trigger is a severe default event.
      */
     function lock() public {
-        require(msg.sender == address(lendingPool), "UNAUTHORIZED");
+        require(msg.sender == address(lendingPool), "T_L: UNAUTHORIZED");
         locked = true;
     }
 
@@ -74,7 +74,7 @@ contract Tranche is ERC4626, Owned {
 
     /**
      * @notice Modification of the standard ERC-4626 deposit implementation
-     * @param assets tTe amount of assets of the underlying ERC-20 token being deposited
+     * @param assets The amount of assets of the underlying ERC-20 token being deposited
      * @param receiver The address that receives the minted shares.
      * @return shares The amount of shares minted
      * @dev This contract does not directly transfers the underlying assets from the sender to the receiver.
@@ -82,11 +82,12 @@ contract Tranche is ERC4626, Owned {
      * Hence the sender should not give this contract an allowance to transfer the underlying asset but the Lending Pool.
      */
     function deposit(uint256 assets, address receiver) public override notLocked returns (uint256 shares) {
+        //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
         // Check for rounding error since we round down in previewDeposit.
-        require((shares = previewDeposit(assets)) != 0, "ZERO_SHARES");
+        require((shares = previewDeposit(assets)) != 0, "T_D: ZERO_SHARES");
 
-        // Need to transfer (via lendingPool.deposit()) before minting or ERC777s could reenter.
-        lendingPool.deposit(assets, msg.sender);
+        // Need to transfer (via lendingPool.depositInLendingPool()) before minting or ERC777s could reenter.
+        lendingPool.depositInLendingPool(assets, msg.sender);
 
         _mint(receiver, shares);
 
@@ -103,10 +104,11 @@ contract Tranche is ERC4626, Owned {
      * Hence the sender should not give this contract an allowance to transfer the underlying asset but the Lending Pool.
      */
     function mint(uint256 shares, address receiver) public override notLocked returns (uint256 assets) {
+        //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
         assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
 
-        // Need to transfer (via lendingPool.deposit()) before minting or ERC777s could reenter.
-        ILendingPool(address(lendingPool)).deposit(assets, msg.sender);
+        // Need to transfer (via lendingPool.depositInLendingPool()) before minting or ERC777s could reenter.
+        lendingPool.depositInLendingPool(assets, msg.sender);
 
         _mint(receiver, shares);
 
@@ -126,6 +128,7 @@ contract Tranche is ERC4626, Owned {
         notLocked
         returns (uint256 shares)
     {
+        //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
         shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
 
         if (msg.sender != owner_) {
@@ -136,11 +139,11 @@ contract Tranche is ERC4626, Owned {
             }
         }
 
-        ILendingPool(address(lendingPool)).withdraw(assets, receiver);
-
         _burn(owner_, shares);
 
         emit Withdraw(msg.sender, receiver, owner_, assets, shares);
+
+        lendingPool.withdrawFromLendingPool(assets, receiver);
     }
 
     /**
@@ -164,14 +167,15 @@ contract Tranche is ERC4626, Owned {
             }
         }
 
+        //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
         // Check for rounding error since we round down in previewRedeem.
-        require((assets = previewRedeem(shares)) != 0, "ZERO_ASSETS");
+        require((assets = previewRedeem(shares)) != 0, "T_R: ZERO_ASSETS");
 
         _burn(owner_, shares);
 
         emit Withdraw(msg.sender, receiver, owner_, assets, shares);
 
-        ILendingPool(address(lendingPool)).withdraw(assets, receiver);
+        lendingPool.withdrawFromLendingPool(assets, receiver);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -184,7 +188,7 @@ contract Tranche is ERC4626, Owned {
      * @dev The Liquidity Pool does the accounting of the outstanding claim on liquidity per tranche.
      */
     function totalAssets() public view override returns (uint256 assets) {
-        assets = lendingPool.supplyBalances(address(this));
+        assets = lendingPool.liquidityOf(address(this));
     }
 
     /*//////////////////////////////////////////////////////////////

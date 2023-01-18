@@ -28,13 +28,4 @@ contract Vault {
             return false;
         }
     }
-
-    function decreaseMarginPosition(address, uint256 amount) external returns (bool) {
-        if (lockedValue >= amount) {
-            lockedValue -= amount;
-            return true;
-        } else {
-            return false;
-        }
-    }
 }

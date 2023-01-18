@@ -45,14 +45,12 @@ abstract contract TrancheTest is Test {
     function setUp() public virtual {
         vm.startPrank(creator);
         pool = new LendingPool(asset, treasury, address(factory));
-        pool.updateInterestRate(5 * 10 ** 16); //5% with 18 decimals precision
-
-        debt = new DebtToken(address(pool));
-        pool.setDebtToken(address(debt));
 
         tranche = new Tranche(address(pool), "Senior", "SR");
         pool.addTranche(address(tranche), 50);
         vm.stopPrank();
+
+        debt = DebtToken(address(pool));
 
         vm.prank(liquidityProvider);
         asset.approve(address(pool), type(uint256).max);
@@ -91,8 +89,8 @@ contract LockingTest is TrancheTest {
         vm.startPrank(unprivilegedAddress);
         // When: unprivilegedAddress lock
 
-        // Then: lock reverts with "UNAUTHORIZED"
-        vm.expectRevert("UNAUTHORIZED");
+        // Then: lock reverts with "T_L: UNAUTHORIZED"
+        vm.expectRevert("T_L: UNAUTHORIZED");
         tranche.lock();
         vm.stopPrank();
     }
@@ -166,8 +164,8 @@ contract DepositAndWithdrawalTest is TrancheTest {
         vm.startPrank(liquidityProvider);
         // When: liquidityProvider deposit 0
 
-        // Then: deposit should revert with "ZERO_SHARES"
-        vm.expectRevert("ZERO_SHARES");
+        // Then: deposit should revert with "T_D: ZERO_SHARES"
+        vm.expectRevert("T_D: ZERO_SHARES");
         tranche.deposit(0, receiver);
         vm.stopPrank();
     }
@@ -187,7 +185,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         assertEq(asset.balanceOf(address(pool)), assets);
     }
 
-    function testRevert_mintLocked(uint128 shares, address receiver) public {
+    function testRevert_mint_Locked(uint128 shares, address receiver) public {
         // Given: pool lock
         vm.prank(address(pool));
         tranche.lock();
@@ -235,9 +233,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address receiver,
         address owner,
         address unprivilegedAddress
-    )
-        public
-    {
+    ) public {
         // Given: unprivilegedAddress is not owner, assets bigger than 0, liquidityProvider deposit assets
         vm.assume(unprivilegedAddress != owner);
         vm.assume(assets > 0);
@@ -260,9 +256,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address receiver,
         address owner,
         address beneficiary
-    )
-        public
-    {
+    ) public {
         // Given: beneficiary is not owner, assetsDeposited is bigger than 0 and less than sharesAllowed, liquidityProvider deposit assetsDeposited, owner approve beneficiary
         vm.assume(beneficiary != owner);
         vm.assume(assetsDeposited > 0);
@@ -278,7 +272,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         // When: beneficiary withdraw
 
         // Then: withdraw should revert with stdError.arithmeticError
-        vm.expectRevert("LP_W: Withdraw amount should be lower than the supplied balance");
+        vm.expectRevert(stdError.arithmeticError);
         tranche.withdraw(sharesAllowed, receiver, owner);
         vm.stopPrank();
     }
@@ -288,9 +282,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         uint128 assetsWithdrawn,
         address owner,
         address receiver
-    )
-        public
-    {
+    ) public {
         // Given: assetsDeposited should be bigger than 0, less than assetsWithdrawn, liquidityProvider deposit assetsDeposited
         vm.assume(assetsDeposited > 0);
         vm.assume(assetsDeposited < assetsWithdrawn);
@@ -302,7 +294,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         // When: owner withdraw
 
         // Then: withdraw should revert with stdError.arithmeticError
-        vm.expectRevert("LP_W: Withdraw amount should be lower than the supplied balance");
+        vm.expectRevert(stdError.arithmeticError);
         tranche.withdraw(assetsWithdrawn, receiver, owner);
         vm.stopPrank();
     }
@@ -312,10 +304,8 @@ contract DepositAndWithdrawalTest is TrancheTest {
         uint128 assetsWithdrawn,
         address owner,
         address receiver
-    )
-        public
-    {
-        // Given: assetsDeposited bigger than 0, bigger than equal to assetsWithdrawn, receiver is not pool or liquidityProvider
+    ) public {
+        // Given: assetsDeposited bigger than 0 and assetsWithdrawn, receiver is not pool or liquidityProvider
         vm.assume(assetsDeposited > 0);
         vm.assume(assetsDeposited >= assetsWithdrawn);
         vm.assume(receiver != liquidityProvider);
@@ -343,10 +333,8 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address receiver,
         address owner,
         address beneficiary
-    )
-        public
-    {
-        // Given: assetsDeposited bigger than 0, bigger than equal to assetsWithdrawn, sharesAllowed bigger than equal to assetsWithdrawn,
+    ) public {
+        // Given: assetsDeposited bigger than 0 and assetsWithdrawn, sharesAllowed bigger than equal to assetsWithdrawn,
         // receiver is not pool or liquidityProvider, beneficiary is not owner
         vm.assume(assetsDeposited > 0);
         vm.assume(assetsDeposited >= assetsWithdrawn);
@@ -380,10 +368,8 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address receiver,
         address owner,
         address beneficiary
-    )
-        public
-    {
-        // Given: assetsDeposited is bigger than 0, bigger than equal to assetsWithdrawn, receiver is not liquidityProvider,
+    ) public {
+        // Given: assetsDeposited is bigger than 0 and assetsWithdrawn, receiver is not liquidityProvider,
         // receiver is not pool, beneficiary is not owner
         vm.assume(assetsDeposited > 0);
         vm.assume(assetsDeposited >= assetsWithdrawn);
@@ -416,12 +402,18 @@ contract DepositAndWithdrawalTest is TrancheTest {
         vm.prank(address(pool));
         tranche.lock();
 
-        vm.startPrank(liquidityProvider);
         // When: liquidityProvider redeem
-
         // Then: redeem should revert with "TRANCHE: LOCKED"
+        vm.startPrank(liquidityProvider);
         vm.expectRevert("TRANCHE: LOCKED");
         tranche.redeem(shares, receiver, owner);
+        vm.stopPrank();
+    }
+
+    function testRevert_redeem_ZeroAssets(address receiver, address owner) public {
+        vm.startPrank(liquidityProvider);
+        vm.expectRevert("T_R: ZERO_ASSETS");
+        tranche.redeem(0, receiver, owner);
         vm.stopPrank();
     }
 
@@ -430,9 +422,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address receiver,
         address owner,
         address unprivilegedAddress
-    )
-        public
-    {
+    ) public {
         // Given: unprivilegedAddress is not owner, shares bigger than 0, liquidityProvider mint shares
         vm.assume(unprivilegedAddress != owner);
         vm.assume(shares > 0);
@@ -455,9 +445,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address receiver,
         address owner,
         address beneficiary
-    )
-        public
-    {
+    ) public {
         // Given: beneficiary is not owner, sharesMinted bigger than 0 and less than sharesAllowed, liquidityProvider mint shares, owner approve beneficiary
         vm.assume(beneficiary != owner);
         vm.assume(sharesMinted > 0);
@@ -483,9 +471,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
         uint128 sharesRedeemed,
         address owner,
         address receiver
-    )
-        public
-    {
+    ) public {
         // Given: sharesMinted bigger than 0, sharesMinted less than sharesRedeemed, liquidityProvider mint sharesMinted
         vm.assume(sharesMinted > 0);
         vm.assume(sharesMinted < sharesRedeemed);
@@ -505,7 +491,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
     function testSuccess_redeem_ByOwner(uint128 sharesMinted, uint128 sharesRedeemed, address owner, address receiver)
         public
     {
-        // Given: sharesMinted and sharesRedeemed bigger than 0, sharesMinted bigger than equal sharesRedeemed, receiver is not liquidityProvider, receiver is not pool
+        // Given: sharesMinted and sharesRedeemed bigger than 0, sharesMinted bigger than sharesRedeemed, receiver is not liquidityProvider, receiver is not pool
         vm.assume(sharesMinted > 0);
         vm.assume(sharesRedeemed > 0);
         vm.assume(sharesMinted >= sharesRedeemed);
@@ -534,10 +520,9 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address receiver,
         address owner,
         address beneficiary
-    )
-        public
-    {
-        // Given: sharesMinted and sharesRedeemed bigger than 0, sharesMinted and sharesAllowed bigger than equal sharesRedeemed, receiver is not liquidityProvider, receiver is not pool, beneficiary is not owner
+    ) public {
+        // Given: sharesMinted and sharesRedeemed bigger than 0, sharesMinted bigger than equal sharesRedeemed, sharesAllowed bigger than equal sharesRedeemed,
+        // receiver is not liquidityProvider, receiver is not pool, beneficiary is not owner
         vm.assume(sharesMinted > 0);
         vm.assume(sharesRedeemed > 0);
         vm.assume(sharesMinted >= sharesRedeemed);
@@ -573,10 +558,8 @@ contract DepositAndWithdrawalTest is TrancheTest {
         address receiver,
         address owner,
         address beneficiary
-    )
-        public
-    {
-        // Given: sharesMinted and sharesRedeemed bigger than 0, sharesMinted bigger than equal sharesRedeemed, receiver is not liquidityProvider, receiver is not pool, beneficiary is not owner
+    ) public {
+        // Given: sharesMinted and sharesRedeemed bigger than 0, sharesMinted bigger sharesRedeemed, receiver is not liquidityProvider, receiver is not pool, beneficiary is not owner
         vm.assume(sharesMinted > 0);
         vm.assume(sharesRedeemed > 0);
         vm.assume(sharesMinted >= sharesRedeemed);
@@ -603,5 +586,24 @@ contract DepositAndWithdrawalTest is TrancheTest {
         assertEq(tranche.allowance(owner, beneficiary), type(uint256).max);
         assertEq(asset.balanceOf(address(pool)), sharesMinted - sharesRedeemed);
         assertEq(asset.balanceOf(receiver), sharesRedeemed);
+    }
+}
+
+/*//////////////////////////////////////////////////////////////
+                        ACCOUNTING LOGIC
+//////////////////////////////////////////////////////////////*/
+contract AccountingTest is TrancheTest {
+    using stdStorage for StdStorage;
+
+    function setUp() public override {
+        super.setUp();
+    }
+
+    function testSuccess_totalAssets(uint128 assets) public {
+        stdstore.target(address(pool)).sig(pool.realisedLiquidityOf.selector).with_key(address(tranche)).checked_write(
+            assets
+        );
+
+        assertEq(tranche.totalAssets(), assets);
     }
 }

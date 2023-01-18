@@ -4,3 +4,9 @@
 [submodule "lib/solmate"]
 	path = lib/solmate
 	url = https://github.com/transmissions11/solmate
+[submodule "lib/ds-test"]
+	path = lib/ds-test
+	url = https://github.com/dapphub/ds-test
+[submodule "arcadia-vaults"]
+	path = arcadia-vaults
+	url = http://github.com/arcadia-finance/arcadia-vaults
