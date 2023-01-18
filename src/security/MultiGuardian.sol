@@ -14,11 +14,12 @@ import "../../lib/openzeppelin-contracts/contracts/utils/Context.sol";
  *
  */
 abstract contract MultiGuardian is Context {
-
     address public guardian;
 
     event GuardianChanged(address indexed oldGuardian, address indexed newGuardian);
-    event PauseUpdate(address account, bool repayPauseUpdate, bool withdrawPauseUpdate, bool borrowPauseUpdate, bool supplyPauseUpdate);
+    event PauseUpdate(
+        address account, bool repayPauseUpdate, bool withdrawPauseUpdate, bool borrowPauseUpdate, bool supplyPauseUpdate
+    );
 
     bool private _repayPaused;
     bool private _withdrawPaused;
@@ -56,14 +57,10 @@ abstract contract MultiGuardian is Context {
         require(!_supplyPaused, "Guardian: supply paused");
         _;
     }
+
     function changeGuardian(address _newGuardian) external virtual {}
 
-    function pause(
-        bool repayPaused,
-        bool withdrawPaused,
-        bool borrowPaused,
-        bool supplyPaused
-    ) external onlyGuardian {
+    function pause(bool repayPaused, bool withdrawPaused, bool borrowPaused, bool supplyPaused) external onlyGuardian {
         _repayPaused = repayPaused;
         _withdrawPaused = withdrawPaused;
         _borrowPaused = borrowPaused;
