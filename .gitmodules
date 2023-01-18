@@ -10,3 +10,6 @@
 [submodule "arcadia-vaults"]
 	path = arcadia-vaults
 	url = http://github.com/arcadia-finance/arcadia-vaults
+[submodule "lib/openzeppelin-contracts"]
+	path = lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
