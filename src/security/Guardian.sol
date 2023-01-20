@@ -14,7 +14,7 @@ import "../../lib/solmate/src/auth/Owned.sol";
  * @dev This module provides a mechanism that allows authorized accounts to trigger an emergency stop
  *
  */
-abstract contract MultiGuardian is Context, Owned {
+abstract contract Guardian is Context, Owned {
     address public guardian;
 
     event GuardianChanged(address indexed oldGuardian, address indexed newGuardian);
