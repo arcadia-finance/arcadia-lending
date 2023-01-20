@@ -1066,8 +1066,8 @@ contract InterestRateTest is LendingPoolTest {
             utilisationThreshold: utilisationThreshold_
         });
 
-        vm.startPrank(unprivilegedAddress);
         // When: unprivilegedAddress calls setInterestConfig
+        vm.startPrank(unprivilegedAddress);
         // Then: setInterestConfig should revert with UNAUTHORIZED
         vm.expectRevert("UNAUTHORIZED");
         pool.setInterestConfig(config);
@@ -1092,7 +1092,7 @@ contract InterestRateTest is LendingPoolTest {
         vm.prank(creator);
         pool.setInterestConfig(config);
 
-        // Then: config is sucesfully set
+        // Then: config is successfully set
         (uint256 baseRatePerYear, uint256 lowSlopePerYear, uint256 highSlopePerYear, uint256 utilisationThreshold) =
             pool.interestRateConfig();
         assertEq(baseRatePerYear, baseRate_);
