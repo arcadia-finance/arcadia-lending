@@ -56,7 +56,7 @@ abstract contract Guardian is Owned {
      * @dev Throws if called by any account other than the guardian.
      */
     modifier onlyGuardian() {
-        require(msg.sender == guardian, "Guardian: Only guardian can call this function");
+        require(msg.sender == guardian, "Guardian: Only guardian");
         _;
     }
 
