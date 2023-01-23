@@ -126,7 +126,7 @@ contract GuardianUnitTest is Test {
 
         // When: owner can unPauses the borrow
         vm.startPrank(owner);
-        lendingPool.unPause(true, true, false, true);
+        lendingPool.unPause(true, true, false, true, true);
         vm.stopPrank();
 
         // Then: user tries to borrow, which is not paused
@@ -139,7 +139,7 @@ contract GuardianUnitTest is Test {
 
         // Revert: the lending pool is unpaused
         vm.startPrank(owner);
-        lendingPool.unPause(false, false, false, false);
+        lendingPool.unPause(false, false, false, false, false);
         vm.stopPrank();
     }
 
@@ -168,7 +168,7 @@ contract GuardianUnitTest is Test {
 
         // Given: only borrow left paused
         vm.startPrank(owner);
-        lendingPool.unPause(false, false, true, false);
+        lendingPool.unPause(false, false, true, false, false);
         vm.stopPrank();
 
         // When: a user tries to supply
@@ -190,7 +190,7 @@ contract GuardianUnitTest is Test {
 
         // Revert: the lending pool is unpaused
         vm.startPrank(owner);
-        lendingPool.unPause(false, false, false, false);
+        lendingPool.unPause(false, false, false, false, false);
         vm.stopPrank();
     }
 
@@ -207,7 +207,7 @@ contract GuardianUnitTest is Test {
 
         // When: the owner unPauses the supply
         vm.startPrank(owner);
-        lendingPool.unPause(true, true, true, false);
+        lendingPool.unPause(true, true, true, false, true);
         vm.stopPrank();
 
         // Then: the user can supply
@@ -232,12 +232,12 @@ contract GuardianUnitTest is Test {
 
         // When: the owner unPauses the supply
         vm.startPrank(owner);
-        lendingPool.unPause(true, true, true, false);
+        lendingPool.unPause(true, true, true, false, true);
         vm.stopPrank();
 
         // When: the owner attempts the pause the supply from the unPause
         vm.startPrank(owner);
-        lendingPool.unPause(true, true, true, true);
+        lendingPool.unPause(true, true, true, true, true);
         vm.stopPrank();
 
         // Then: the user can still supply because the once the supply is unPaused, it cannot be paused
@@ -263,7 +263,7 @@ contract GuardianUnitTest is Test {
 
         // When: the owner unPauses
         vm.startPrank(owner);
-        lendingPool.unPause(false, false, false, false);
+        lendingPool.unPause(false, false, false, false, false);
         vm.stopPrank();
 
         // Then: the guardian cannot pause again until 32 days passed from the first pause
