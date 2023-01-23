@@ -13,9 +13,6 @@ contract LendingPoolMockup is Guardian {
     uint256 public totalSupply;
     uint256 public totalBorrow;
 
-    //    constructor()
-    //    {}
-
     function depositGuarded(uint256 supply) external whenDepositNotPaused {
         totalSupply += supply;
     }
@@ -31,6 +28,14 @@ contract LendingPoolMockup is Guardian {
     function reset() external onlyOwner {
         totalSupply = 0;
         totalBorrow = 0;
+    }
+
+    function resetPauseVars() external onlyOwner {
+        borrowPaused = false;
+        depositPaused = false;
+        repayPaused = false;
+        withdrawPaused = false;
+        liquidationPaused = false;
     }
 }
 
@@ -55,6 +60,7 @@ contract GuardianUnitTest is Test {
         // Reset the lending pool variables
         vm.startPrank(owner);
         lendingPool.reset();
+        lendingPool.resetPauseVars();
         vm.stopPrank();
         // Reset: the lending pool pauseTimestamp
         stdstore.target(address(lendingPool)).sig(lendingPool.pauseTimestamp.selector).checked_write(uint256(0));
@@ -93,7 +99,7 @@ contract GuardianUnitTest is Test {
 
     function testRevert_pause_onlyGuard() public {
         // Given When Then: the lending pool is paused
-        vm.expectRevert("Guardian: Only guardian can call this function");
+        vm.expectRevert("Guardian: Only guardian");
         vm.startPrank(owner);
         lendingPool.pause();
         vm.stopPrank();
@@ -136,11 +142,6 @@ contract GuardianUnitTest is Test {
 
         // Then: the total borrow is updated
         assertEq(lendingPool.totalBorrow(), 100);
-
-        // Revert: the lending pool is unpaused
-        vm.startPrank(owner);
-        lendingPool.unPause(false, false, false, false, false);
-        vm.stopPrank();
     }
 
     function testSuccess_borrowUnguarded_notPaused() public {
@@ -187,11 +188,6 @@ contract GuardianUnitTest is Test {
 
         // Then: the total borrow is not updated
         assertEq(lendingPool.totalBorrow(), 0);
-
-        // Revert: the lending pool is unpaused
-        vm.startPrank(owner);
-        lendingPool.unPause(false, false, false, false, false);
-        vm.stopPrank();
     }
 
     function testSuccess_unPause_ownerCanUnPauseDuring30Days(uint256 timePassedAfterPause) public {
@@ -268,7 +264,7 @@ contract GuardianUnitTest is Test {
 
         // Then: the guardian cannot pause again until 32 days passed from the first pause
         vm.warp(startTimestamp + timePassedAfterPause);
-        vm.expectRevert("Guardian: Cannot pause, Pause time not expired");
+        vm.expectRevert("G_P: Cannot pause");
         vm.startPrank(guardian);
         lendingPool.pause();
         vm.stopPrank();
@@ -286,7 +282,7 @@ contract GuardianUnitTest is Test {
         vm.warp(block.timestamp + timePassedAfterPause);
 
         // When: the user tries to unPause
-        vm.expectRevert("Guardian: Cannot unPause, unPause time not expired");
+        vm.expectRevert("G_P: Cannot unPause");
         vm.startPrank(user);
         lendingPool.unPause();
         vm.stopPrank();
@@ -334,7 +330,7 @@ contract GuardianUnitTest is Test {
         // When: the guardian tries pause
         vm.startPrank(guardian);
         // Then: the guardian cannot pause again until 32 days passed from the first pause
-        vm.expectRevert("Guardian: Cannot pause, Pause time not expired");
+        vm.expectRevert("G_P: Cannot pause");
         lendingPool.pause();
         vm.stopPrank();
     }

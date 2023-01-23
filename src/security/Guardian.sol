@@ -129,7 +129,7 @@ abstract contract Guardian is Owned {
      *  the protocol can again be paused (by or the owner or the guardian.
      */
     function pause() external onlyGuardian {
-        require(block.timestamp > pauseTimestamp + 32 days, "Guardian: Cannot pause, Pause time not expired");
+        require(block.timestamp > pauseTimestamp + 32 days, "G_P: Cannot pause");
         repayPaused = true;
         withdrawPaused = true;
         borrowPaused = true;
@@ -174,14 +174,14 @@ abstract contract Guardian is Owned {
      *  the protocol can again be paused (by or the owner or the guardian.
      */
     function unPause() external {
-        require(block.timestamp > pauseTimestamp + 30 days, "Guardian: Cannot unPause, unPause time not expired");
-        if (repayPaused || withdrawPaused || borrowPaused || depositPaused) {
+        require(block.timestamp > pauseTimestamp + 30 days, "G_P: Cannot unPause");
+        if (repayPaused || withdrawPaused || borrowPaused || depositPaused || liquidationPaused) {
             repayPaused = false;
             withdrawPaused = false;
             borrowPaused = false;
             depositPaused = false;
             liquidationPaused = false;
-            emit PauseUpdate(msg.sender, repayPaused, withdrawPaused, borrowPaused, depositPaused, liquidationPaused);
+            emit PauseUpdate(msg.sender, false, false, false, false, false);
         }
     }
 }
