@@ -475,7 +475,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * In this case the liquidator will call settleLiquidation() to settle the deficit.
      * the Liquidator will transfer any remaining funds to the Lending Pool.
      */
-    function liquidateVault(uint256 debt) public override {
+    function liquidateVault(uint256 debt) public override whenLiquidationNotPaused {
         //Function can only be called by Vaults with debt.
         //Only Vaults can have debt, debtTokens are non-transferrable, and only Vaults can call borrow().
         //Since DebtTokens are non-transferrable, only vaults can have debt.
