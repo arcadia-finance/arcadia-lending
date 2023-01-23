@@ -20,13 +20,14 @@ import {TrustedCreditor} from "./TrustedCreditor.sol";
 import {DebtToken} from "./DebtToken.sol";
 import {DataTypes} from "./libraries/DataTypes.sol";
 import {InterestRateModule} from "./InterestRateModule.sol";
+import {Guardian} from "./security/Guardian.sol";
 
 /**
  * @title Lending Pool
  * @author Arcadia Finance
  * @notice The Lending pool contains the main logic to provide liquidity and take or repay loans for a certain asset
  */
-contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
+contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
@@ -77,11 +78,7 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
      * @param vaultFactory_ The address of the vault factory
      * @dev The name and symbol of the pool are automatically generated, based on the name and symbol of the underlying token
      */
-    constructor(ERC20 asset_, address treasury_, address vaultFactory_)
-        Owned(msg.sender)
-        TrustedCreditor()
-        DebtToken(asset_)
-    {
+    constructor(ERC20 asset_, address treasury_, address vaultFactory_) TrustedCreditor() DebtToken(asset_) {
         treasury = treasury_;
         vaultFactory = vaultFactory_;
     }
@@ -174,7 +171,12 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
      * (this is always msg.sender, a tranche), the second parameter is 'from':
      * (the origin of the underlying ERC-20 token, who deposits assets via a Tranche)
      */
-    function depositInLendingPool(uint256 assets, address from) public onlyTranche processInterests {
+    function depositInLendingPool(uint256 assets, address from)
+        public
+        whenDepositNotPaused
+        onlyTranche
+        processInterests
+    {
         // Need to transfer before minting or ERC777s could reenter.
         // Address(this) is trusted -> no risk on re-entrancy attack after transfer
         asset.transferFrom(from, address(this), assets);
@@ -190,7 +192,7 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
      * @param assets the amount of assets of the underlying ERC-20 token being withdrawn
      * @param receiver The address of the receiver of the underlying ERC-20 tokens
      */
-    function withdrawFromLendingPool(uint256 assets, address receiver) public processInterests {
+    function withdrawFromLendingPool(uint256 assets, address receiver) public whenWithdrawNotPaused processInterests {
         require(realisedLiquidityOf[msg.sender] >= assets, "LP_WFLP: Amount exceeds balance");
 
         realisedLiquidityOf[msg.sender] -= assets;
@@ -229,7 +231,7 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
      * @param to The address who receives the lended out underlying tokens
      * @dev The sender might be different as the owner if they have the proper allowances
      */
-    function borrow(uint256 amount, address vault, address to) public processInterests {
+    function borrow(uint256 amount, address vault, address to) public whenBorrowNotPaused processInterests {
         require(IFactory(vaultFactory).isVault(vault), "LP_B: Not a vault");
 
         //Check allowances to send underlying to to
@@ -260,7 +262,7 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
      * @dev ToDo: should it be possible to trigger a repay on behalf of an other account,
      * If so, work with allowances
      */
-    function repay(uint256 amount, address vault) public processInterests {
+    function repay(uint256 amount, address vault) public whenRepayNotPaused processInterests {
         require(IFactory(vaultFactory).isVault(vault), "LP_R: Not a vault");
 
         uint256 vaultDebt = maxWithdraw(vault);
