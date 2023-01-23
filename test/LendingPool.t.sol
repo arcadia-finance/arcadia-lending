@@ -1529,7 +1529,7 @@ contract GuardianTest is LendingPoolTest {
         vm.warp(60 days);
     }
 
-    function testRevert_pause_depositInLendingPoolPaused() public {
+    function testRevert_depositInLendingPool_Paused() public {
         // Given: all necessary contracts are deployed on the setup
         assertEq(pool.guardian(), pauseGuardian);
 
@@ -1548,7 +1548,7 @@ contract GuardianTest is LendingPoolTest {
         pool.depositInLendingPool(type(uint128).max, liquidityProvider);
     }
 
-    function testRevert_pause_borrowPaused() public {
+    function testRevert_borrow_Paused() public {
         // Given: all necessary contracts are deployed on the setup
         assertEq(pool.guardian(), pauseGuardian);
 
@@ -1566,7 +1566,7 @@ contract GuardianTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testRevert_pause_withdrawFromLendingPoolPaused() public {
+    function testRevert_withdrawFromLendingPool_Paused() public {
         // Given: all necessary contracts are deployed on the setup
         assertEq(pool.guardian(), pauseGuardian);
 
@@ -1584,7 +1584,7 @@ contract GuardianTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testRevert_pause_liquidationPaused() public {
+    function testRevert_liquidateVault_Paused() public {
         // Given: all necessary contracts are deployed on the setup
         assertEq(pool.guardian(), pauseGuardian);
 
@@ -1602,7 +1602,7 @@ contract GuardianTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testRevert_pause_repayPaused() public {
+    function testRevert_repay_Paused() public {
         // Given: all necessary contracts are deployed on the setup
         assertEq(pool.guardian(), pauseGuardian);
 
@@ -1621,7 +1621,7 @@ contract GuardianTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_unPause_OwnerUnpausesDepositAndWithdrawOnly(uint256 timePassed) public {
+    function testSuccess_withdraw_OwnerUnpausesDepositAndWithdrawOnly(uint256 timePassed) public {
         // Preprocess: set fuzzing limits
         vm.assume(timePassed < 30 days);
         vm.assume(timePassed > 0);
@@ -1669,7 +1669,7 @@ contract GuardianTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_unPause_UserUnpauses(uint64 deltaTimePassed, address randomUser) public {
+    function testSuccess_withdraw_UserUnpauses(uint64 deltaTimePassed, address randomUser) public {
         // Preprocess: set fuzzing limits
         uint256 timePassed = 30 days + 1;
         vm.assume(deltaTimePassed < 30 days);
