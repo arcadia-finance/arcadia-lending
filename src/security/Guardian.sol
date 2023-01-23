@@ -24,7 +24,12 @@ abstract contract Guardian is Owned {
 
     event GuardianChanged(address indexed oldGuardian, address indexed newGuardian);
     event PauseUpdate(
-        address account, bool repayPauseUpdate, bool withdrawPauseUpdate, bool borrowPauseUpdate, bool supplyPauseUpdate
+        address account,
+        bool repayPauseUpdate,
+        bool withdrawPauseUpdate,
+        bool borrowPauseUpdate,
+        bool supplyPauseUpdate,
+        bool liquidationPauseUpdate
     );
 
     /*
@@ -36,6 +41,7 @@ abstract contract Guardian is Owned {
     bool public withdrawPaused;
     bool public borrowPaused;
     bool public depositPaused;
+    bool public liquidationPaused;
     uint256 public pauseTimestamp;
 
     constructor() Owned(msg.sender) {
@@ -92,6 +98,14 @@ abstract contract Guardian is Owned {
     }
 
     /**
+     * @dev Throws if liquidation is paused.
+     */
+    modifier whenLiquidationNotPaused() {
+        require(!liquidationPaused, "Guardian: liquidation paused");
+        _;
+    }
+
+    /**
      * @param guardian_ The address of the new guardian.
      * @dev Allows onlyOwner to change the guardian address.
      */
@@ -113,8 +127,9 @@ abstract contract Guardian is Owned {
         withdrawPaused = true;
         borrowPaused = true;
         depositPaused = true;
+        liquidationPaused = true;
         pauseTimestamp = block.timestamp;
-        emit PauseUpdate(msg.sender, repayPaused, withdrawPaused, borrowPaused, depositPaused);
+        emit PauseUpdate(msg.sender, repayPaused, withdrawPaused, borrowPaused, depositPaused, liquidationPaused);
     }
 
     /**
@@ -126,15 +141,19 @@ abstract contract Guardian is Owned {
      * @dev Only owner can call this function.
      * @dev updates the variables if incoming variable is false. If variable is false and incoming variable is true, then it does not update the variable.
      */
-    function unPause(bool repayPaused_, bool withdrawPaused_, bool borrowPaused_, bool depositPaused_)
-        external
-        onlyOwner
-    {
+    function unPause(
+        bool repayPaused_,
+        bool withdrawPaused_,
+        bool borrowPaused_,
+        bool depositPaused_,
+        bool liquidationPaused_
+    ) external onlyOwner {
         repayPaused = repayPaused && repayPaused_;
         withdrawPaused = withdrawPaused && withdrawPaused_;
         borrowPaused = borrowPaused && borrowPaused_;
         depositPaused = depositPaused && depositPaused_;
-        emit PauseUpdate(msg.sender, repayPaused, withdrawPaused, borrowPaused, depositPaused);
+        liquidationPaused = liquidationPaused && liquidationPaused_;
+        emit PauseUpdate(msg.sender, repayPaused, withdrawPaused, borrowPaused, depositPaused, liquidationPaused);
     }
 
     /**
@@ -149,7 +168,8 @@ abstract contract Guardian is Owned {
             withdrawPaused = false;
             borrowPaused = false;
             depositPaused = false;
-            emit PauseUpdate(msg.sender, repayPaused, withdrawPaused, borrowPaused, depositPaused);
+            liquidationPaused = false;
+            emit PauseUpdate(msg.sender, repayPaused, withdrawPaused, borrowPaused, depositPaused, liquidationPaused);
         }
     }
 }
