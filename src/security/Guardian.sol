@@ -58,7 +58,7 @@ abstract contract Guardian is Owned {
     */
 
     /**
-     * @dev Throws if called by any account other than the owner.
+     * @dev Throws if called by any account other than the guardian.
      */
     modifier onlyGuardian() {
         require(msg.sender == guardian, "Guardian: Only guardian can call this function");
@@ -66,7 +66,8 @@ abstract contract Guardian is Owned {
     }
 
     /**
-     * @dev Throws if repay is paused.
+     * @dev This modifier is used to restrict access to certain functions when the contract is paused for repay.
+     * It throws if repay is paused.
      */
     modifier whenRepayNotPaused() {
         require(!repayPaused, "Guardian: repay paused");
@@ -74,7 +75,8 @@ abstract contract Guardian is Owned {
     }
 
     /**
-     * @dev Throws if withdraw is paused.
+     * @dev This modifier is used to restrict access to certain functions when the contract is paused for withdraw.
+     * It throws if withdraw is paused.
      */
     modifier whenWithdrawNotPaused() {
         require(!withdrawPaused, "Guardian: withdraw paused");
@@ -82,7 +84,8 @@ abstract contract Guardian is Owned {
     }
 
     /**
-     * @dev Throws if borrow is paused.
+     * @dev This modifier is used to restrict access to certain functions when the contract is paused for borrow.
+     * It throws if borrow is paused.
      */
     modifier whenBorrowNotPaused() {
         require(!borrowPaused, "Guardian: borrow paused");
@@ -90,7 +93,8 @@ abstract contract Guardian is Owned {
     }
 
     /**
-     * @dev Throws if deposit is paused.
+     * @dev This modifier is used to restrict access to certain functions when the contract is paused for deposit.
+     * It throws if deposit is paused.
      */
     modifier whenDepositNotPaused() {
         require(!depositPaused, "Guardian: deposit paused");
@@ -98,7 +102,8 @@ abstract contract Guardian is Owned {
     }
 
     /**
-     * @dev Throws if liquidation is paused.
+     * @dev This modifier is used to restrict access to certain functions when the contract is paused for liquidation.
+     * It throws if liquidation is paused.
      */
     modifier whenLiquidationNotPaused() {
         require(!liquidationPaused, "Guardian: liquidation paused");
@@ -106,6 +111,7 @@ abstract contract Guardian is Owned {
     }
 
     /**
+     * @notice This function is used to set the guardian address
      * @param guardian_ The address of the new guardian.
      * @dev Allows onlyOwner to change the guardian address.
      */
@@ -115,14 +121,17 @@ abstract contract Guardian is Owned {
     }
 
     /**
+     * @notice This function is used to pause the contract.
      * @dev This function can be called by the guardian to pause all functionality in the event of an emergency.
      *      This function pauses repay, withdraw, borrow, deposit and liquidation.
      *      This function can only be called by the guardian.
-     *      Guardian can only pause the protocol once 32 days past from the last pause. This is to prevent
-     *  guardian from pausing the protocol too often. And giving unpause time for users to trigger.
-     *  When protocol is paused for 30 days only owner role has a right to unpause the protocol. After 30 days,
-     *  any user can unpause the protocol. This flow gives at least 2 days to unpause the protocol for any user
-     *  since guardian can only trigger pause once every 32 days after the previous pause event.
+     *      The guardian can only pause the protocol again after 32 days have past since the last pause.
+     *      This is to prevent that a malicious guardian can take user-funds hostage for an indefinite time.
+     *  After the guardian has paused the protocol, the owner has 30 days to find potential problems,
+     *  find a solution and unpause the protocol. If the protocol is not unpaused after 30 days,
+     *  an emergency procedure can be started by any user to unpause the protocol.
+     *  All users have now at least a two-day window to withdraw assets and close positions before
+     *  the protocol can again be paused (by or the owner or the guardian.
      */
     function pause() external onlyGuardian {
         require(block.timestamp > pauseTimestamp + 32 days, "Guardian: Cannot pause, Pause time not expired");
@@ -132,10 +141,11 @@ abstract contract Guardian is Owned {
         depositPaused = true;
         liquidationPaused = true;
         pauseTimestamp = block.timestamp;
-        emit PauseUpdate(msg.sender, repayPaused, withdrawPaused, borrowPaused, depositPaused, liquidationPaused);
+        emit PauseUpdate(msg.sender, true, true, true, true, true);
     }
 
     /**
+     * @notice This function is used to unpause the contract.
      * @param repayPaused_ Whether repay functionality should be paused.
      * @param withdrawPaused_ Whether withdraw functionality should be paused.
      * @param borrowPaused_ Whether borrow functionality should be paused.
@@ -161,9 +171,12 @@ abstract contract Guardian is Owned {
     }
 
     /**
-     * @dev Users can call this function after 30 days that the protocol is paused. Since Guardian can only pause the protocol
-     *  once every 32 days, this function gives at least 2 days to any user to unpause the protocol.
-     *      This function can unPause variables all at once.
+     * @notice This function is used to unpause the contract.
+     * @dev This function can unPause variables all at once.
+     *      If the protocol is not unpaused after 30 days, any user can unpause the protocol.
+     *  This ensures that no rogue owner or guardian can lock user funds for an indefinite amount of time.
+     *  All users have now at least a two-day window to withdraw assets and close positions before
+     *  the protocol can again be paused (by or the owner or the guardian.
      */
     function unPause() external {
         require(block.timestamp > pauseTimestamp + 30 days, "Guardian: Cannot unPause, unPause time not expired");
