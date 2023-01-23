@@ -77,7 +77,10 @@ abstract contract Guardian is Context, Owned {
         emit PauseUpdate(msg.sender, repayPaused, withdrawPaused, borrowPaused, supplyPaused);
     }
 
-    function unPause(bool repayPaused_, bool withdrawPaused_, bool borrowPaused_, bool supplyPaused_) external onlyOwner {
+    function unPause(bool repayPaused_, bool withdrawPaused_, bool borrowPaused_, bool supplyPaused_)
+        external
+        onlyOwner
+    {
         repayPaused = repayPaused && repayPaused_;
         withdrawPaused = withdrawPaused && withdrawPaused_;
         borrowPaused = borrowPaused && borrowPaused_;
