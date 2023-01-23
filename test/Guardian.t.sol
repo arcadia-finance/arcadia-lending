@@ -16,7 +16,7 @@ contract LendingPoolMockup is Guardian {
     //    constructor()
     //    {}
 
-    function supplyGuarded(uint256 supply) external whenSupplyNotPaused {
+    function depositGuarded(uint256 supply) external whenDepositNotPaused {
         totalSupply += supply;
     }
 
@@ -34,7 +34,7 @@ contract LendingPoolMockup is Guardian {
     }
 }
 
-contract GuardianTest is Test {
+contract GuardianUnitTest is Test {
     using stdStorage for StdStorage;
 
     LendingPoolMockup lendingPool;
@@ -99,26 +99,26 @@ contract GuardianTest is Test {
         vm.stopPrank();
     }
 
-    function testSuccess_supplyGuarded_notPause() public {
+    function testSuccess_depositGuarded_notPause() public {
         // Given: the lending pool is not paused
         vm.startPrank(user);
         // When: a user supplies
-        lendingPool.supplyGuarded(100);
+        lendingPool.depositGuarded(100);
         vm.stopPrank();
         // Then: the total supply is updated
         assertEq(lendingPool.totalSupply(), 100);
     }
 
-    function testRevert_supplyGuarded_paused() public {
+    function testRevert_depositGuarded_paused() public {
         // Given: the lending pool supply is paused, only supply paused
         vm.startPrank(guardian);
         lendingPool.pause();
         vm.stopPrank();
 
         // When Then: a user tries to supply, it is reverted as paused
-        vm.expectRevert("Guardian: supply paused");
+        vm.expectRevert("Guardian: deposit paused");
         vm.startPrank(user);
-        lendingPool.supplyGuarded(100);
+        lendingPool.depositGuarded(100);
         vm.stopPrank();
 
         // Then: the total supply is not updated
@@ -173,7 +173,7 @@ contract GuardianTest is Test {
 
         // When: a user tries to supply
         vm.startPrank(user);
-        lendingPool.supplyGuarded(100);
+        lendingPool.depositGuarded(100);
         vm.stopPrank();
 
         // Then: the total supply is updated
@@ -212,7 +212,7 @@ contract GuardianTest is Test {
 
         // Then: the user can supply
         vm.startPrank(user);
-        lendingPool.supplyGuarded(100);
+        lendingPool.depositGuarded(100);
         vm.stopPrank();
 
         // Then: the total supply is updated
@@ -242,7 +242,7 @@ contract GuardianTest is Test {
 
         // Then: the user can still supply because the once the supply is unPaused, it cannot be paused
         vm.startPrank(user);
-        lendingPool.supplyGuarded(100);
+        lendingPool.depositGuarded(100);
         vm.stopPrank();
 
         // Then: the total supply is updated
@@ -313,7 +313,7 @@ contract GuardianTest is Test {
 
         // Then: the user can supply
         vm.startPrank(user);
-        lendingPool.supplyGuarded(100);
+        lendingPool.depositGuarded(100);
         vm.stopPrank();
         assertEq(lendingPool.totalSupply(), 100);
     }
