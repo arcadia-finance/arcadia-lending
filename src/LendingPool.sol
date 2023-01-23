@@ -240,7 +240,7 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
         }
 
         //Call vault to check if there is sufficient collateral.
-        //If so calculate and store the liquidation threshhold.
+        //If so calculate and store the liquidation threshold.
         require(IVault(vault).increaseMarginPosition(address(asset), amount), "LP_B: Reverted");
 
         //Mint debt tokens to the vault
@@ -256,8 +256,6 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
      * @notice repays a loan
      * @param amount The amount of underlying ERC-20 tokens to be repaid
      * @param vault The address of the Arcadia Vault backing the loan
-     * @dev ToDo: should it be possible to trigger a repay on behalf of an other account,
-     * If so, work with allowances
      */
     function repay(uint256 amount, address vault) public processInterests {
         require(IFactory(vaultFactory).isVault(vault), "LP_R: Not a vault");
@@ -273,11 +271,11 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
     }
 
     /* //////////////////////////////////////////////////////////////
-                            LEVERAGE LOGIC
+                        LEVERAGED ACTIONS LOGIC
     ////////////////////////////////////////////////////////////// */
 
     /**
-     * @notice Takes a leveraged position backed by collateral in an Arcadia Vault
+     * @notice Execute and interact with external logic on leverage.
      * @param margin The amount of underlying ERC-20 tokens to be lent out
      * @param vault The address of the Arcadia Vault backing the loan
      * @param actionHandler the address of the action handler to call
@@ -285,8 +283,11 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
      * @dev The sender might be different as the owner if they have the proper allowances.
      * @dev vaultManagementAction() works similar to flash loans, this function optimistically calls external logic and checks for the vault state at the very end.
      */
-    function doActionWithLeverage(uint256 margin, address vault, address actionHandler, bytes calldata actionData) public processInterests {
-        require(IFactory(vaultFactory).isVault(vault), "LP_B: Not a vault");
+    function doActionWithLeverage(uint256 margin, address vault, address actionHandler, bytes calldata actionData)
+        public
+        processInterests
+    {
+        require(IFactory(vaultFactory).isVault(vault), "LP_DAWL: Not a vault");
 
         //Check allowances to take debt
         if (IVault(vault).owner() != msg.sender) {
@@ -303,7 +304,7 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
 
         //Send Borrowed funds to the actionHandler
         asset.safeTransfer(actionHandler, margin);
-        
+
         //The actionhandler will use the borrowed funds (optionally with additional assets previously deposited in the Vault)
         //to excecute one or more actions (swap, deposit, mint...).
         //Next the actionhandler will deposit any of the remaining funds or any of the recipient token
