@@ -115,11 +115,14 @@ abstract contract Guardian is Owned {
     }
 
     /**
-     * @dev Pauses repay, withdraw, borrow, and deposit functionality.
-     * @dev Only guardian can call this function.
-     * @dev This function can only be called once every 32 days. This is to prevent the guardian from
-     *      accidentally or maliciously locking the protocol.
-     * @dev This function can be called again after 32 days.
+     * @dev This function can be called by the guardian to pause all functionality in the event of an emergency.
+     *      This function pauses repay, withdraw, borrow, deposit and liquidation.
+     *      This function can only be called by the guardian.
+     *      Guardian can only pause the protocol once 32 days past from the last pause. This is to prevent
+     *  guardian from pausing the protocol too often. And giving unpause time for users to trigger.
+     *  When protocol is paused for 30 days only owner role has a right to unpause the protocol. After 30 days,
+     *  any user can unpause the protocol. This flow gives at least 2 days to unpause the protocol for any user
+     *  since guardian can only trigger pause once every 32 days after the previous pause event.
      */
     function pause() external onlyGuardian {
         require(block.timestamp > pauseTimestamp + 32 days, "Guardian: Cannot pause, Pause time not expired");
@@ -138,8 +141,9 @@ abstract contract Guardian is Owned {
      * @param borrowPaused_ Whether borrow functionality should be paused.
      * @param depositPaused_ Whether deposit functionality should be paused.
      * @dev Unpauses repay, withdraw, borrow, and deposit functionality.
-     * @dev Only owner can call this function.
-     * @dev updates the variables if incoming variable is false. If variable is false and incoming variable is true, then it does not update the variable.
+     *      This function can unPause variables individually.
+     *      Only owner can call this function. It updates the variables if incoming variable is false.
+     *  If variable is false and incoming variable is true, then it does not update the variable.
      */
     function unPause(
         bool repayPaused_,
@@ -157,9 +161,9 @@ abstract contract Guardian is Owned {
     }
 
     /**
-     * @dev Unpauses repay, withdraw, borrow, and deposit functionality.
-     * @dev Users can call this function after 30 days that the protocol is paused.
-     * @dev unpauses all the variables
+     * @dev Users can call this function after 30 days that the protocol is paused. Since Guardian can only pause the protocol
+     *  once every 32 days, this function gives at least 2 days to any user to unpause the protocol.
+     *      This function can unPause variables all at once.
      */
     function unPause() external {
         require(block.timestamp > pauseTimestamp + 30 days, "Guardian: Cannot unPause, unPause time not expired");

@@ -78,7 +78,11 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param vaultFactory_ The address of the vault factory
      * @dev The name and symbol of the pool are automatically generated, based on the name and symbol of the underlying token
      */
-    constructor(ERC20 asset_, address treasury_, address vaultFactory_) Guardian() TrustedCreditor() DebtToken(asset_) {
+    constructor(ERC20 asset_, address treasury_, address vaultFactory_)
+        Guardian()
+        TrustedCreditor()
+        DebtToken(asset_)
+    {
         treasury = treasury_;
         vaultFactory = vaultFactory_;
     }
