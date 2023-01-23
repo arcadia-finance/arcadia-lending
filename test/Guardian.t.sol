@@ -69,7 +69,7 @@ contract GuardianUnitTest is Test {
     }
 
     function testSuccess_changeGuardian() public {
-        // Given: the lending pool owner is owner§
+        // Given: the lending pool owner is owner
         vm.startPrank(owner);
         // When: the owner changes the guardian
         lendingPool.changeGuardian(newGuardian);
