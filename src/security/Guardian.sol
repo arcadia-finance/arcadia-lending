@@ -7,14 +7,13 @@
 
 pragma solidity ^0.8.0;
 
-import "../../lib/openzeppelin-contracts/contracts/utils/Context.sol";
 import "../../lib/solmate/src/auth/Owned.sol";
 
 /**
  * @dev This module provides a mechanism that allows authorized accounts to trigger an emergency stop
  *
  */
-abstract contract Guardian is Context, Owned {
+abstract contract Guardian is Owned {
     address public guardian;
 
     /*
