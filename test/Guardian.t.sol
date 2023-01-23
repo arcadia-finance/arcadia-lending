@@ -282,7 +282,7 @@ contract GuardianUnitTest is Test {
         vm.warp(block.timestamp + timePassedAfterPause);
 
         // When: the user tries to unPause
-        vm.expectRevert("G_P: Cannot unPause");
+        vm.expectRevert("G_UP: Cannot unPause");
         vm.startPrank(user);
         lendingPool.unPause();
         vm.stopPrank();

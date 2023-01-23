@@ -174,7 +174,7 @@ abstract contract Guardian is Owned {
      *  the protocol can again be paused (by or the owner or the guardian.
      */
     function unPause() external {
-        require(block.timestamp > pauseTimestamp + 30 days, "G_P: Cannot unPause");
+        require(block.timestamp > pauseTimestamp + 30 days, "G_UP: Cannot unPause");
         if (repayPaused || withdrawPaused || borrowPaused || depositPaused || liquidationPaused) {
             repayPaused = false;
             withdrawPaused = false;
