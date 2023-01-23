@@ -44,12 +44,7 @@ abstract contract Guardian is Owned {
     bool public liquidationPaused;
     uint256 public pauseTimestamp;
 
-    constructor() Owned(msg.sender) {
-        repayPaused = false;
-        withdrawPaused = false;
-        borrowPaused = false;
-        depositPaused = false;
-    }
+    constructor() Owned(msg.sender) {}
 
     /*
     //////////////////////////////////////////////////////////////
