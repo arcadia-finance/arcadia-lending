@@ -836,7 +836,6 @@ contract LendingLogicTest is LendingPoolTest {
                     LEVERAGED ACTIONS LOGIC
 ////////////////////////////////////////////////////////////// */
 contract LeveragedActions is LendingPoolTest {
-    //Unit tests only, for intergration tests see:
     function setUp() public override {
         super.setUp();
 
