@@ -25,14 +25,14 @@ abstract contract Guardian is Context, Owned {
     bool public repayPaused;
     bool public withdrawPaused;
     bool public borrowPaused;
-    bool public supplyPaused;
+    bool public depositPaused;
     uint256 public pauseTimestamp;
 
     constructor() Owned(msg.sender) {
         repayPaused = false;
         withdrawPaused = false;
         borrowPaused = false;
-        supplyPaused = false;
+        depositPaused = false;
     }
 
     modifier onlyGuardian() {
@@ -55,16 +55,16 @@ abstract contract Guardian is Context, Owned {
         _;
     }
 
-    modifier whenSupplyNotPaused() {
-        require(!supplyPaused, "Guardian: supply paused");
+    modifier whenDepositNotPaused() {
+        require(!depositPaused, "Guardian: deposit paused");
         _;
     }
 
     //    function changeGuardian(address _newGuardian) external virtual {}
 
     function changeGuardian(address guardian_) external onlyOwner {
-        emit GuardianChanged(guardian, guardian_);
         guardian = guardian_;
+        emit GuardianChanged(guardian, guardian_);
     }
 
     function pause() external onlyGuardian {
@@ -72,30 +72,30 @@ abstract contract Guardian is Context, Owned {
         repayPaused = true;
         withdrawPaused = true;
         borrowPaused = true;
-        supplyPaused = true;
+        depositPaused = true;
         pauseTimestamp = block.timestamp;
-        emit PauseUpdate(msg.sender, repayPaused, withdrawPaused, borrowPaused, supplyPaused);
+        emit PauseUpdate(msg.sender, repayPaused, withdrawPaused, borrowPaused, depositPaused);
     }
 
-    function unPause(bool repayPaused_, bool withdrawPaused_, bool borrowPaused_, bool supplyPaused_)
+    function unPause(bool repayPaused_, bool withdrawPaused_, bool borrowPaused_, bool depositPaused_)
         external
         onlyOwner
     {
         repayPaused = repayPaused && repayPaused_;
         withdrawPaused = withdrawPaused && withdrawPaused_;
         borrowPaused = borrowPaused && borrowPaused_;
-        supplyPaused = supplyPaused && supplyPaused_;
-        emit PauseUpdate(msg.sender, repayPaused, withdrawPaused, borrowPaused, supplyPaused);
+        depositPaused = depositPaused && depositPaused_;
+        emit PauseUpdate(msg.sender, repayPaused, withdrawPaused, borrowPaused, depositPaused);
     }
 
     function unPause() external {
         require(block.timestamp > pauseTimestamp + 30 days, "Guardian: Cannot unPause, unPause time not expired");
-        if (repayPaused || withdrawPaused || borrowPaused || supplyPaused) {
+        if (repayPaused || withdrawPaused || borrowPaused || depositPaused) {
             repayPaused = false;
             withdrawPaused = false;
             borrowPaused = false;
-            supplyPaused = false;
-            emit PauseUpdate(msg.sender, repayPaused, withdrawPaused, borrowPaused, supplyPaused);
+            depositPaused = false;
+            emit PauseUpdate(msg.sender, repayPaused, withdrawPaused, borrowPaused, depositPaused);
         }
     }
 }
