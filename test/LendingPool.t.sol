@@ -877,9 +877,9 @@ contract LeveragedActions is LendingPoolTest {
 
         vm.assume(amount > 0);
         vm.startPrank(beneficiary);
-        // When: borrow as beneficiary
+        // When: doActionWithLeverage as beneficiary
 
-        // Then: borrow should revert with stdError.arithmeticError
+        // Then: doActionWithLeverage should revert with stdError.arithmeticError
         vm.expectRevert(stdError.arithmeticError);
         pool.doActionWithLeverage(amount, address(vault), actionHandler, actionData);
         vm.stopPrank();
