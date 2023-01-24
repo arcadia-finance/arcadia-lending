@@ -297,13 +297,13 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
             }
         }
 
-        //Mint debt tokens to the vault, debt must be minted Before the actions in the vault are performed.
         if (margin != 0) {
+            //Mint debt tokens to the vault, debt must be minted Before the actions in the vault are performed.
             _deposit(margin, vault);
-        }
 
-        //Send Borrowed funds to the actionHandler
-        asset.safeTransfer(actionHandler, margin);
+            //Send Borrowed funds to the actionHandler
+            asset.safeTransfer(actionHandler, margin);
+        }
 
         //The actionhandler will use the borrowed funds (optionally with additional assets previously deposited in the Vault)
         //to excecute one or more actions (swap, deposit, mint...).
