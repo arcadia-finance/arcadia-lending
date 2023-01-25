@@ -17,4 +17,6 @@ interface IVault {
         uint256[] calldata assetAmounts,
         uint256[] calldata assetTypes
     ) external payable;
+
+    function vaultManagementAction(address actionHandler, bytes calldata actionData) external;
 }
