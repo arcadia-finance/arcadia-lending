@@ -246,10 +246,10 @@ contract LendingPool is Owned, TrustedCreditor, DebtToken, InterestRateModule {
         //Mint debt tokens to the vault
         if (amount != 0) {
             _deposit(amount, vault);
-        }
 
-        //Transfer fails if there is insufficient liquidity in the pool
-        asset.safeTransfer(to, amount);
+            //Transfer fails if there is insufficient liquidity in the pool
+            asset.safeTransfer(to, amount);
+        }
     }
 
     /**
