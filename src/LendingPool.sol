@@ -35,7 +35,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     uint256 public constant YEARLY_SECONDS = 31_536_000;
 
     uint32 public lastSyncedTimestamp;
-    uint16 public originationFee; //factor 10_000, meaning 0.1% = 10
+    uint16 public originationFee; //4 decimals precision (10 equals 0.001 or 0.1%)
     uint256 public totalWeight;
     uint256 public totalRealisedLiquidity;
     uint256 public feeWeight;
