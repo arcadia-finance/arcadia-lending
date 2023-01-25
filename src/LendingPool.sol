@@ -53,7 +53,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     mapping(address => mapping(address => uint256)) public creditAllowance;
 
     event CreditApproval(address indexed vault, address indexed beneficiary, uint256 amount);
-    event MarginIssued(address indexed vault, bytes3 indexed referrer, uint256 amount);
+    event Borrow(address indexed vault, bytes3 indexed referrer, uint256 amount);
 
     modifier onlyLiquidator() {
         require(liquidator == msg.sender, "UNAUTHORIZED");
