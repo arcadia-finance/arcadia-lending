@@ -787,6 +787,7 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(collateralValue >= amountLoaned + (amountLoaned * originationFee / 10000));
         vm.assume(liquidity >= amountLoaned);
         vm.assume(amountLoaned > 0);
+        vm.assume(to != liquidityProvider);
 
         vm.prank(creator);
         pool.setOriginationFee(originationFee);
