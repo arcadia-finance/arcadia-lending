@@ -35,7 +35,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     uint256 public constant YEARLY_SECONDS = 31_536_000;
 
     uint32 public lastSyncedTimestamp;
-    uint16 public originationFee; //4 decimals precision (10 equals 0.001 or 0.1%)
+    uint8 public originationFee; //4 decimals precision (10 equals 0.001 or 0.1%)
     uint256 public totalWeight;
     uint256 public totalRealisedLiquidity;
     uint256 public feeWeight;
@@ -150,6 +150,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param _feeWeight The new weight of the protocol fee
      * @dev The weight the fee determines the relative share of the yield (interest payments) that goes to the protocol treasury
      * @dev Setting feeWeight to a very high value will cause the protocol to collect all interest fees from that moment on.
+     * Although this will affect the future profits of liquidity providers, no funds nor realized interest is at risk for LPs.
      */
     function setFeeWeight(uint256 _feeWeight) external onlyOwner {
         totalWeight = totalWeight - feeWeight + _feeWeight;
@@ -168,8 +169,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @notice Sets the new origination fee
      * @param originationFee_ The new origination fee
      */
-    function setOriginationFee(uint16 originationFee_) external onlyOwner {
-        originationFee = uint16(originationFee_);
+    function setOriginationFee(uint8 originationFee_) external onlyOwner {
+        originationFee = uint8(originationFee_);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -275,7 +276,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
             realisedLiquidityOf[treasury] += amountWithFee - amount;
 
-            emit MarginIssued(vault, referrer, amountWithFee);
+            emit Borrow(vault, referrer, amountWithFee);
         }
     }
 
@@ -303,7 +304,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
     /**
      * @notice Execute and interact with external logic on leverage.
-     * @param margin The amount of underlying ERC-20 tokens to be lent out
+     * @param amountBorrowed The amount of underlying ERC-20 tokens to be lent out
      * @param vault The address of the Arcadia Vault backing the loan
      * @param actionHandler the address of the action handler to call
      * @param actionData a bytes object containing two actionAssetData structs, an address array and a bytes array
@@ -311,7 +312,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev vaultManagementAction() works similar to flash loans, this function optimistically calls external logic and checks for the vault state at the very end.
      */
     function doActionWithLeverage(
-        uint256 margin,
+        uint256 amountBorrowed,
         address vault,
         address actionHandler,
         bytes calldata actionData,
@@ -319,26 +320,26 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     ) public whenBorrowNotPaused processInterests {
         require(IFactory(vaultFactory).isVault(vault), "LP_DAWL: Not a vault");
 
-        uint256 marginWithFee = margin + (margin * originationFee) / 10_000;
+        uint256 amountBorrowedWithFee = amountBorrowed + (amountBorrowed * originationFee) / 10_000;
 
         //Check allowances to take debt
         if (IVault(vault).owner() != msg.sender) {
             uint256 allowed = creditAllowance[vault][msg.sender];
             if (allowed != type(uint256).max) {
-                creditAllowance[vault][msg.sender] = allowed - marginWithFee;
+                creditAllowance[vault][msg.sender] = allowed - amountBorrowedWithFee;
             }
         }
 
-        if (marginWithFee != 0) {
+        if (amountBorrowedWithFee != 0) {
             //Mint debt tokens to the vault, debt must be minted Before the actions in the vault are performed.
-            _deposit(marginWithFee, vault);
+            _deposit(amountBorrowedWithFee, vault);
 
             //Send Borrowed funds to the actionHandler
-            asset.safeTransfer(actionHandler, margin);
+            asset.safeTransfer(actionHandler, amountBorrowed);
 
-            realisedLiquidityOf[treasury] += marginWithFee - margin;
+            realisedLiquidityOf[treasury] += amountBorrowedWithFee - amountBorrowed;
 
-            emit MarginIssued(vault, referrer, marginWithFee);
+            emit Borrow(vault, referrer, amountBorrowedWithFee);
         }
 
         //The actionhandler will use the borrowed funds (optionally with additional assets previously deposited in the Vault)

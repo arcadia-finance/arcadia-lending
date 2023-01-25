@@ -52,7 +52,7 @@ abstract contract LendingPoolTest is Test {
 
     bytes3 public emptyBytes3;
 
-    event MarginIssued(address indexed vault, bytes3 indexed referrer, uint256 amount);
+    event Borrow(address indexed vault, bytes3 indexed referrer, uint256 amount);
 
     //Before
     constructor() {
@@ -774,12 +774,12 @@ contract LendingLogicTest is LendingPoolTest {
         assertEq(pool.creditAllowance(address(vault), beneficiary), type(uint256).max);
     }
 
-    function testSuccss_borrow_originationFeeAvailable(
+    function testSuccess_borrow_originationFeeAvailable(
         uint256 amountLoaned,
         uint256 collateralValue,
         uint128 liquidity,
         address to,
-        uint16 originationFee,
+        uint8 originationFee,
         bytes3 ref
     ) public {
         vm.assume(amountLoaned <= type(uint256).max / (uint256(originationFee) + 1));
@@ -819,7 +819,7 @@ contract LendingLogicTest is LendingPoolTest {
         uint256 collateralValue,
         uint128 liquidity,
         address to,
-        uint16 originationFee,
+        uint8 originationFee,
         bytes3 ref
     ) public {
         // Given: collateralValue and liquidity bigger than equal to amountLoaned, amountLoaned is bigger than 0,
@@ -846,7 +846,7 @@ contract LendingLogicTest is LendingPoolTest {
 
         vm.startPrank(vaultOwner);
         vm.expectEmit(true, true, true, true);
-        emit MarginIssued(address(vault), ref, amountLoanedWithFee);
+        emit Borrow(address(vault), ref, amountLoanedWithFee);
         pool.borrow(amountLoaned, address(vault), to, ref);
         vm.stopPrank();
     }
@@ -1244,7 +1244,7 @@ contract LeveragedActions is LendingPoolTest {
         uint128 liquidity,
         address actionHandler,
         bytes calldata actionData,
-        uint16 originationFee
+        uint8 originationFee
     ) public {
         vm.assume(collateralValue >= amountLoaned);
         vm.assume(liquidity >= amountLoaned);
@@ -1284,7 +1284,7 @@ contract LeveragedActions is LendingPoolTest {
         uint128 liquidity,
         address actionHandler,
         bytes calldata actionData,
-        uint16 originationFee,
+        uint8 originationFee,
         bytes3 ref
     ) public {
         vm.assume(amountLoaned <= type(uint256).max / (uint256(originationFee) + 1));
@@ -1308,7 +1308,7 @@ contract LeveragedActions is LendingPoolTest {
 
         vm.startPrank(vaultOwner);
         vm.expectEmit(true, true, true, true);
-        emit MarginIssued(address(vault), ref, amountLoanedWithFee);
+        emit Borrow(address(vault), ref, amountLoanedWithFee);
         // When: vaultOwner does action with leverage of amountLoaned
         pool.doActionWithLeverage(amountLoaned, address(vault), actionHandler, actionData, ref);
         vm.stopPrank();
