@@ -307,6 +307,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         super.setUp();
 
         vm.startPrank(creator);
+        pool.changeGuardian(creator);
         pool.addTranche(address(srTranche), 50);
         pool.addTranche(address(jrTranche), 40);
         vm.stopPrank();
@@ -318,7 +319,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
     function testRevert_depositInLendingPool_NonTranche(address unprivilegedAddress, uint128 assets, address from)
         public
     {
-        // Given: all neccesary contracts are deployed on the setup
+        // Given: all necessary contracts are deployed on the setup
         vm.assume(unprivilegedAddress != address(jrTranche));
         vm.assume(unprivilegedAddress != address(srTranche));
 
@@ -342,6 +343,25 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         vm.expectRevert(stdError.arithmeticError);
         pool.depositInLendingPool(amount, liquidityProvider);
         vm.stopPrank();
+    }
+
+    function testRevert_depositInLendingPool_Paused(uint256 amount0, uint256 amount1) public {
+        // Given: totalAmount is amount0 added by amount1, liquidityProvider approve max value
+        vm.assume(amount0 <= type(uint256).max - amount1);
+
+        // When: pool is paused
+        vm.warp(35 days);
+        vm.prank(creator);
+        pool.pause();
+
+        // Then: depositInLendingPool is reverted with PAUSED
+        vm.expectRevert("Guardian: deposit paused");
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(amount0, liquidityProvider);
+        // And: depositInLendingPool is reverted with PAUSED
+        vm.expectRevert("Guardian: deposit paused");
+        vm.prank(address(jrTranche));
+        pool.depositInLendingPool(amount1, liquidityProvider);
     }
 
     function testSuccess_depositInLendingPool_FirstDepositByTranche(uint256 amount) public {
@@ -411,6 +431,33 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         vm.stopPrank();
     }
 
+    function testRevert_withdrawFromLendingPool_Paused(
+        uint256 assetsDeposited,
+        uint256 assetsWithdrawn,
+        address receiver
+    ) public {
+        // Given: assetsWithdrawn less than assetsDeposited, receiver is not pool or liquidityProvider,
+        // liquidityProvider approve max value, assetsDeposited and assetsWithdrawn are bigger than 0
+        vm.assume(receiver != address(pool));
+        vm.assume(receiver != liquidityProvider);
+        vm.assume(assetsDeposited >= assetsWithdrawn);
+
+        // And: srTranche deposit and withdraw
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(assetsDeposited, liquidityProvider);
+
+        // When: pool is paused
+        vm.warp(35 days);
+        vm.prank(creator);
+        pool.pause();
+
+        // Then: withdrawFromLendingPool is reverted with PAUSED
+        vm.expectRevert("Guardian: withdraw paused");
+        vm.prank(address(srTranche));
+        pool.withdrawFromLendingPool(assetsWithdrawn, receiver);
+        vm.stopPrank();
+    }
+
     function testSuccess_withdrawFromLendingPool(uint256 assetsDeposited, uint256 assetsWithdrawn, address receiver)
         public
     {
@@ -446,6 +493,7 @@ contract LendingLogicTest is LendingPoolTest {
         vm.startPrank(creator);
         pool.addTranche(address(srTranche), 50);
         pool.addTranche(address(jrTranche), 40);
+        pool.changeGuardian(creator);
         vm.stopPrank();
 
         vm.startPrank(vaultOwner);
@@ -582,6 +630,33 @@ contract LendingLogicTest is LendingPoolTest {
         vm.expectRevert("TRANSFER_FAILED");
         pool.borrow(amountLoaned, address(vault), to);
         vm.stopPrank();
+    }
+
+    function testRevert_borrow_Paused(uint256 amountLoaned, uint256 collateralValue, uint256 liquidity, address to)
+        public
+    {
+        // Given: collateralValue bigger than equal to amountLoaned, liquidity is bigger than 0 and amountLoaned,
+        // to is not address 0, creator setDebtToken to debt, liquidityProvider approve pool to max value,
+        // srTranche deposit liquidity, setTotalValue to colletralValue
+        vm.assume(collateralValue <= amountLoaned);
+        vm.assume(liquidity > amountLoaned);
+        vm.assume(liquidity > 0);
+        vm.assume(to != address(0));
+
+        vm.warp(35 days);
+
+        // And enough liquidity in the pool
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(liquidity, liquidityProvider);
+        vault.setTotalValue(collateralValue);
+        // When: pool is paused
+        vm.prank(creator);
+        pool.pause();
+
+        // Then: borrow should revert with "Guardian borrow paused"
+        vm.expectRevert("Guardian: borrow paused");
+        vm.prank(vaultOwner);
+        pool.borrow(amountLoaned, address(vault), to);
     }
 
     function testSuccess_borrow_ByVaultOwner(
@@ -729,6 +804,38 @@ contract LendingLogicTest is LendingPoolTest {
         // When: sender repays amountLoaned which is more than his available funds
         // Then: repay should revert with an ovcerflow
         vm.expectRevert(stdError.arithmeticError);
+        pool.repay(amountLoaned, address(vault));
+        vm.stopPrank();
+    }
+
+    function testRevert_repay_Paused(uint128 amountLoaned, uint256 availableFunds, address sender) public {
+        // Given: amountLoaned is greater than availableFunds, availableFunds greater than 0,
+        // sender is not zero address, liquidityProvider or vaultOwner, creator setDebtToken to debt,
+        // setTotalValue to amountLoaned, liquidityProvider approve max value, transfer availableFunds,
+        // srTranche deposit amountLoaned, vaultOwner borrow amountLoaned
+        vm.assume(amountLoaned > availableFunds);
+        vm.assume(availableFunds > 0);
+        vm.assume(sender != address(0));
+        vm.assume(sender != liquidityProvider);
+        vm.assume(sender != vaultOwner);
+        vm.warp(35 days);
+
+        vault.setTotalValue(amountLoaned);
+        vm.prank(liquidityProvider);
+        asset.transfer(sender, availableFunds);
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(amountLoaned, liquidityProvider);
+        vm.prank(vaultOwner);
+        pool.borrow(amountLoaned, address(vault), vaultOwner);
+
+        // When: pool is paused
+        vm.prank(creator);
+        pool.pause();
+
+        vm.startPrank(sender);
+        asset.approve(address(pool), type(uint256).max);
+        // Then: repay should revert with an Paused
+        vm.expectRevert("Guardian: repay paused");
         pool.repay(amountLoaned, address(vault));
         vm.stopPrank();
     }
@@ -1074,9 +1181,11 @@ contract AccountingTest is LendingPoolTest {
 
     function testSuccess_totalAssets(uint128 realisedDebt, uint256 interestRate, uint24 deltaTimestamp) public {
         // Given: all neccesary contracts are deployed on the setup
-        vm.assume(interestRate <= 10e3 * 10e18); //1000%
+        vm.assume(interestRate <= 10e3 * 10e18);
+        //1000%
         vm.assume(interestRate > 0);
-        vm.assume(deltaTimestamp <= 5 * 365 * 24 * 60 * 60); //5 year
+        vm.assume(deltaTimestamp <= 5 * 365 * 24 * 60 * 60);
+        //5 year
 
         vm.prank(address(srTranche));
         pool.depositInLendingPool(type(uint128).max, liquidityProvider);
@@ -1105,8 +1214,10 @@ contract AccountingTest is LendingPoolTest {
         uint128 initialLiquidity
     ) public {
         // Given: all necessary contracts are deployed on the setup
-        vm.assume(deltaTimestamp <= 5 * 365 * 24 * 60 * 60); //5 year
-        vm.assume(interestRate <= 10e3 * 10 ** 18); //1000%
+        vm.assume(deltaTimestamp <= 5 * 365 * 24 * 60 * 60);
+        //5 year
+        vm.assume(interestRate <= 10e3 * 10 ** 18);
+        //1000%
         vm.assume(interestRate > 0);
         vm.assume(initialLiquidity >= realisedDebt);
 
@@ -1124,7 +1235,8 @@ contract AccountingTest is LendingPoolTest {
 
         uint256 unrealisedDebt = calcUnrealisedDebtChecked(interestRate, deltaTimestamp, realisedDebt);
         uint256 interest = unrealisedDebt * 50 / 90;
-        if (interest * 90 < unrealisedDebt * 50) interest += 1; // interest for a tranche is rounded up
+        if (interest * 90 < unrealisedDebt * 50) interest += 1;
+        // interest for a tranche is rounded up
         uint256 expectedValue = initialLiquidity + interest;
 
         uint256 actualValue = pool.liquidityOf(address(srTranche));
@@ -1159,9 +1271,12 @@ contract InterestsTest is LendingPoolTest {
     {
         // Given: deltaTimestamp smaller than equal to 5 years,
         // realisedDebt smaller than equal to than 3402823669209384912995114146594816
-        vm.assume(deltaTimestamp <= 5 * 365 * 24 * 60 * 60); //5 year
-        vm.assume(interestRate <= 10 * 10 ** 18); //1000%
-        vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
+        vm.assume(deltaTimestamp <= 5 * 365 * 24 * 60 * 60);
+        //5 year
+        vm.assume(interestRate <= 10 * 10 ** 18);
+        //1000%
+        vm.assume(realisedDebt <= type(uint128).max / (10 ** 5));
+        //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
 
         stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
         stdstore.target(address(pool)).sig(pool.lastSyncedTimestamp.selector).checked_write(block.number);
@@ -1185,9 +1300,12 @@ contract InterestsTest is LendingPoolTest {
         uint256 interestRate
     ) public {
         // Given: deltaTimestamp than 5 years, realisedDebt than 3402823669209384912995114146594816 and bigger than 0
-        vm.assume(deltaTimestamp <= 5 * 365 * 24 * 60 * 60); //5 year
-        vm.assume(interestRate <= 10 * 10 ** 18); //1000%
-        vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
+        vm.assume(deltaTimestamp <= 5 * 365 * 24 * 60 * 60);
+        //5 year
+        vm.assume(interestRate <= 10 * 10 ** 18);
+        //1000%
+        vm.assume(realisedDebt <= type(uint128).max / (10 ** 5));
+        //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
         vm.assume(realisedDebt > 0);
         vm.assume(realisedDebt <= realisedLiquidity);
 
@@ -1283,8 +1401,8 @@ contract InterestRateTest is LendingPoolTest {
             utilisationThreshold: utilisationThreshold_
         });
 
-        vm.startPrank(unprivilegedAddress);
         // When: unprivilegedAddress calls setInterestConfig
+        vm.startPrank(unprivilegedAddress);
         // Then: setInterestConfig should revert with UNAUTHORIZED
         vm.expectRevert("UNAUTHORIZED");
         pool.setInterestConfig(config);
@@ -1309,7 +1427,7 @@ contract InterestRateTest is LendingPoolTest {
         vm.prank(creator);
         pool.setInterestConfig(config);
 
-        // Then: config is sucesfully set
+        // Then: config is successfully set
         (uint256 baseRatePerYear, uint256 lowSlopePerYear, uint256 highSlopePerYear, uint256 utilisationThreshold) =
             pool.interestRateConfig();
         assertEq(baseRatePerYear, baseRate_);
@@ -1327,9 +1445,12 @@ contract InterestRateTest is LendingPoolTest {
     ) public {
         // Given: deltaBlocks smaller than equal to 5 years,
         // realisedDebt smaller than equal to than 3402823669209384912995114146594816
-        vm.assume(deltaTimestamp <= 5 * 365 * 24 * 60 * 60); //5 year
-        vm.assume(interestRate <= 10 * 10 ** 18); //1000%
-        vm.assume(realisedDebt <= type(uint128).max / (10 ** 5)); //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
+        vm.assume(deltaTimestamp <= 5 * 365 * 24 * 60 * 60);
+        //5 year
+        vm.assume(interestRate <= 10 * 10 ** 18);
+        //1000%
+        vm.assume(realisedDebt <= type(uint128).max / (10 ** 5));
+        //highest possible debt at 1000% over 5 years: 3402823669209384912995114146594816
         vm.assume(realisedDebt <= realisedLiquidity);
 
         // And: There is realisedLiquidity liquidity
@@ -1377,6 +1498,7 @@ contract DefaultTest is LendingPoolTest {
         //Set Tranche weight on 0 so that all yield goes to treasury
         pool.addTranche(address(srTranche), 0);
         pool.addTranche(address(jrTranche), 0);
+        pool.changeGuardian(creator);
         vm.stopPrank();
 
         vm.prank(liquidityProvider);
@@ -1423,6 +1545,32 @@ contract DefaultTest is LendingPoolTest {
         vm.expectRevert("LP_LV: Not a Vault with debt");
         pool.liquidateVault(amountLoaned);
         vm.stopPrank();
+    }
+
+    function testRevert_liquidateVault_Paused(uint128 amountLoaned) public {
+        // Given: all necessary contracts are deployed on the setup
+        // And: A vault has debt
+        vm.assume(amountLoaned > 0);
+        vault.setTotalValue(amountLoaned);
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(amountLoaned, liquidityProvider);
+        vm.prank(vaultOwner);
+        pool.borrow(amountLoaned, address(vault), vaultOwner);
+        // And: The liquidator is set
+        vm.prank(creator);
+        pool.setLiquidator(liquidator);
+        vm.warp(35 days);
+
+        // When: pool is paused
+        vm.prank(creator);
+        pool.pause();
+
+        // Then: liquidateVault should revert with "LP_LV: Pool is paused"
+        vm.expectRevert("Guardian: liquidation paused");
+        vm.prank(address(vault));
+        pool.liquidateVault(amountLoaned);
     }
 
     function testSuccess_liquidateVault(uint128 amountLoaned) public {
@@ -1709,5 +1857,213 @@ contract VaultTest is LendingPoolTest {
 
         // Then: The open position should equal the amount loaned
         assertEq(amountLoaned, openPosition);
+    }
+}
+
+/* //////////////////////////////////////////////////////////////
+                        GUARDIAN LOGIC
+////////////////////////////////////////////////////////////// */
+contract GuardianTest is LendingPoolTest {
+    using stdStorage for StdStorage;
+
+    address pauseGuardian = address(17);
+
+    function setUp() public override {
+        super.setUp();
+
+        // Set Guardian
+        vm.startPrank(creator);
+        pool.changeGuardian(pauseGuardian);
+        vm.stopPrank();
+
+        // Warp the block timestamp to 60days for smooth testing
+        vm.warp(60 days);
+    }
+
+    function testRevert_depositInLendingPool_Paused() public {
+        // Given: all necessary contracts are deployed on the setup
+        assertEq(pool.guardian(), pauseGuardian);
+
+        // When: the guardian pauses the pool
+        vm.prank(pauseGuardian);
+        pool.pause();
+        vm.stopPrank();
+
+        // Then: the pool should be paused
+        assertTrue(pool.depositPaused());
+        // And: the pool should not be able to deposit
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        vm.prank(address(srTranche));
+        vm.expectRevert("Guardian: deposit paused");
+        pool.depositInLendingPool(type(uint128).max, liquidityProvider);
+    }
+
+    function testRevert_borrow_Paused() public {
+        // Given: all necessary contracts are deployed on the setup
+        assertEq(pool.guardian(), pauseGuardian);
+
+        // When: the guardian pauses the pool
+        vm.prank(pauseGuardian);
+        pool.pause();
+        vm.stopPrank();
+
+        // Then: the pool should be paused
+        assertTrue(pool.borrowPaused());
+        vm.startPrank(vaultOwner);
+        // And: the pool should not be able to borrow
+        vm.expectRevert("Guardian: borrow paused");
+        pool.borrow(uint256(20 * 10 ** 18), address(vault), address(412));
+        vm.stopPrank();
+    }
+
+    function testRevert_withdrawFromLendingPool_Paused() public {
+        // Given: all necessary contracts are deployed on the setup
+        assertEq(pool.guardian(), pauseGuardian);
+
+        // When: the guardian pauses the pool
+        vm.prank(pauseGuardian);
+        pool.pause();
+        vm.stopPrank();
+
+        // Then: the pool should be paused
+        assertTrue(pool.withdrawPaused());
+        vm.startPrank(address(srTranche));
+        // And: the pool should not be able to borrow
+        vm.expectRevert("Guardian: withdraw paused");
+        pool.withdrawFromLendingPool(uint256(20 * 10 ** 18), address(42));
+        vm.stopPrank();
+    }
+
+    function testRevert_liquidateVault_Paused() public {
+        // Given: all necessary contracts are deployed on the setup
+        assertEq(pool.guardian(), pauseGuardian);
+
+        // When: the guardian pauses the pool
+        vm.prank(pauseGuardian);
+        pool.pause();
+        vm.stopPrank();
+
+        // Then: the pool should be paused
+        assertTrue(pool.liquidationPaused());
+        // And: the pool should not be able to borrow
+        vm.expectRevert("Guardian: liquidation paused");
+        vm.prank(address(vault));
+        pool.liquidateVault(uint256(256));
+        vm.stopPrank();
+    }
+
+    function testRevert_repay_Paused() public {
+        // Given: all necessary contracts are deployed on the setup
+        assertEq(pool.guardian(), pauseGuardian);
+
+        // When: the guardian pauses the pool
+        vm.prank(pauseGuardian);
+        pool.pause();
+        vm.stopPrank();
+
+        // Then: the pool should be paused
+        assertTrue(pool.repayPaused());
+        vm.startPrank(vaultOwner);
+        asset.approve(address(pool), type(uint256).max);
+        // And: the pool should not be able to borrow
+        vm.expectRevert("Guardian: repay paused");
+        pool.repay(uint256(20 * 10 ** 18), address(42));
+        vm.stopPrank();
+    }
+
+    function testSuccess_withdraw_OwnerUnpausesDepositAndWithdrawOnly(uint256 timePassed) public {
+        // Preprocess: set fuzzing limits
+        vm.assume(timePassed < 30 days);
+        vm.assume(timePassed > 0);
+
+        // Given: all necessary contracts are deployed on the setup
+        assertEq(pool.guardian(), pauseGuardian);
+
+        // And: Tranches are added
+        vm.startPrank(creator);
+        pool.addTranche(address(srTranche), 50);
+        pool.addTranche(address(jrTranche), 40);
+        vm.stopPrank();
+
+        // And: the guardian pauses the pool
+        vm.prank(pauseGuardian);
+        pool.pause();
+        vm.stopPrank();
+
+        // And: and time passes
+        vm.warp(block.timestamp + timePassed);
+
+        // When: the owner unpauses the pool, only withdraw and deposit
+        vm.prank(creator);
+        pool.unPause(true, false, true, false, true);
+        vm.stopPrank();
+
+        // Then: the variables should be set correctly
+        assertTrue(!pool.depositPaused());
+        assertTrue(pool.borrowPaused());
+        assertTrue(!pool.withdrawPaused());
+        assertTrue(pool.repayPaused());
+
+        // And: the pool should not be able to repay
+        vm.expectRevert("Guardian: repay paused");
+        pool.repay(uint256(20 * 10 ** 18), address(42));
+        vm.stopPrank();
+
+        // And: the pool should be able to deposit and withdraw
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        vm.startPrank(address(srTranche));
+        pool.depositInLendingPool(uint256(20 * 10 ** 18), liquidityProvider);
+
+        pool.withdrawFromLendingPool(uint256(19 * 10 ** 18), address(412));
+        vm.stopPrank();
+    }
+
+    function testSuccess_withdraw_UserUnpauses(uint64 deltaTimePassed, address randomUser) public {
+        // Preprocess: set fuzzing limits
+        uint256 timePassed = 30 days + 1;
+        vm.assume(deltaTimePassed < 30 days);
+        timePassed = timePassed + uint256(deltaTimePassed);
+        vm.assume(randomUser != address(0));
+        vm.assume(randomUser != creator);
+        vm.assume(randomUser != pauseGuardian);
+
+        // Given: all necessary contracts are deployed on the setup
+        assertEq(pool.guardian(), pauseGuardian);
+
+        // And: Tranches are added
+        vm.startPrank(creator);
+        pool.addTranche(address(srTranche), 50);
+        pool.addTranche(address(jrTranche), 40);
+        vm.stopPrank();
+
+        // And: the guardian pauses the pool
+        vm.prank(pauseGuardian);
+        pool.pause();
+        vm.stopPrank();
+
+        // And: and time passes
+        vm.warp(block.timestamp + timePassed);
+
+        // When: the randomUser unpauses the pool
+        vm.prank(randomUser);
+        pool.unPause();
+        vm.stopPrank();
+
+        // Then: the variables should be set correctly
+        assertTrue(!pool.depositPaused());
+        assertTrue(!pool.borrowPaused());
+        assertTrue(!pool.withdrawPaused());
+        assertTrue(!pool.repayPaused());
+
+        // And: the pool should be able to deposit and withdraw
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        vm.startPrank(address(srTranche));
+        pool.depositInLendingPool(uint256(20 * 10 ** 18), liquidityProvider);
+
+        pool.withdrawFromLendingPool(uint256(19 * 10 ** 18), address(412));
+        vm.stopPrank();
     }
 }
