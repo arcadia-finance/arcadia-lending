@@ -23,9 +23,10 @@ abstract contract TrustedCreditor {
 
     /**
      * @notice Called by a vault when it is being liquidated (auctioned) to repay an amount of debt.
+     * @param vault The vault address.
      * @param debt The amount of debt that will be repaid after the auction.
      */
-    function liquidateVault(uint256 debt) public virtual;
+    function liquidateVault(address vault, uint256 debt) public virtual;
 
     /* //////////////////////////////////////////////////////////////
                             VAULT LOGIC

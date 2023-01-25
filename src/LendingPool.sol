@@ -469,7 +469,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     }
 
     /**
-     * @notice Called by a vault when it is being liquidated (auctioned) to repay an amount of debt.
+     * @notice Called by the liquidator when a vault is being liquidated (auctioned).
+     * @param vault The vault address.
      * @param debt The amount of debt that will be repaid.
      * @dev At the start of the liquidation the debt tokens are burned,
      * as such interests are not accrued during the liquidation.
@@ -482,16 +483,9 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * In this case the liquidator will call settleLiquidation() to settle the deficit.
      * the Liquidator will transfer any remaining funds to the Lending Pool.
      */
-    function liquidateVault(uint256 debt) public override whenLiquidationNotPaused {
-        //Function can only be called by Vaults with debt.
-        //Only Vaults can have debt, debtTokens are non-transferrable, and only Vaults can call borrow().
-        //Since DebtTokens are non-transferrable, only vaults can have debt.
-        //Hence by checking that the balance of msg.sender is not 0, we know the sender is
-        //indeed a vault and has debt.
-        require(balanceOf[msg.sender] != 0, "LP_LV: Not a Vault with debt");
-
+    function liquidateVault(address vault, uint256 debt) public override onlyLiquidator whenLiquidationNotPaused {
         //Remove debt from Vault (burn DebtTokens)
-        _withdraw(debt, msg.sender, msg.sender);
+        _withdraw(debt, vault, vault);
     }
 
     /**

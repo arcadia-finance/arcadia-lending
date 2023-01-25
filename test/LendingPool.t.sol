@@ -1540,10 +1540,10 @@ contract DefaultTest is LendingPoolTest {
         pool.setLiquidator(liquidator);
 
         // When: unprivilegedAddress liquidates a vault
-        // Then: liquidateVault should revert with "LP_LV: Not a Vault with debt"
+        // Then: liquidateVault should revert with "UNAUTHORIZED"
         vm.startPrank(unprivilegedAddress);
-        vm.expectRevert("LP_LV: Not a Vault with debt");
-        pool.liquidateVault(amountLoaned);
+        vm.expectRevert("UNAUTHORIZED");
+        pool.liquidateVault(address(vault), amountLoaned);
         vm.stopPrank();
     }
 
@@ -1569,12 +1569,16 @@ contract DefaultTest is LendingPoolTest {
 
         // Then: liquidateVault should revert with "LP_LV: Pool is paused"
         vm.expectRevert("Guardian: liquidation paused");
-        vm.prank(address(vault));
-        pool.liquidateVault(amountLoaned);
+        vm.prank(liquidator);
+        pool.liquidateVault(address(vault), amountLoaned);
     }
 
-    function testSuccess_liquidateVault(uint128 amountLoaned) public {
+    function testRevert_liquidateVault_ExcessiveAmountLiquidated(uint128 amountLoaned, uint128 amountLiquidated)
+        public
+    {
         // Given: all necessary contracts are deployed on the setup
+        // And: amountLoaned is smaller than amountLiquidated
+        vm.assume(amountLoaned < amountLiquidated);
         // And: A vault has debt
         vm.assume(amountLoaned > 0);
         vault.setTotalValue(amountLoaned);
@@ -1588,13 +1592,38 @@ contract DefaultTest is LendingPoolTest {
         vm.prank(creator);
         pool.setLiquidator(liquidator);
 
-        // When: Vault calls liquidateVault
-        vm.prank(address(vault));
-        pool.liquidateVault(amountLoaned);
+        // When: liquidator liquidates a vault
+        // Then: liquidateVault should revert with "stdError.arithmeticError"
+        vm.startPrank(liquidator);
+        vm.expectRevert(stdError.arithmeticError);
+        pool.liquidateVault(address(vault), amountLiquidated);
+        vm.stopPrank();
+    }
 
-        // Then: The debt of the vault should be zero
-        assertEq(debt.balanceOf(address(vault)), 0);
-        assertEq(debt.totalSupply(), 0);
+    function testSuccess_liquidateVault(uint128 amountLoaned, uint128 amountLiquidated) public {
+        // Given: all necessary contracts are deployed on the setup
+        // And: amountLoaned is bigger or equal to amountLiquidated
+        vm.assume(amountLoaned >= amountLiquidated);
+        // And: A vault has debt
+        vm.assume(amountLoaned > 0);
+        vault.setTotalValue(amountLoaned);
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(amountLoaned, liquidityProvider);
+        vm.prank(vaultOwner);
+        pool.borrow(amountLoaned, address(vault), vaultOwner);
+        // And: The liquidator is set
+        vm.prank(creator);
+        pool.setLiquidator(liquidator);
+
+        // When: Liquidator calls liquidateVault
+        vm.prank(liquidator);
+        pool.liquidateVault(address(vault), amountLiquidated);
+
+        // Then: The debt of the vault should be decreased with amountLiquidated
+        assertEq(debt.balanceOf(address(vault)), amountLoaned - amountLiquidated);
+        assertEq(debt.totalSupply(), amountLoaned - amountLiquidated);
     }
 
     function testRevert_settleLiquidation_Unauthorised(
@@ -1938,6 +1967,9 @@ contract GuardianTest is LendingPoolTest {
     function testRevert_liquidateVault_Paused() public {
         // Given: all necessary contracts are deployed on the setup
         assertEq(pool.guardian(), pauseGuardian);
+        // And: The liquidator is set
+        vm.prank(creator);
+        pool.setLiquidator(liquidator);
 
         // When: the guardian pauses the pool
         vm.prank(pauseGuardian);
@@ -1948,8 +1980,8 @@ contract GuardianTest is LendingPoolTest {
         assertTrue(pool.liquidationPaused());
         // And: the pool should not be able to borrow
         vm.expectRevert("Guardian: liquidation paused");
-        vm.prank(address(vault));
-        pool.liquidateVault(uint256(256));
+        vm.prank(liquidator);
+        pool.liquidateVault(address(vault), uint256(256));
         vm.stopPrank();
     }
 
