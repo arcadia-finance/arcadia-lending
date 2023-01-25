@@ -50,6 +50,10 @@ abstract contract LendingPoolTest is Test {
     address vaultOwner = address(5);
     address liquidityProvider = address(6);
 
+    bytes3 public emptyBytes3;
+
+    event MarginIssued(address indexed vault, bytes3 indexed referrer, uint256 amount);
+
     //Before
     constructor() {
         vm.startPrank(tokenCreator);
@@ -549,7 +553,7 @@ contract LendingLogicTest is LendingPoolTest {
 
         // Then: borrow should revert with "LP_B: Not a vault"
         vm.expectRevert("LP_B: Not a vault");
-        pool.borrow(amount, nonVault, to);
+        pool.borrow(amount, nonVault, to, emptyBytes3);
     }
 
     function testRevert_borrow_Unauthorised(uint256 amount, address beneficiary, address to) public {
@@ -562,7 +566,7 @@ contract LendingLogicTest is LendingPoolTest {
 
         // Then: borrow should revert with stdError.arithmeticError
         vm.expectRevert(stdError.arithmeticError);
-        pool.borrow(amount, address(vault), to);
+        pool.borrow(amount, address(vault), to, emptyBytes3);
         vm.stopPrank();
     }
 
@@ -584,7 +588,7 @@ contract LendingLogicTest is LendingPoolTest {
 
         // Then: borrow should revert with stdError.arithmeticError
         vm.expectRevert(stdError.arithmeticError);
-        pool.borrow(amountLoaned, address(vault), to);
+        pool.borrow(amountLoaned, address(vault), to, emptyBytes3);
         vm.stopPrank();
     }
 
@@ -601,7 +605,7 @@ contract LendingLogicTest is LendingPoolTest {
 
         // Then: borrow should revert with "LP_B: Reverted"
         vm.expectRevert("LP_B: Reverted");
-        pool.borrow(amountLoaned, address(vault), to);
+        pool.borrow(amountLoaned, address(vault), to, emptyBytes3);
         vm.stopPrank();
     }
 
@@ -628,7 +632,7 @@ contract LendingLogicTest is LendingPoolTest {
 
         // Then: borrow should revert with "TRANSFER_FAILED"
         vm.expectRevert("TRANSFER_FAILED");
-        pool.borrow(amountLoaned, address(vault), to);
+        pool.borrow(amountLoaned, address(vault), to, emptyBytes3);
         vm.stopPrank();
     }
 
@@ -656,7 +660,7 @@ contract LendingLogicTest is LendingPoolTest {
         // Then: borrow should revert with "Guardian borrow paused"
         vm.expectRevert("Guardian: borrow paused");
         vm.prank(vaultOwner);
-        pool.borrow(amountLoaned, address(vault), to);
+        pool.borrow(amountLoaned, address(vault), to, emptyBytes3);
     }
 
     function testSuccess_borrow_ByVaultOwner(
@@ -682,7 +686,7 @@ contract LendingLogicTest is LendingPoolTest {
 
         vm.startPrank(vaultOwner);
         // When: vaultOwner borrow amountLoaned
-        pool.borrow(amountLoaned, address(vault), to);
+        pool.borrow(amountLoaned, address(vault), to, emptyBytes3);
         vm.stopPrank();
 
         // Then: balanceOf pool should be equal to liquidity minus amountLoaned, balanceOf "to" should be equal to amountLoaned,
@@ -721,7 +725,7 @@ contract LendingLogicTest is LendingPoolTest {
 
         vm.startPrank(beneficiary);
         // When: beneficiary borrow amountLoaned
-        pool.borrow(amountLoaned, address(vault), to);
+        pool.borrow(amountLoaned, address(vault), to, emptyBytes3);
         vm.stopPrank();
 
         // Then: balanceOf pool should be equal to liquidity minus amountLoaned, balanceOf "to" should be equal to amountLoaned,
@@ -759,7 +763,7 @@ contract LendingLogicTest is LendingPoolTest {
 
         vm.startPrank(beneficiary);
         // When: beneficiary borrow
-        pool.borrow(amountLoaned, address(vault), to);
+        pool.borrow(amountLoaned, address(vault), to, emptyBytes3);
         vm.stopPrank();
 
         // Then: balanceOf pool should be equal to liquidity minus amountLoaned, balanceOf "to" should be equal to amountLoaned,
@@ -768,6 +772,86 @@ contract LendingLogicTest is LendingPoolTest {
         assertEq(asset.balanceOf(to), amountLoaned);
         assertEq(debt.balanceOf(address(vault)), amountLoaned);
         assertEq(pool.creditAllowance(address(vault), beneficiary), type(uint256).max);
+    }
+
+    function testSuccss_borrow_originationFeeAvailable(
+        uint256 amountLoaned,
+        uint256 collateralValue,
+        uint128 liquidity,
+        address to,
+        uint16 originationFee,
+        bytes3 ref
+    ) public {
+        vm.assume(amountLoaned <= type(uint256).max / (uint256(originationFee) + 1));
+        vm.assume(amountLoaned <= type(uint256).max - (amountLoaned * originationFee / 10000));
+        vm.assume(collateralValue >= amountLoaned + (amountLoaned * originationFee / 10000));
+        vm.assume(liquidity >= amountLoaned);
+        vm.assume(amountLoaned > 0);
+
+        vm.prank(creator);
+        pool.setOriginationFee(originationFee);
+
+        vault.setTotalValue(collateralValue);
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(liquidity, liquidityProvider);
+
+        uint256 treasuryBalancePre = pool.realisedLiquidityOf(treasury);
+
+        vm.startPrank(vaultOwner);
+        pool.borrow(amountLoaned, address(vault), to, ref);
+        vm.stopPrank();
+
+        uint256 treasuryBalancePost = pool.realisedLiquidityOf(treasury);
+
+        // Then: balanceOf pool should be equal to liquidity minus amountLoaned, balanceOf "actionHandler" should be equal to amountLoaned,
+        // balanceOf vault should be equal to amountLoaned + fee
+        assertEq(asset.balanceOf(address(pool)), liquidity - amountLoaned);
+        assertEq(asset.balanceOf(to), amountLoaned);
+
+        emit log_named_uint("balanceDebt", debt.balanceOf(address(vault)));
+        emit log_named_uint("calc", amountLoaned + (amountLoaned * originationFee / 10000));
+
+        assertEq(debt.balanceOf(address(vault)), amountLoaned + (amountLoaned * originationFee / 10000));
+        assertEq(treasuryBalancePre + (amountLoaned * originationFee / 10000), treasuryBalancePost);
+    }
+
+    function testSuccess_borrow_EmitReferralEvent(
+        uint256 amountLoaned,
+        uint256 collateralValue,
+        uint128 liquidity,
+        address to,
+        uint16 originationFee,
+        bytes3 ref
+    ) public {
+        // Given: collateralValue and liquidity bigger than equal to amountLoaned, amountLoaned is bigger than 0,
+        // to is not address 0 and not liquidityProvider, creator setDebtToken to debt, setTotalValue to colletralValue,
+        // liquidityProvider approve pool to max value, srTranche deposit liquidity
+        vm.assume(amountLoaned <= type(uint256).max / (uint256(originationFee) + 1));
+        vm.assume(amountLoaned <= type(uint256).max - (amountLoaned * originationFee / 10000));
+        vm.assume(collateralValue >= amountLoaned + (amountLoaned * originationFee / 10000));
+        vm.assume(liquidity >= amountLoaned);
+        vm.assume(amountLoaned > 0);
+        vm.assume(to != address(0));
+        vm.assume(to != liquidityProvider);
+
+        uint256 amountLoanedWithFee = amountLoaned + (amountLoaned * originationFee / 10000);
+
+        vm.prank(creator);
+        pool.setOriginationFee(originationFee);
+
+        vault.setTotalValue(collateralValue);
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(liquidity, liquidityProvider);
+
+        vm.startPrank(vaultOwner);
+        vm.expectEmit(true, true, true, true);
+        emit MarginIssued(address(vault), ref, amountLoanedWithFee);
+        pool.borrow(amountLoaned, address(vault), to, ref);
+        vm.stopPrank();
     }
 
     function testRevert_repay_NonVault(uint256 amount, address nonVault) public {
@@ -797,7 +881,7 @@ contract LendingLogicTest is LendingPoolTest {
         vm.prank(address(srTranche));
         pool.depositInLendingPool(amountLoaned, liquidityProvider);
         vm.prank(vaultOwner);
-        pool.borrow(amountLoaned, address(vault), vaultOwner);
+        pool.borrow(amountLoaned, address(vault), vaultOwner, emptyBytes3);
 
         vm.startPrank(sender);
         asset.approve(address(pool), type(uint256).max);
@@ -826,7 +910,7 @@ contract LendingLogicTest is LendingPoolTest {
         vm.prank(address(srTranche));
         pool.depositInLendingPool(amountLoaned, liquidityProvider);
         vm.prank(vaultOwner);
-        pool.borrow(amountLoaned, address(vault), vaultOwner);
+        pool.borrow(amountLoaned, address(vault), vaultOwner, emptyBytes3);
 
         // When: pool is paused
         vm.prank(creator);
@@ -858,7 +942,7 @@ contract LendingLogicTest is LendingPoolTest {
         vm.prank(address(srTranche));
         pool.depositInLendingPool(amountLoaned, liquidityProvider);
         vm.prank(vaultOwner);
-        pool.borrow(amountLoaned, address(vault), vaultOwner);
+        pool.borrow(amountLoaned, address(vault), vaultOwner, emptyBytes3);
 
         vm.startPrank(sender);
         // When: sender approve pool with max value, repay amountRepaid
@@ -889,7 +973,7 @@ contract LendingLogicTest is LendingPoolTest {
         vm.prank(address(srTranche));
         pool.depositInLendingPool(amountLoaned, liquidityProvider);
         vm.prank(vaultOwner);
-        pool.borrow(amountLoaned, address(vault), vaultOwner);
+        pool.borrow(amountLoaned, address(vault), vaultOwner, emptyBytes3);
 
         vm.startPrank(sender);
         // When: sender approve pool with max value, repay amountLoaned
@@ -923,7 +1007,7 @@ contract LendingLogicTest is LendingPoolTest {
         vm.prank(address(srTranche));
         pool.depositInLendingPool(amountLoaned, liquidityProvider);
         vm.prank(vaultOwner);
-        pool.borrow(amountLoaned, address(vault), vaultOwner);
+        pool.borrow(amountLoaned, address(vault), vaultOwner, emptyBytes3);
 
         vm.startPrank(sender);
         // When: sender approve pool with max value, repay availablefunds
@@ -970,7 +1054,7 @@ contract LeveragedActions is LendingPoolTest {
 
         // Then: doActionWithLeverage should revert with "LP_DAWL: Not a vault"
         vm.expectRevert("LP_DAWL: Not a vault");
-        pool.doActionWithLeverage(amount, nonVault, actionHandler, actionData);
+        pool.doActionWithLeverage(amount, nonVault, actionHandler, actionData, emptyBytes3);
     }
 
     function testRevert_doActionWithLeverage_Unauthorised(
@@ -988,7 +1072,7 @@ contract LeveragedActions is LendingPoolTest {
 
         // Then: doActionWithLeverage should revert with stdError.arithmeticError
         vm.expectRevert(stdError.arithmeticError);
-        pool.doActionWithLeverage(amount, address(vault), actionHandler, actionData);
+        pool.doActionWithLeverage(amount, address(vault), actionHandler, actionData, emptyBytes3);
         vm.stopPrank();
     }
 
@@ -1011,7 +1095,7 @@ contract LeveragedActions is LendingPoolTest {
 
         // Then: doActionWithLeverage should revert with stdError.arithmeticError
         vm.expectRevert(stdError.arithmeticError);
-        pool.doActionWithLeverage(amountLoaned, address(vault), actionHandler, actionData);
+        pool.doActionWithLeverage(amountLoaned, address(vault), actionHandler, actionData, emptyBytes3);
         vm.stopPrank();
     }
 
@@ -1039,7 +1123,7 @@ contract LeveragedActions is LendingPoolTest {
 
         // Then: doActionWithLeverage should revert with "TRANSFER_FAILED"
         vm.expectRevert("TRANSFER_FAILED");
-        pool.doActionWithLeverage(amountLoaned, address(vault), actionHandler, actionData);
+        pool.doActionWithLeverage(amountLoaned, address(vault), actionHandler, actionData, emptyBytes3);
         vm.stopPrank();
     }
 
@@ -1067,7 +1151,7 @@ contract LeveragedActions is LendingPoolTest {
 
         vm.startPrank(vaultOwner);
         // When: vaultOwner does action with leverage of amountLoaned
-        pool.doActionWithLeverage(amountLoaned, address(vault), actionHandler, actionData);
+        pool.doActionWithLeverage(amountLoaned, address(vault), actionHandler, actionData, emptyBytes3);
         vm.stopPrank();
 
         // Then: balanceOf pool should be equal to liquidity minus amountLoaned, balanceOf "actionHandler" should be equal to amountLoaned,
@@ -1107,7 +1191,7 @@ contract LeveragedActions is LendingPoolTest {
 
         vm.startPrank(beneficiary);
         // When: beneficiary does action with leverage of amountLoaned
-        pool.doActionWithLeverage(amountLoaned, address(vault), actionHandler, actionData);
+        pool.doActionWithLeverage(amountLoaned, address(vault), actionHandler, actionData, emptyBytes3);
         vm.stopPrank();
 
         // Then: balanceOf pool should be equal to liquidity minus amountLoaned, balanceOf "actionHandler" should be equal to amountLoaned,
@@ -1146,7 +1230,7 @@ contract LeveragedActions is LendingPoolTest {
 
         vm.startPrank(beneficiary);
         // When: beneficiary does action with leverage of amountLoaned
-        pool.doActionWithLeverage(amountLoaned, address(vault), actionHandler, actionData);
+        pool.doActionWithLeverage(amountLoaned, address(vault), actionHandler, actionData, emptyBytes3);
         vm.stopPrank();
 
         // Then: balanceOf pool should be equal to liquidity minus amountLoaned, balanceOf "actionHandler" should be equal to amountLoaned,
@@ -1155,6 +1239,82 @@ contract LeveragedActions is LendingPoolTest {
         assertEq(asset.balanceOf(actionHandler), amountLoaned);
         assertEq(debt.balanceOf(address(vault)), amountLoaned);
         assertEq(pool.creditAllowance(address(vault), beneficiary), type(uint256).max);
+    }
+
+    function testSuccss_doActionWithLeverage_originationFeeAvailable(
+        uint256 amountLoaned,
+        uint256 collateralValue,
+        uint128 liquidity,
+        address actionHandler,
+        bytes calldata actionData,
+        uint16 originationFee
+    ) public {
+        vm.assume(collateralValue >= amountLoaned);
+        vm.assume(liquidity >= amountLoaned);
+        vm.assume(amountLoaned > 0);
+        vm.assume(actionHandler != address(0));
+        vm.assume(actionHandler != liquidityProvider);
+
+        vm.prank(creator);
+        pool.setOriginationFee(originationFee);
+
+        vault.setTotalValue(collateralValue);
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(liquidity, liquidityProvider);
+
+        uint256 treasuryBalancePre = pool.realisedLiquidityOf(treasury);
+
+        vm.startPrank(vaultOwner);
+        // When: vaultOwner does action with leverage of amountLoaned
+        pool.doActionWithLeverage(amountLoaned, address(vault), actionHandler, actionData, emptyBytes3);
+        vm.stopPrank();
+
+        uint256 treasuryBalancePost = pool.realisedLiquidityOf(treasury);
+
+        // Then: balanceOf pool should be equal to liquidity minus amountLoaned, balanceOf "actionHandler" should be equal to amountLoaned,
+        // balanceOf vault should be equal to amountLoaned + fee
+        assertEq(asset.balanceOf(address(pool)), liquidity - amountLoaned);
+        assertEq(asset.balanceOf(actionHandler), amountLoaned);
+        assertEq(debt.balanceOf(address(vault)), amountLoaned + (amountLoaned * originationFee / 10000));
+        assertEq(treasuryBalancePre + (amountLoaned * originationFee / 10000), treasuryBalancePost);
+    }
+
+    function testSuccess_doActionWithLeverage_EmitReferralEvent(
+        uint256 amountLoaned,
+        uint256 collateralValue,
+        uint128 liquidity,
+        address actionHandler,
+        bytes calldata actionData,
+        uint16 originationFee,
+        bytes3 ref
+    ) public {
+        vm.assume(amountLoaned <= type(uint256).max / (uint256(originationFee) + 1));
+        vm.assume(amountLoaned <= type(uint256).max - (amountLoaned * originationFee / 10000));
+        vm.assume(collateralValue >= amountLoaned + (amountLoaned * originationFee / 10000));
+        vm.assume(liquidity >= amountLoaned);
+        vm.assume(amountLoaned > 0);
+        vm.assume(actionHandler != address(0));
+        vm.assume(actionHandler != liquidityProvider);
+
+        uint256 amountLoanedWithFee = amountLoaned + (amountLoaned * originationFee / 10000);
+
+        vm.prank(creator);
+        pool.setOriginationFee(originationFee);
+
+        vault.setTotalValue(collateralValue);
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(liquidity, liquidityProvider);
+
+        vm.startPrank(vaultOwner);
+        vm.expectEmit(true, true, true, true);
+        emit MarginIssued(address(vault), ref, amountLoanedWithFee);
+        // When: vaultOwner does action with leverage of amountLoaned
+        pool.doActionWithLeverage(amountLoaned, address(vault), actionHandler, actionData, ref);
+        vm.stopPrank();
     }
 }
 
@@ -1193,7 +1353,7 @@ contract AccountingTest is LendingPoolTest {
         vault.setTotalValue(realisedDebt);
 
         vm.prank(vaultOwner);
-        pool.borrow(realisedDebt, address(vault), vaultOwner);
+        pool.borrow(realisedDebt, address(vault), vaultOwner, emptyBytes3);
 
         stdstore.target(address(pool)).sig(pool.interestRate.selector).checked_write(interestRate);
 
@@ -1226,7 +1386,7 @@ contract AccountingTest is LendingPoolTest {
         vault.setTotalValue(realisedDebt);
 
         vm.prank(vaultOwner);
-        pool.borrow(realisedDebt, address(vault), vaultOwner);
+        pool.borrow(realisedDebt, address(vault), vaultOwner, emptyBytes3);
 
         // When: deltaTimestamp amount of time has passed
         vm.warp(block.timestamp + deltaTimestamp);
@@ -1316,7 +1476,7 @@ contract InterestsTest is LendingPoolTest {
         vm.prank(address(srTranche));
         pool.depositInLendingPool(realisedLiquidity, liquidityProvider);
         vm.prank(vaultOwner);
-        pool.borrow(realisedDebt, address(vault), address(vault));
+        pool.borrow(realisedDebt, address(vault), address(vault), emptyBytes3);
 
         // And: deltaTimestamp have passed
         uint256 start_timestamp = block.timestamp;
@@ -1557,7 +1717,7 @@ contract DefaultTest is LendingPoolTest {
         vm.prank(address(srTranche));
         pool.depositInLendingPool(amountLoaned, liquidityProvider);
         vm.prank(vaultOwner);
-        pool.borrow(amountLoaned, address(vault), vaultOwner);
+        pool.borrow(amountLoaned, address(vault), vaultOwner, emptyBytes3);
         // And: The liquidator is set
         vm.prank(creator);
         pool.setLiquidator(liquidator);
@@ -1583,7 +1743,7 @@ contract DefaultTest is LendingPoolTest {
         vm.prank(address(srTranche));
         pool.depositInLendingPool(amountLoaned, liquidityProvider);
         vm.prank(vaultOwner);
-        pool.borrow(amountLoaned, address(vault), vaultOwner);
+        pool.borrow(amountLoaned, address(vault), vaultOwner, emptyBytes3);
         // And: The liquidator is set
         vm.prank(creator);
         pool.setLiquidator(liquidator);
@@ -1850,7 +2010,7 @@ contract VaultTest is LendingPoolTest {
         vm.assume(amountLoaned > 0);
         vault.setTotalValue(amountLoaned);
         vm.prank(vaultOwner);
-        pool.borrow(amountLoaned, address(vault), vaultOwner);
+        pool.borrow(amountLoaned, address(vault), vaultOwner, emptyBytes3);
 
         // When: The vault fetches its open position
         uint256 openPosition = pool.getOpenPosition(address(vault));
@@ -1913,7 +2073,7 @@ contract GuardianTest is LendingPoolTest {
         vm.startPrank(vaultOwner);
         // And: the pool should not be able to borrow
         vm.expectRevert("Guardian: borrow paused");
-        pool.borrow(uint256(20 * 10 ** 18), address(vault), address(412));
+        pool.borrow(uint256(20 * 10 ** 18), address(vault), address(412), emptyBytes3);
         vm.stopPrank();
     }
 

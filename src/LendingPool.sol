@@ -35,6 +35,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     uint256 public constant YEARLY_SECONDS = 31_536_000;
 
     uint32 public lastSyncedTimestamp;
+    uint16 public originationFee; //factor 10_000, meaning 0.1% = 10
     uint256 public totalWeight;
     uint256 public totalRealisedLiquidity;
     uint256 public feeWeight;
@@ -52,6 +53,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     mapping(address => mapping(address => uint256)) public creditAllowance;
 
     event CreditApproval(address indexed vault, address indexed beneficiary, uint256 amount);
+    event MarginIssued(address indexed vault, bytes3 indexed referrer, uint256 amount);
 
     modifier onlyLiquidator() {
         require(liquidator == msg.sender, "UNAUTHORIZED");
@@ -147,7 +149,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @notice Changes the weight of the protocol fee
      * @param _feeWeight The new weight of the protocol fee
      * @dev The weight the fee determines the relative share of the yield (interest payments) that goes to the protocol treasury
-     * @dev ToDo: TBD of we want the weight to be changeable, should be fixed percentage of weight? Now protocol yield is ruggable
+     * @dev Setting feeWeight to a very high value will cause the protocol to collect all interest fees from that moment on.
      */
     function setFeeWeight(uint256 _feeWeight) external onlyOwner {
         totalWeight = totalWeight - feeWeight + _feeWeight;
@@ -160,6 +162,14 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      */
     function setTreasury(address treasury_) external onlyOwner {
         treasury = treasury_;
+    }
+
+    /**
+     * @notice Sets the new origination fee
+     * @param originationFee_ The new origination fee
+     */
+    function setOriginationFee(uint16 originationFee_) external onlyOwner {
+        originationFee = uint16(originationFee_);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -235,27 +245,37 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param to The address who receives the lended out underlying tokens
      * @dev The sender might be different as the owner if they have the proper allowances
      */
-    function borrow(uint256 amount, address vault, address to) public whenBorrowNotPaused processInterests {
+    function borrow(uint256 amount, address vault, address to, bytes3 referrer)
+        public
+        whenBorrowNotPaused
+        processInterests
+    {
         require(IFactory(vaultFactory).isVault(vault), "LP_B: Not a vault");
+
+        uint256 amountWithFee = amount + (amount * originationFee) / 10_000;
 
         //Check allowances to take debt
         if (IVault(vault).owner() != msg.sender) {
             uint256 allowed = creditAllowance[vault][msg.sender];
             if (allowed != type(uint256).max) {
-                creditAllowance[vault][msg.sender] = allowed - amount;
+                creditAllowance[vault][msg.sender] = allowed - amountWithFee;
             }
         }
 
         //Call vault to check if there is sufficient collateral.
         //If so calculate and store the liquidation threshold.
-        require(IVault(vault).increaseMarginPosition(address(asset), amount), "LP_B: Reverted");
+        require(IVault(vault).increaseMarginPosition(address(asset), amountWithFee), "LP_B: Reverted");
 
         //Mint debt tokens to the vault
-        if (amount != 0) {
-            _deposit(amount, vault);
+        if (amountWithFee != 0) {
+            _deposit(amountWithFee, vault);
 
             //Transfer fails if there is insufficient liquidity in the pool
             asset.safeTransfer(to, amount);
+
+            realisedLiquidityOf[treasury] += amountWithFee - amount;
+
+            emit MarginIssued(vault, referrer, amountWithFee);
         }
     }
 
@@ -290,26 +310,35 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev The sender might be different as the owner if they have the proper allowances.
      * @dev vaultManagementAction() works similar to flash loans, this function optimistically calls external logic and checks for the vault state at the very end.
      */
-    function doActionWithLeverage(uint256 margin, address vault, address actionHandler, bytes calldata actionData)
-        public
-        processInterests
-    {
+    function doActionWithLeverage(
+        uint256 margin,
+        address vault,
+        address actionHandler,
+        bytes calldata actionData,
+        bytes3 referrer
+    ) public whenBorrowNotPaused processInterests {
         require(IFactory(vaultFactory).isVault(vault), "LP_DAWL: Not a vault");
+
+        uint256 marginWithFee = margin + (margin * originationFee) / 10_000;
 
         //Check allowances to take debt
         if (IVault(vault).owner() != msg.sender) {
             uint256 allowed = creditAllowance[vault][msg.sender];
             if (allowed != type(uint256).max) {
-                creditAllowance[vault][msg.sender] = allowed - margin;
+                creditAllowance[vault][msg.sender] = allowed - marginWithFee;
             }
         }
 
-        if (margin != 0) {
+        if (marginWithFee != 0) {
             //Mint debt tokens to the vault, debt must be minted Before the actions in the vault are performed.
-            _deposit(margin, vault);
+            _deposit(marginWithFee, vault);
 
             //Send Borrowed funds to the actionHandler
             asset.safeTransfer(actionHandler, margin);
+
+            realisedLiquidityOf[treasury] += marginWithFee - margin;
+
+            emit MarginIssued(vault, referrer, marginWithFee);
         }
 
         //The actionhandler will use the borrowed funds (optionally with additional assets previously deposited in the Vault)
