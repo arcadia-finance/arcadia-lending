@@ -238,7 +238,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     function borrow(uint256 amount, address vault, address to) public whenBorrowNotPaused processInterests {
         require(IFactory(vaultFactory).isVault(vault), "LP_B: Not a vault");
 
-        //Check allowances to send underlying to to
+        //Check allowances to take debt
         if (IVault(vault).owner() != msg.sender) {
             uint256 allowed = creditAllowance[vault][msg.sender];
             if (allowed != type(uint256).max) {
@@ -247,24 +247,22 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         }
 
         //Call vault to check if there is sufficient collateral.
-        //If so calculate and store the liquidation threshhold.
+        //If so calculate and store the liquidation threshold.
         require(IVault(vault).increaseMarginPosition(address(asset), amount), "LP_B: Reverted");
 
         //Mint debt tokens to the vault
         if (amount != 0) {
             _deposit(amount, vault);
-        }
 
-        //Transfer fails if there is insufficient liquidity in the pool
-        asset.safeTransfer(to, amount);
+            //Transfer fails if there is insufficient liquidity in the pool
+            asset.safeTransfer(to, amount);
+        }
     }
 
     /**
      * @notice repays a loan
      * @param amount The amount of underlying ERC-20 tokens to be repaid
      * @param vault The address of the Arcadia Vault backing the loan
-     * @dev ToDo: should it be possible to trigger a repay on behalf of an other account,
-     * If so, work with allowances
      */
     function repay(uint256 amount, address vault) public whenRepayNotPaused processInterests {
         require(IFactory(vaultFactory).isVault(vault), "LP_R: Not a vault");
@@ -280,43 +278,48 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     }
 
     /* //////////////////////////////////////////////////////////////
-                            LEVERAGE LOGIC
+                        LEVERAGED ACTIONS LOGIC
     ////////////////////////////////////////////////////////////// */
 
-    // /**
-    //  * @notice Takes a leveraged position backed by collateral in an Arcadia Vault
-    //  * @param amount The amount of underlying ERC-20 tokens to be lent out
-    //  * @param vault The address of the Arcadia Vault backing the loan
-    //  * @dev The sender might be different as the owner if they have the proper allowances
-    //  */
-    // function takeLeverage(uint256 amount, address vault) public processInterests {
-    //     require(IFactory(vaultFactory).isVault(vault), "LP_B: Not a vault");
+    /**
+     * @notice Execute and interact with external logic on leverage.
+     * @param margin The amount of underlying ERC-20 tokens to be lent out
+     * @param vault The address of the Arcadia Vault backing the loan
+     * @param actionHandler the address of the action handler to call
+     * @param actionData a bytes object containing two actionAssetData structs, an address array and a bytes array
+     * @dev The sender might be different as the owner if they have the proper allowances.
+     * @dev vaultManagementAction() works similar to flash loans, this function optimistically calls external logic and checks for the vault state at the very end.
+     */
+    function doActionWithLeverage(uint256 margin, address vault, address actionHandler, bytes calldata actionData)
+        public
+        processInterests
+    {
+        require(IFactory(vaultFactory).isVault(vault), "LP_DAWL: Not a vault");
 
-    //     //Check allowances to send underlying to to
-    //     if (IVault(vault).owner() != msg.sender) {
-    //         uint256 allowed = creditAllowance[vault][msg.sender];
-    //         if (allowed != type(uint256).max) {
-    //             creditAllowance[vault][msg.sender] = allowed - amount;
-    //         }
-    //     }
+        //Check allowances to take debt
+        if (IVault(vault).owner() != msg.sender) {
+            uint256 allowed = creditAllowance[vault][msg.sender];
+            if (allowed != type(uint256).max) {
+                creditAllowance[vault][msg.sender] = allowed - margin;
+            }
+        }
 
-    //     //Deposit underlying assets in owners vault
-    //     asset.approve(vault, amount);
-    //     address[] memory assetAddresses = new address[](1);
-    //     assetAddresses[0] = asset;
-    //     uint256[] memory assetAmounts = new uint256[](1);
-    //     assetAmounts[0] = amount;
-    //     IVault(vault).deposit(assetAddresses, new uint256[](1), assetAmounts, new uint256[](1));
+        if (margin != 0) {
+            //Mint debt tokens to the vault, debt must be minted Before the actions in the vault are performed.
+            _deposit(margin, vault);
 
-    //     //Call vault to check if there is sufficient collateral.
-    //     //If so calculate and store the liquidation threshhold.
-    //     require(IVault(vault).increaseMarginPosition(address(asset), amount), "LP_B: Reverted");
+            //Send Borrowed funds to the actionHandler
+            asset.safeTransfer(actionHandler, margin);
+        }
 
-    //     //Mint debt tokens to the vault
-    //     if (amount != 0) {
-    //         _deposit(amount, vault);
-    //     }
-    // }
+        //The actionhandler will use the borrowed funds (optionally with additional assets previously deposited in the Vault)
+        //to excecute one or more actions (swap, deposit, mint...).
+        //Next the actionhandler will deposit any of the remaining funds or any of the recipient token
+        //resulting from the actions back into the vault.
+        //As last step, after all assets are deposited back into the vault a final health check is done:
+        //The Collateral Value of all assets in the vault is bigger than the total liabilities against the vault (including the margin taken during this function).
+        IVault(vault).vaultManagementAction(actionHandler, actionData);
+    }
 
     /* //////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
