@@ -810,9 +810,6 @@ contract LendingLogicTest is LendingPoolTest {
         assertEq(asset.balanceOf(address(pool)), liquidity - amountLoaned);
         assertEq(asset.balanceOf(to), amountLoaned);
 
-        emit log_named_uint("balanceDebt", debt.balanceOf(address(vault)));
-        emit log_named_uint("calc", amountLoaned + (amountLoaned * originationFee / 10000));
-
         assertEq(debt.balanceOf(address(vault)), amountLoaned + (amountLoaned * originationFee / 10000));
         assertEq(treasuryBalancePre + (amountLoaned * originationFee / 10000), treasuryBalancePost);
     }
