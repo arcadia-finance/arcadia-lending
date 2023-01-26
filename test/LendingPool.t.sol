@@ -368,6 +368,47 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         pool.depositInLendingPool(amount1, liquidityProvider);
     }
 
+    function testRevert_depositInLendingPool_SupplyCap(uint256 amount) public {
+        // Given: amount should be greater than 1
+        vm.assume(amount > 1);
+
+        // When: supply cap is set to 1
+        vm.prank(creator);
+        pool.setSupplyCap(1);
+
+        // Then: depositInLendingPool is reverted with SUPPLY_CAP_REACHED
+        vm.expectRevert("LP_DFLP: Supply cap exceeded");
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(amount, liquidityProvider);
+    }
+
+    function testSuccess_depositInLendingPool_SupplyCapBackToZero(uint256 amount) public {
+        // Given: amount should be greater than 1
+        vm.assume(amount > 1);
+
+        // When: supply cap is set to 1
+        vm.prank(creator);
+        pool.setSupplyCap(1);
+
+        // Then: depositInLendingPool is reverted with SUPPLY_CAP_REACHED
+        vm.expectRevert("LP_DFLP: Supply cap exceeded");
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(amount, liquidityProvider);
+
+        // When: supply cap is set to 0
+        vm.prank(creator);
+        pool.setSupplyCap(0);
+
+        // Then: depositInLendingPool is succeeded
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(amount, liquidityProvider);
+
+        // And: supplyBalances srTranche should be amount, totalSupply should be amount, supplyBalances pool should be amount
+        assertEq(pool.realisedLiquidityOf(address(srTranche)), amount);
+        assertEq(pool.totalRealisedLiquidity(), amount);
+        assertEq(asset.balanceOf(address(pool)), amount);
+    }
+
     function testSuccess_depositInLendingPool_FirstDepositByTranche(uint256 amount) public {
         vm.prank(address(srTranche));
         // When: srTranche deposit
@@ -661,6 +702,123 @@ contract LendingLogicTest is LendingPoolTest {
         vm.expectRevert("Guardian: borrow paused");
         vm.prank(vaultOwner);
         pool.borrow(amountLoaned, address(vault), to, emptyBytes3);
+    }
+
+    function testRevert_borrow_BorrowCap(uint256 amountLoaned, uint256 collateralValue, uint128 liquidity, address to)
+        public
+    {
+        // Given: collateralValue bigger than equal to amountLoaned, liquidity is bigger than 0 and amountLoaned,
+        // to is not address 0, creator setDebtToken to debt, liquidityProvider approve pool to max value,
+        // srTranche deposit liquidity, setTotalValue to collateral Value
+        vm.assume(amountLoaned > 1);
+        vm.assume(collateralValue >= amountLoaned);
+        vm.assume(liquidity > amountLoaned);
+        vm.assume(liquidity > 0);
+        vm.assume(to != address(0));
+
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(liquidity, liquidityProvider);
+        vault.setTotalValue(collateralValue);
+
+        // When: borrow cap is set to 1
+        vm.prank(creator);
+        pool.setBorrowCap(1);
+
+        // Then: borrow should revert with "LP_B: Borrow cap reached"
+        vm.expectRevert("DT_D: BORROW_CAP_EXCEEDED");
+        vm.prank(vaultOwner);
+        pool.borrow(amountLoaned, address(vault), to, emptyBytes3);
+    }
+
+    function testSuccess_borrow_BorrowCapSetToZeroAgain(
+        uint256 amountLoaned,
+        uint256 collateralValue,
+        uint128 liquidity,
+        address to
+    ) public {
+        // Given: collateralValue bigger than equal to amountLoaned, liquidity is bigger than 0 and amountLoaned,
+        // to is not address 0, creator setDebtToken to debt, liquidityProvider approve pool to max value,
+        // srTranche deposit liquidity, setTotalValue to collateral Value
+        vm.assume(amountLoaned > 1);
+        vm.assume(collateralValue >= amountLoaned);
+        vm.assume(liquidity > amountLoaned);
+        vm.assume(liquidity > 0);
+        vm.assume(to != address(0));
+
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(liquidity, liquidityProvider);
+        vault.setTotalValue(collateralValue);
+
+        // When: borrow cap is set to 1
+        vm.prank(creator);
+        pool.setBorrowCap(1);
+
+        // Then: borrow should revert with "LP_B: Borrow cap reached"
+        vm.expectRevert("DT_D: BORROW_CAP_EXCEEDED");
+        vm.prank(vaultOwner);
+        pool.borrow(amountLoaned, address(vault), to, emptyBytes3);
+
+        // When: borrow cap is set to 0
+        vm.prank(creator);
+        pool.setBorrowCap(0);
+
+        // Then: borrow should succeed
+        vm.prank(vaultOwner);
+        pool.borrow(amountLoaned, address(vault), to, emptyBytes3);
+        assertEq(asset.balanceOf(address(pool)), liquidity - amountLoaned);
+        assertEq(asset.balanceOf(to), amountLoaned);
+        assertEq(debt.balanceOf(address(vault)), amountLoaned);
+    }
+
+    function testSuccess_borrow_BorrowCapNotReached(
+        uint256 amountLoaned,
+        uint256 amountLoanedToFail,
+        uint256 collateralValue,
+        uint128 liquidity,
+        address to
+    ) public {
+        // Given: amountLoaned is greater than 1, and less than 100
+        // collateralValue bigger than equal to amountLoaned, liquidity is bigger than 0 and amountLoaned,
+        // to is not address 0, creator setDebtToken to debt, liquidityProvider approve pool to max value,
+        // srTranche deposit liquidity, setTotalValue to collateral Value
+        vm.assume(amountLoaned > 1);
+        vm.assume(amountLoaned < 100);
+        vm.assume(amountLoanedToFail > 100);
+        vm.assume(collateralValue >= amountLoanedToFail);
+        vm.assume(liquidity > amountLoaned);
+        vm.assume(liquidity > 0);
+        vm.assume(to != address(0));
+
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(liquidity, liquidityProvider);
+        vault.setTotalValue(collateralValue);
+
+        // When: borrow cap is set to 1
+        vm.prank(creator);
+        pool.setBorrowCap(1);
+
+        // Then: borrow should revert with "LP_B: Borrow cap reached"
+        vm.expectRevert("DT_D: BORROW_CAP_EXCEEDED");
+        vm.prank(vaultOwner);
+        pool.borrow(amountLoaned, address(vault), to, emptyBytes3);
+
+        // When: borrow cap is set to 100 which is lower than the amountLoaned
+        vm.prank(creator);
+        pool.setBorrowCap(100);
+
+        // Then: borrow should still fail with exceeding amount
+        vm.expectRevert("DT_D: BORROW_CAP_EXCEEDED");
+        vm.prank(vaultOwner);
+        pool.borrow(amountLoanedToFail, address(vault), to, emptyBytes3);
+
+        // When: right amount is used
+        vm.prank(vaultOwner);
+        pool.borrow(amountLoaned, address(vault), to, emptyBytes3);
+
+        // Then: borrow should succeed
+        assertEq(asset.balanceOf(address(pool)), liquidity - amountLoaned);
+        assertEq(asset.balanceOf(to), amountLoaned);
+        assertEq(debt.balanceOf(address(vault)), amountLoaned);
     }
 
     function testSuccess_borrow_ByVaultOwner(
