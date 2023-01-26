@@ -43,7 +43,7 @@ contract DeployScript is DSTest, Script {
         pool.setVaultVersion(1, true);
         pool.addTranche(address(srTranche), 50);
         pool.addTranche(address(jrTranche), 50);
-        pool.setFeeWeight(10);
+        pool.setTreasuryInterestWeight(10);
         vm.stopPrank();
     }
 }

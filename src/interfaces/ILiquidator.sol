@@ -7,5 +7,5 @@
 pragma solidity ^0.8.13;
 
 interface ILiquidator {
-    function startAuction(address vault, uint256 openDebt) external returns (address originalOwner);
+    function startAuction(address vault, uint256 openDebt) external;
 }

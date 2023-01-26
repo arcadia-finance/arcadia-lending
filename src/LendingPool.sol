@@ -10,6 +10,7 @@ import {Owned} from "../lib/solmate/src/auth/Owned.sol";
 import {Auth} from "../lib/solmate/src/auth/Auth.sol";
 import {ERC20, ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
+import {SafeCastLib} from "../lib/solmate/src/utils/SafeCastLib.sol";
 import {FixedPointMathLib} from "../lib/solmate/src/utils/FixedPointMathLib.sol";
 import {LogExpMath} from "./utils/LogExpMath.sol";
 import "./interfaces/ITranche.sol";
@@ -36,19 +37,20 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     uint256 public constant YEARLY_SECONDS = 31_536_000;
 
     uint32 public lastSyncedTimestamp;
-    uint8 public originationFee; //4 decimals precision (10 equals 0.001 or 0.1%)
-    uint256 public totalInterestWeight;
-    uint256 public totalLiquidationWeight;
-    uint256 public totalRealisedLiquidity;
-    uint256 public interestWeightTreasury;
-    uint256 public liquidationWeightTreasury;
+    uint8 public originationFee; //4 decimals precision (10 equals 0.001 or 0.1%), 255 = 2.55% max
+    uint24 public totalInterestWeight;
+    uint16 public interestWeightTreasury;
+    uint24 public totalLiquidationWeight;
+    uint16 public liquidationWeightTreasury;
+
+    uint128 public totalRealisedLiquidity; //32 + 8 + 24 + 16 + 24 + 16 + 136 = 256 
 
     address public treasury;
     address public liquidator;
     address public vaultFactory;
 
-    uint256[] public interestWeightTranches;
-    uint256[] public liquidationWeightTranches;
+    uint16[] public interestWeightTranches;
+    uint16[] public liquidationWeightTranches;
     address[] public tranches;
 
     mapping(address => bool) public isTranche;
@@ -107,7 +109,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev The interestWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
      * @dev ToDo: For now manually add newly created tranche, do via factory in future?
      */
-    function addTranche(address tranche, uint256 _weight) public onlyOwner {
+    function addTranche(address tranche, uint16 _weight) public onlyOwner {
         require(!isTranche[tranche], "TR_AD: Already exists");
         totalInterestWeight += _weight;
         interestWeightTranches.push(_weight);
@@ -123,7 +125,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev The interestWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
      * @dev ToDo: TBD of we want the interestWeight to be changeable?
      */
-    function setWeight(uint256 index, uint256 _weight) public onlyOwner {
+    function setInterestWeight(uint256 index, uint16 _weight) public onlyOwner {
         require(index < tranches.length, "TR_SW: Inexisting Tranche");
         totalInterestWeight = totalInterestWeight - interestWeightTranches[index] + _weight;
         interestWeightTranches[index] = _weight;
@@ -152,14 +154,26 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
     /**
      * @notice Changes the interestWeight of the protocol fee
-     * @param _interestWeightTreasury The new interestWeight of the protocol fee
-     * @dev The interestWeight the fee determines the relative share of the yield (interest payments) that goes to the protocol treasury
+     * @param interestWeightTreasury_ The new interestWeight of the protocol fee
+     * @dev The interestWeight fee determines the relative share of the yield (interest payments) that goes to the protocol treasury
      * @dev Setting interestWeightTreasury to a very high value will cause the protocol to collect all interest fees from that moment on.
-     * Although this will affect the future profits of liquidity providers, no funds nor realized interest is at risk for LPs.
+     * Although this will affect the future profits of liquidity providers, no funds nor realized interest are at risk for LPs.
      */
-    function setFeeWeight(uint256 _interestWeightTreasury) external onlyOwner {
-        totalInterestWeight = totalInterestWeight - interestWeightTreasury + _interestWeightTreasury;
-        interestWeightTreasury = _interestWeightTreasury;
+    function setTreasuryInterestWeight(uint16 interestWeightTreasury_) external onlyOwner {
+        totalInterestWeight = totalInterestWeight - interestWeightTreasury + interestWeightTreasury_;
+        interestWeightTreasury = interestWeightTreasury_;
+    }
+
+    /**
+     * @notice Changes the liquidationWeight of the liquidation penalty fee
+     * @param liquidationWeightTreasury_ The new liquidationWeight of the liquidation penalty fee
+     * @dev The liquidationWeight fee determines the relative share of the liquidation penalty that goes to the protocol treasury
+     * @dev Setting liquidationWeightTreasury to a very high value will cause the protocol to collect all liquidation penalty fees from that moment on.
+     * Although this will affect the future profits of liquidity providers in the Jr tranche, no funds nor realized interest are at risk for LPs.
+     */
+    function setTreasuryLiquidationWeight(uint16 liquidationWeightTreasury_) external onlyOwner {
+        totalLiquidationWeight = totalLiquidationWeight - liquidationWeightTreasury + liquidationWeightTreasury_;
+        liquidationWeightTreasury = liquidationWeightTreasury_;
     }
 
     /**
@@ -173,6 +187,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     /**
      * @notice Sets the new origination fee
      * @param originationFee_ The new origination fee
+     * @dev originationFee is limited by being a uint8 -> max value is 2.55%
+     * 4 decimal precision (10 = 0.1%)
      */
     function setOriginationFee(uint8 originationFee_) external onlyOwner {
         originationFee = uint8(originationFee_);
@@ -203,7 +219,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         unchecked {
             realisedLiquidityOf[msg.sender] += assets;
-            totalRealisedLiquidity += assets;
+            totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
         }
     }
 
@@ -216,7 +232,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         require(realisedLiquidityOf[msg.sender] >= assets, "LP_WFLP: Amount exceeds balance");
 
         realisedLiquidityOf[msg.sender] -= assets;
-        totalRealisedLiquidity -= assets;
+        totalRealisedLiquidity -= SafeCastLib.safeCastTo128(assets);
 
         asset.safeTransfer(receiver, assets);
     }
@@ -386,7 +402,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         if (lastSyncedTimestamp != uint32(block.timestamp)) {
             // The total liquidity of a tranche equals the sum of the realised liquidity
             // of the tranche, and its pending interests
-            uint256 interest = calcUnrealisedDebt().mulDivUp(interestWeight[owner_], totalInterestWeight);
+            uint256 interest = uint256(calcUnrealisedDebt()).mulDivUp(interestWeight[owner_], totalInterestWeight);
             assets = realisedLiquidityOf[owner_] + interest;
         } else {
             assets = realisedLiquidityOf[owner_];
@@ -430,6 +446,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     function calcUnrealisedDebt() public view returns (uint256 unrealisedDebt) {
         uint256 base;
         uint256 exponent;
+        uint256 unrealisedDebt256;
 
         unchecked {
             //gas: can't overflow for reasonable interest rates
@@ -445,8 +462,10 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             //over a period of 5 years
             //this won't overflow as long as opendebt < 3402823669209384912995114146594816
             //which is 3.4 million billion *10**18 decimals
-            unrealisedDebt = (realisedDebt * (LogExpMath.pow(base, exponent) - 1e18)) / 1e18;
+            unrealisedDebt256 = (uint256(realisedDebt) * (LogExpMath.pow(base, exponent) - 1e18)) / 1e18;
         }
+
+        return SafeCastLib.safeCastTo128(unrealisedDebt256);
     }
 
     /**
@@ -459,7 +478,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         uint256 trancheShare;
         for (uint256 i; i < tranches.length;) {
-            trancheShare = assets.mulDivDown(interestWeightTranches[i], totalInterestWeight);
+            trancheShare = uint256(assets).mulDivDown(interestWeightTranches[i], totalInterestWeight);
             unchecked {
                 realisedLiquidityOf[tranches[i]] += trancheShare;
                 remainingAssets -= trancheShare;
@@ -467,7 +486,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             }
         }
         unchecked {
-            totalRealisedLiquidity += assets;
+            totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
 
             // Add the remainingAssets to the treasury balance
             realisedLiquidityOf[treasury] += remainingAssets;
@@ -558,28 +577,27 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         if (badDebt != 0) {
             _processDefault(badDebt);
+            totalRealisedLiquidity = SafeCastLib.safeCastTo128(uint256(totalRealisedLiquidity) - badDebt + liquidationInitiatorReward);
         } else {
-            //Process liquidationPenalty
+            totalRealisedLiquidity =
+                SafeCastLib.safeCastTo128(uint256(totalRealisedLiquidity) + liquidationInitiatorReward + liquidationPenalty + remainder);
+
+            // ToDo:Process liquidationPenalty
             if (remainder != 0) {
                 //Make remainder claimable by originalOwner
-                realisedLiquidityOf[originalOwner] += liquidationInitiatorReward;
+                realisedLiquidityOf[originalOwner] += remainder;
             }
         }
     }
 
     /**
      * @notice Handles the bookkeeping in case of bad debt (Vault became undercollateralised).
-     * @param assets The total amount of underlying assets that need to be written off as bad debt.
+     * @param badDebt The total amount of underlying assets that need to be written off as bad debt.
      * @dev The order of the tranches is important, the most senior tranche is at index 0, the most junior at the last index.
-     * @dev The most junior tranche will loose its underlying capital first. If all liquidty of a certain Tranche is written off,
+     * @dev The most junior tranche will loose its underlying assets first. If all liquidty of a certain Tranche is written off,
      * the complete tranche is locked and removed. If there is still remaining bad debt, the next Tranche starts losing capital.
      */
-    function _processDefault(uint256 assets) internal {
-        if (totalRealisedLiquidity < assets) {
-            //Should never be possible, this means the total protocol has more debt than claimable liquidity.
-            assets = totalRealisedLiquidity;
-        }
-
+    function _processDefault(uint256 badDebt) internal {
         address tranche;
         uint256 maxBurned;
         for (uint256 i = tranches.length; i > 0;) {
@@ -588,19 +606,17 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             }
             tranche = tranches[i];
             maxBurned = realisedLiquidityOf[tranche];
-            if (assets < maxBurned) {
+            if (badDebt < maxBurned) {
                 // burn
-                realisedLiquidityOf[tranche] -= assets;
-                totalRealisedLiquidity -= assets;
+                realisedLiquidityOf[tranche] -= badDebt;
                 break;
             } else {
-                ITranche(tranche).lock();
+                ITranche(tranche).lock(); //todo gas: can be removed
                 // burn
                 realisedLiquidityOf[tranche] -= maxBurned;
-                totalRealisedLiquidity -= maxBurned;
                 _popTranche(i, tranche);
                 unchecked {
-                    assets -= maxBurned;
+                    badDebt -= maxBurned;
                 }
             }
         }
@@ -615,16 +631,26 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         uint256 remainingAssets = assets;
 
         uint256 trancheShare;
+        uint256 weightOfTranche;
         for (uint256 i; i < tranches.length;) {
-            trancheShare = assets.mulDivDown(interestWeightTranches[i], totalInterestWeight);
+            weightOfTranche = liquidationWeightTranches[i];
+
+            if (weightOfTranche != 0) {
+                //skip if weight is zero, which is the case for Sr tranche
+                trancheShare = uint256(assets).mulDivDown(weightOfTranche, totalLiquidationWeight);
+                unchecked {
+                    realisedLiquidityOf[tranches[i]] += trancheShare;
+                    remainingAssets -= trancheShare;
+                }
+            }
+
             unchecked {
-                realisedLiquidityOf[tranches[i]] += trancheShare;
-                remainingAssets -= trancheShare;
                 ++i;
             }
         }
+
         unchecked {
-            totalRealisedLiquidity += assets;
+            totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
 
             // Add the remainingAssets to the treasury balance
             realisedLiquidityOf[treasury] += remainingAssets;
