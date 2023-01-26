@@ -43,7 +43,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     uint24 public totalLiquidationWeight;
     uint16 public liquidationWeightTreasury;
 
-    uint128 public totalRealisedLiquidity; //32 + 8 + 24 + 16 + 24 + 16 + 136 = 256 
+    uint128 public totalRealisedLiquidity; //32 + 8 + 24 + 16 + 24 + 16 + 136 = 256
 
     address public treasury;
     address public liquidator;
@@ -577,10 +577,12 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         if (badDebt != 0) {
             _processDefault(badDebt);
-            totalRealisedLiquidity = SafeCastLib.safeCastTo128(uint256(totalRealisedLiquidity) - badDebt + liquidationInitiatorReward);
-        } else {
             totalRealisedLiquidity =
-                SafeCastLib.safeCastTo128(uint256(totalRealisedLiquidity) + liquidationInitiatorReward + liquidationPenalty + remainder);
+                SafeCastLib.safeCastTo128(uint256(totalRealisedLiquidity) - badDebt + liquidationInitiatorReward);
+        } else {
+            totalRealisedLiquidity = SafeCastLib.safeCastTo128(
+                uint256(totalRealisedLiquidity) + liquidationInitiatorReward + liquidationPenalty + remainder
+            );
 
             // ToDo:Process liquidationPenalty
             if (remainder != 0) {

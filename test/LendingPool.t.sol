@@ -1717,9 +1717,7 @@ contract LiquidationTest is LendingPoolTest {
         assertEq(liquidator_, pool.liquidator());
     }
 
-    function testRevert_liquidateVault_Paused(address liquidationInitiator, address vault_)
-        public
-    {
+    function testRevert_liquidateVault_Paused(address liquidationInitiator, address vault_) public {
         // Given: The liquidator is set
         vm.prank(creator);
         pool.setLiquidator(address(liquidator));
@@ -1736,9 +1734,7 @@ contract LiquidationTest is LendingPoolTest {
         pool.liquidateVault(vault_);
     }
 
-    function testRevert_liquidateVault_NoDebt(address liquidationInitiator, address vault_)
-        public
-    {
+    function testRevert_liquidateVault_NoDebt(address liquidationInitiator, address vault_) public {
         // Given: The liquidator is set
         vm.prank(creator);
         pool.setLiquidator(address(liquidator));
@@ -1867,9 +1863,11 @@ contract LiquidationTest is LendingPoolTest {
         assertEq(pool.totalRealisedLiquidity(), totalAmount - badDebt);
     }
 
-    function testSuccess_settleLiquidation_TwoTranches(uint128 liquiditySenior, uint128 liquidityJunior, uint128 badDebt)
-        public
-    {
+    function testSuccess_settleLiquidation_TwoTranches(
+        uint128 liquiditySenior,
+        uint128 liquidityJunior,
+        uint128 badDebt
+    ) public {
         vm.assume(badDebt > 0);
         // Given: srTranche deposit liquiditySenior, jrTranche deposit liquidityJunior
         vm.assume(liquiditySenior <= type(uint128).max - liquidityJunior);
@@ -1959,8 +1957,13 @@ contract LiquidationTest is LendingPoolTest {
         uint128 liquidationPenalty,
         uint128 remainder
     ) public {
-        vm.assume(uint256(liquidity) + uint256(liquidationInitiatorReward) <= type(uint128).max - uint256(liquidationPenalty));
-        vm.assume(uint256(liquidity) + uint256(liquidationInitiatorReward) + uint256(liquidationPenalty) <= type(uint128).max - uint256(remainder));
+        vm.assume(
+            uint256(liquidity) + uint256(liquidationInitiatorReward) <= type(uint128).max - uint256(liquidationPenalty)
+        );
+        vm.assume(
+            uint256(liquidity) + uint256(liquidationInitiatorReward) + uint256(liquidationPenalty)
+                <= type(uint128).max - uint256(remainder)
+        );
         // Given: Liquidity is deposited in Lending Pool
         vm.prank(address(srTranche));
         pool.depositInLendingPool(liquidity, liquidityProvider);
