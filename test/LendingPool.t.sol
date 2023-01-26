@@ -129,15 +129,15 @@ contract TranchesTest is LendingPoolTest {
     function testSuccess_addTranche_SingleTranche() public {
         // Given: all neccesary contracts are deployed on the setup
         vm.prank(creator);
-        // When: creator calls addTranche with srTranche as Tranche address and 50 as weight
+        // When: creator calls addTranche with srTranche as Tranche address and 50 as interestWeight
         pool.addTranche(address(srTranche), 50);
 
-        // Then: pool totalWeight should be equal to 50, weights 0 should be equal to 50,
-        // weight of srTranche should be equal to 50, tranches 0 should be equal to srTranche,
+        // Then: pool totalInterestWeight should be equal to 50, interestWeightTranches 0 should be equal to 50,
+        // interestWeight of srTranche should be equal to 50, tranches 0 should be equal to srTranche,
         // isTranche for srTranche should return true
-        assertEq(pool.totalWeight(), 50);
-        assertEq(pool.weights(0), 50);
-        assertEq(pool.weight(address(srTranche)), 50);
+        assertEq(pool.totalInterestWeight(), 50);
+        assertEq(pool.interestWeightTranches(0), 50);
+        assertEq(pool.interestWeight(address(srTranche)), 50);
         assertEq(pool.tranches(0), address(srTranche));
         assertTrue(pool.isTranche(address(srTranche)));
     }
@@ -157,20 +157,20 @@ contract TranchesTest is LendingPoolTest {
     function testSuccess_addTranche_MultipleTranches() public {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
-        // When: creator calls addTranche for srTranche and jrTranche with 50 and 40 weights
+        // When: creator calls addTranche for srTranche and jrTranche with 50 and 40 interestWeightTranches
         pool.addTranche(address(srTranche), 50);
         pool.addTranche(address(jrTranche), 40);
         vm.stopPrank();
 
-        // Then: pool totalWeight should be equal to 90, weights index 0 should be equal to 50,
-        // weights index 1 should be equal to 40, weight of srTranche should be equal to 50,
-        // weight of jrTranche should be equal to 40, tranches index 0 should be equal to srTranche,
+        // Then: pool totalInterestWeight should be equal to 90, interestWeightTranches index 0 should be equal to 50,
+        // interestWeightTranches index 1 should be equal to 40, interestWeight of srTranche should be equal to 50,
+        // interestWeight of jrTranche should be equal to 40, tranches index 0 should be equal to srTranche,
         // tranches index 1 should be equal to jrTranche, isTranche should return true for both srTranche and jrTranche
-        assertEq(pool.totalWeight(), 90);
-        assertEq(pool.weights(0), 50);
-        assertEq(pool.weights(1), 40);
-        assertEq(pool.weight(address(srTranche)), 50);
-        assertEq(pool.weight(address(jrTranche)), 40);
+        assertEq(pool.totalInterestWeight(), 90);
+        assertEq(pool.interestWeightTranches(0), 50);
+        assertEq(pool.interestWeightTranches(1), 40);
+        assertEq(pool.interestWeight(address(srTranche)), 50);
+        assertEq(pool.interestWeight(address(jrTranche)), 40);
         assertEq(pool.tranches(0), address(srTranche));
         assertEq(pool.tranches(1), address(jrTranche));
         assertTrue(pool.isTranche(address(srTranche)));
@@ -207,10 +207,10 @@ contract TranchesTest is LendingPoolTest {
         pool.setWeight(0, 40);
         vm.stopPrank();
 
-        // Then: totalWeight should be equal to 40, weights index 0 should return 40, weight of srTranche should return 40
-        assertEq(pool.totalWeight(), 40);
-        assertEq(pool.weights(0), 40);
-        assertEq(pool.weight(address(srTranche)), 40);
+        // Then: totalInterestWeight should be equal to 40, interestWeightTranches index 0 should return 40, interestWeight of srTranche should return 40
+        assertEq(pool.totalInterestWeight(), 40);
+        assertEq(pool.interestWeightTranches(0), 40);
+        assertEq(pool.interestWeight(address(srTranche)), 40);
     }
 
     function testSuccess_popTranche() public {
@@ -224,11 +224,11 @@ contract TranchesTest is LendingPoolTest {
         // And: calls popTranche with 1 and jrTranche
         pool.popTranche(1, address(jrTranche));
 
-        // Then: pool totalWeight should be equal to 50, weights index 0 should be equal to 50,
+        // Then: pool totalInterestWeight should be equal to 50, interestWeightTranches index 0 should be equal to 50,
         // tranches index 0 should be equal to srTranche, isTranche should return true for srTranche,
         // isTranche should return false for jrTranche
-        assertEq(pool.totalWeight(), 50);
-        assertEq(pool.weights(0), 50);
+        assertEq(pool.totalInterestWeight(), 50);
+        assertEq(pool.interestWeightTranches(0), 50);
         assertEq(pool.tranches(0), address(srTranche));
         assertTrue(pool.isTranche(address(srTranche)));
         assertTrue(!pool.isTranche(address(jrTranche)));
@@ -259,23 +259,23 @@ contract ProtocolFeeTest is LendingPoolTest {
     function testSuccess_setFeeWeight() public {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
-        // When: creator addTranche with 50 weight, setFeeWeight 5
+        // When: creator addTranche with 50 interestWeight, setFeeWeight 5
         pool.addTranche(address(srTranche), 50);
         pool.setFeeWeight(5);
         vm.stopPrank();
 
-        // Then: totalWeight should be equal to 55, feeWeight should be equal to 5
-        assertEq(pool.totalWeight(), 55);
-        assertEq(pool.feeWeight(), 5);
+        // Then: totalInterestWeight should be equal to 55, interestWeightTreasury should be equal to 5
+        assertEq(pool.totalInterestWeight(), 55);
+        assertEq(pool.interestWeightTreasury(), 5);
 
         vm.startPrank(creator);
         // When: creator setFeeWeight 10
         pool.setFeeWeight(10);
         vm.stopPrank();
 
-        // Then: totalWeight should be equal to 60, feeWeight should be equal to 10
-        assertEq(pool.totalWeight(), 60);
-        assertEq(pool.feeWeight(), 10);
+        // Then: totalInterestWeight should be equal to 60, interestWeightTreasury should be equal to 10
+        assertEq(pool.totalInterestWeight(), 60);
+        assertEq(pool.interestWeightTreasury(), 10);
     }
 
     //setTreasury
@@ -1500,8 +1500,8 @@ contract InterestsTest is LendingPoolTest {
         uint8 weightJr,
         uint8 weightTreasury
     ) public {
-        uint256 totalWeight = uint256(weightSr) + uint256(weightJr) + uint256(weightTreasury);
-        vm.assume(totalWeight > 0);
+        uint256 totalInterestWeight = uint256(weightSr) + uint256(weightJr) + uint256(weightTreasury);
+        vm.assume(totalInterestWeight > 0);
         // Given: all necessary contracts are deployed on the setup
         vm.startPrank(creator);
         pool.setWeight(0, weightSr);
@@ -1514,8 +1514,8 @@ contract InterestsTest is LendingPoolTest {
 
         // Then: supplyBalances srTranche, jrTranche and treasury should be correct
         // TotalSupply should be equal to interest
-        uint256 interestSr = uint256(interests) * weightSr / totalWeight;
-        uint256 interestJr = uint256(interests) * weightJr / totalWeight;
+        uint256 interestSr = uint256(interests) * weightSr / totalInterestWeight;
+        uint256 interestJr = uint256(interests) * weightJr / totalInterestWeight;
         uint256 interestTreasury = interests - interestSr - interestJr;
 
         assertEq(pool.realisedLiquidityOf(address(srTranche)), interestSr);
@@ -1653,7 +1653,7 @@ contract DefaultTest is LendingPoolTest {
 
         vm.startPrank(creator);
         pool.setFeeWeight(10);
-        //Set Tranche weight on 0 so that all yield goes to treasury
+        //Set Tranche interestWeight on 0 so that all yield goes to treasury
         pool.addTranche(address(srTranche), 0);
         pool.addTranche(address(jrTranche), 0);
         pool.changeGuardian(creator);
@@ -1944,7 +1944,7 @@ contract VaultTest is LendingPoolTest {
 
         vm.startPrank(creator);
         pool.setFeeWeight(10);
-        //Set Tranche weight on 0 so that all yield goes to treasury
+        //Set Tranche interestWeight on 0 so that all yield goes to treasury
         pool.addTranche(address(srTranche), 50);
         pool.addTranche(address(jrTranche), 40);
         vm.stopPrank();
