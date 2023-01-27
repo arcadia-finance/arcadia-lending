@@ -554,15 +554,16 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     }
 
     /**
-     * @notice Settles bad debt of liquidations.
-     * @param originalOwner The
-     * @param badDebt The amount of debt that was not recouped by the auction
-     * @param liquidationInitiatorReward The amount
-     * in the edge case that the liquidation fee was bigger than the auction proceeds
-     * @dev This function is called by the Liquidator after a liquidation is finished,
-     * but only if there is bad debt.
+     * @notice Settles the liquidation after the auction is finished with the Creditor, Original owner and Service providers.
+     * @param vault The contract address of the vault.
+     * @param originalOwner The original owner of the vault before the auction.
+     * @param badDebt The amount of liabilities that was not recouped by the auction.
+     * @param liquidationInitiatorReward The Reward for the Liquidation Initiator.
+     * @param liquidationPenalty The additional penalty the `originalOwner` has to pay to the protocol.
+     * @param remainder Any funds remaining after the auction are returned back to the `originalOwner`.
+     * @dev This function is called by the Liquidator after a liquidation is finished.
      * @dev The liquidator will transfer the auction proceeds (the underlying asset)
-     * Directly back to the liquidity pool after liquidation.
+     * back to the liquidity pool after liquidation.
      */
     function settleLiquidation(
         address vault,
