@@ -216,7 +216,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         onlyTranche
         processInterests
     {
-        if (supplyCap > 0) require(totalSupply + assets <= supplyCap, "LP_DFLP: Supply cap exceeded");
+        if (supplyCap > 0) require(totalRealisedLiquidity + assets <= supplyCap, "LP_DFLP: Supply cap exceeded");
         // Need to transfer before minting or ERC777s could reenter.
         // Address(this) is trusted -> no risk on re-entrancy attack after transfer
         asset.transferFrom(from, address(this), assets);
