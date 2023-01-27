@@ -149,18 +149,20 @@ contract TranchesTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_addTranche_SingleTranche() public {
+    function testSuccess_addTranche_SingleTranche(uint16 interestWeight, uint16 liquidationWeight) public {
         // Given: all neccesary contracts are deployed on the setup
         vm.prank(creator);
         // When: creator calls addTranche with srTranche as Tranche address and 50 as interestWeight
-        pool.addTranche(address(srTranche), 50, 0);
+        pool.addTranche(address(srTranche), interestWeight, liquidationWeight);
 
         // Then: pool totalInterestWeight should be equal to 50, interestWeightTranches 0 should be equal to 50,
         // interestWeight of srTranche should be equal to 50, tranches 0 should be equal to srTranche,
         // isTranche for srTranche should return true
-        assertEq(pool.totalInterestWeight(), 50);
-        assertEq(pool.interestWeightTranches(0), 50);
-        assertEq(pool.interestWeight(address(srTranche)), 50);
+        assertEq(pool.totalInterestWeight(), interestWeight);
+        assertEq(pool.interestWeightTranches(0), interestWeight);
+        assertEq(pool.interestWeight(address(srTranche)), interestWeight);
+        assertEq(pool.totalLiquidationWeight(), liquidationWeight);
+        assertEq(pool.liquidationWeightTranches(0), liquidationWeight);
         assertEq(pool.tranches(0), address(srTranche));
         assertTrue(pool.isTranche(address(srTranche)));
     }
@@ -177,23 +179,26 @@ contract TranchesTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_addTranche_MultipleTranches() public {
+    function testSuccess_addTranche_MultipleTranches(uint16 interestWeightSr, uint16 liquidationWeightSr, uint16 interestWeightJr, uint16 liquidationWeightJr) public {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
         // When: creator calls addTranche for srTranche and jrTranche with 50 and 40 interestWeightTranches
-        pool.addTranche(address(srTranche), 50, 0);
-        pool.addTranche(address(jrTranche), 40, 20);
+        pool.addTranche(address(srTranche), interestWeightSr, liquidationWeightSr);
+        pool.addTranche(address(jrTranche), interestWeightJr, liquidationWeightJr);
         vm.stopPrank();
 
         // Then: pool totalInterestWeight should be equal to 90, interestWeightTranches index 0 should be equal to 50,
         // interestWeightTranches index 1 should be equal to 40, interestWeight of srTranche should be equal to 50,
         // interestWeight of jrTranche should be equal to 40, tranches index 0 should be equal to srTranche,
         // tranches index 1 should be equal to jrTranche, isTranche should return true for both srTranche and jrTranche
-        assertEq(pool.totalInterestWeight(), 90);
-        assertEq(pool.interestWeightTranches(0), 50);
-        assertEq(pool.interestWeightTranches(1), 40);
-        assertEq(pool.interestWeight(address(srTranche)), 50);
-        assertEq(pool.interestWeight(address(jrTranche)), 40);
+        assertEq(pool.totalInterestWeight(), uint256(interestWeightSr) + interestWeightJr);
+        assertEq(pool.interestWeightTranches(0), interestWeightSr);
+        assertEq(pool.interestWeightTranches(1), interestWeightJr);
+        assertEq(pool.interestWeight(address(srTranche)), interestWeightSr);
+        assertEq(pool.interestWeight(address(jrTranche)), interestWeightJr);
+        assertEq(pool.totalLiquidationWeight(), uint256(liquidationWeightSr) + liquidationWeightJr);
+        assertEq(pool.liquidationWeightTranches(0), liquidationWeightSr);
+        assertEq(pool.liquidationWeightTranches(1), liquidationWeightJr);
         assertEq(pool.tranches(0), address(srTranche));
         assertEq(pool.tranches(1), address(jrTranche));
         assertTrue(pool.isTranche(address(srTranche)));
@@ -236,11 +241,46 @@ contract TranchesTest is LendingPoolTest {
         assertEq(pool.interestWeight(address(srTranche)), 40);
     }
 
+    function testRevert_setLiquidationWeight_InvalidOwner(address unprivilegedAddress) public {
+        // Given: all neccesary contracts are deployed on the setup
+        vm.assume(unprivilegedAddress != creator);
+
+        vm.startPrank(unprivilegedAddress);
+        // When: unprivilegedAddress setInterestWeight
+        // Then: setInterestWeight should revert with UNAUTHORIZED
+        vm.expectRevert("UNAUTHORIZED");
+        pool.setLiquidationWeight(0, 50);
+        vm.stopPrank();
+    }
+
+    function testRevert_setLiquidationWeight_InexistingTranche() public {
+        // Given: all neccesary contracts are deployed on the setup
+        vm.startPrank(creator);
+        // When: creator setInterestWeight on index 0
+        // Then: setInterestWeight should revert with TR_SIW: Inexisting Tranche
+        vm.expectRevert("TR_SLW: Inexisting Tranche");
+        pool.setLiquidationWeight(0, 50);
+        vm.stopPrank();
+    }
+
+    function testSuccess_setLiquidationWeight() public {
+        // Given: all neccesary contracts are deployed on the setup
+        vm.startPrank(creator);
+        // When: creator calls addTranche with srTranche and 50, calss setInterestWeight with 0 and 40
+        pool.addTranche(address(srTranche), 50, 0);
+        pool.setLiquidationWeight(0, 40);
+        vm.stopPrank();
+
+        // Then: totalInterestWeight should be equal to 40, interestWeightTranches index 0 should return 40, interestWeight of srTranche should return 40
+        assertEq(pool.totalLiquidationWeight(), 40);
+        assertEq(pool.liquidationWeightTranches(0), 40);
+    }
+
     function testSuccess_popTranche() public {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
         // When: creator calls addTranche with srTranche and 50, jrTranche and 40
-        pool.addTranche(address(srTranche), 50, 0);
+        pool.addTranche(address(srTranche), 50, 10);
         pool.addTranche(address(jrTranche), 40, 20);
         vm.stopPrank();
 
@@ -252,6 +292,8 @@ contract TranchesTest is LendingPoolTest {
         // isTranche should return false for jrTranche
         assertEq(pool.totalInterestWeight(), 50);
         assertEq(pool.interestWeightTranches(0), 50);
+        assertEq(pool.totalLiquidationWeight(), 10);
+        assertEq(pool.liquidationWeightTranches(0), 10);
         assertEq(pool.tranches(0), address(srTranche));
         assertTrue(pool.isTranche(address(srTranche)));
         assertTrue(!pool.isTranche(address(jrTranche)));
@@ -301,6 +343,41 @@ contract ProtocolFeeTest is LendingPoolTest {
         assertEq(pool.interestWeightTreasury(), 10);
     }
 
+    function testRevert_setTreasuryLiquidationWeight_InvalidOwner(address unprivilegedAddress) public {
+        // Given: all neccesary contracts are deployed on the setup
+        vm.assume(unprivilegedAddress != creator);
+
+        vm.startPrank(unprivilegedAddress);
+        // When: unprivilegedAddress setTreasuryLiquidationWeight
+
+        // Then: setTreasuryLiquidationWeight should revert with UNAUTHORIZED
+        vm.expectRevert("UNAUTHORIZED");
+        pool.setTreasuryLiquidationWeight(5);
+        vm.stopPrank();
+    }
+
+    function testSuccess_setTreasuryLiquidationWeight() public {
+        // Given: all neccesary contracts are deployed on the setup
+        vm.startPrank(creator);
+        // When: creator addTranche with 50 liquidationWeight, setTreasuryLiquidationWeight 5
+        pool.addTranche(address(srTranche), 0, 50);
+        pool.setTreasuryLiquidationWeight(5);
+        vm.stopPrank();
+
+        // Then: totalLiquidationWeight should be equal to 55, liquidationWeightTreasury should be equal to 5
+        assertEq(pool.totalLiquidationWeight(), 55);
+        assertEq(pool.liquidationWeightTreasury(), 5);
+
+        vm.startPrank(creator);
+        // When: creator setTreasuryLiquidationWeight 10
+        pool.setTreasuryLiquidationWeight(10);
+        vm.stopPrank();
+
+        // Then: totalLiquidationWeight should be equal to 60, liquidationWeightTreasury should be equal to 10
+        assertEq(pool.totalLiquidationWeight(), 60);
+        assertEq(pool.liquidationWeightTreasury(), 10);
+    }
+
     //setTreasury
     function testRevert_setTreasury_InvalidOwner(address unprivilegedAddress) public {
         // Given: all neccesary contracts are deployed on the setup
@@ -323,6 +400,29 @@ contract ProtocolFeeTest is LendingPoolTest {
 
         // Then: treasury should creators address
         assertEq(pool.treasury(), creator);
+    }
+
+    function testRevert_setOriginationFee_InvalidOwner(address unprivilegedAddress) public {
+        // Given: all neccesary contracts are deployed on the setup
+        vm.assume(unprivilegedAddress != creator);
+
+        vm.startPrank(unprivilegedAddress);
+        // When: unprivilegedAddress calls setOriginationFee
+        // Then: setOriginationFee should revert with UNAUTHORIZED
+        vm.expectRevert("UNAUTHORIZED");
+        pool.setOriginationFee(10);
+        vm.stopPrank();
+    }
+
+    function testSuccess_setOriginationFee(uint8 fee) public {
+        // Given: all neccesary contracts are deployed on the setup
+        vm.startPrank(creator);
+        // When: creator calls setOriginationFee
+        pool.setOriginationFee(fee);
+        vm.stopPrank();
+
+        // Then: treasury should creators address
+        assertEq(pool.originationFee(), fee);
     }
 }
 

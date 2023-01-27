@@ -162,8 +162,10 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      */
     function _popTranche(uint256 index, address tranche) internal {
         totalInterestWeight -= interestWeightTranches[index];
+        totalLiquidationWeight -= liquidationWeightTranches[index];
         isTranche[tranche] = false;
         interestWeightTranches.pop();
+        liquidationWeightTranches.pop();
         tranches.pop();
     }
 
