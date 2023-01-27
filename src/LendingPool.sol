@@ -103,17 +103,22 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     /**
      * @notice Adds a tranche to the Lending Pool
      * @param tranche The address of the Tranche
-     * @param _weight The interestWeight of the specific Tranche
+     * @param _interestWeight The interestWeight of the specific Tranche
+     * @param liquidationWeight The liquidationWeight of the specific Tranche
      * @dev The order of the tranches is important, the most senior tranche is at index 0, the most junior at the last index.
      * @dev Each Tranche is an ERC-4626 contract
      * @dev The interestWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
      * @dev ToDo: For now manually add newly created tranche, do via factory in future?
      */
-    function addTranche(address tranche, uint16 _weight) public onlyOwner {
+    function addTranche(address tranche, uint16 _interestWeight, uint16 liquidationWeight) public onlyOwner {
         require(!isTranche[tranche], "TR_AD: Already exists");
-        totalInterestWeight += _weight;
-        interestWeightTranches.push(_weight);
-        interestWeight[tranche] = _weight;
+        totalInterestWeight += _interestWeight;
+        interestWeightTranches.push(_interestWeight);
+        interestWeight[tranche] = _interestWeight;
+
+        totalLiquidationWeight += liquidationWeight;
+        liquidationWeightTranches.push(liquidationWeight);
+
         tranches.push(tranche);
         isTranche[tranche] = true;
     }
@@ -589,6 +594,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             if (remainder != 0) {
                 //Make remainder claimable by originalOwner
                 realisedLiquidityOf[originalOwner] += remainder;
+                _syncLiquidationPenaltyToLiquidityProviders(liquidationPenalty);
             }
         }
     }
@@ -626,9 +632,9 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     }
 
     /**
-     * @notice Syncs interest payments to the Lending providers and the treasury.
-     * @param assets The total amount of underlying assets to be paid out as interests.
-     * @dev The interestWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
+     * @notice Syncs liquidation penalties to the Lending providers and the treasury.
+     * @param assets The total amount of underlying assets to be paid out as liquidation penalty.
+     * @dev The liquidationWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
      */
     function _syncLiquidationPenaltyToLiquidityProviders(uint256 assets) internal {
         uint256 remainingAssets = assets;
