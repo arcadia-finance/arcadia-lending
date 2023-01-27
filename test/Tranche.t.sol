@@ -47,7 +47,7 @@ abstract contract TrancheTest is Test {
         pool = new LendingPool(asset, treasury, address(factory));
 
         tranche = new Tranche(address(pool), "Senior", "SR");
-        pool.addTranche(address(tranche), 50);
+        pool.addTranche(address(tranche), 50, 0);
         vm.stopPrank();
 
         debt = DebtToken(address(pool));

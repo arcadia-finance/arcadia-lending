@@ -13,10 +13,10 @@ import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
 import {SafeCastLib} from "../lib/solmate/src/utils/SafeCastLib.sol";
 import {FixedPointMathLib} from "../lib/solmate/src/utils/FixedPointMathLib.sol";
 import {LogExpMath} from "./utils/LogExpMath.sol";
-import "./interfaces/ITranche.sol";
-import "./interfaces/IFactory.sol";
-import "./interfaces/IVault.sol";
-import "./interfaces/ILendingPool.sol";
+import {ITranche} from "./interfaces/ITranche.sol";
+import {IFactory} from "./interfaces/IFactory.sol";
+import {IVault} from "./interfaces/IVault.sol";
+import {ILendingPool} from "./interfaces/ILendingPool.sol";
 import {ILiquidator} from "./interfaces/ILiquidator.sol";
 import {TrustedCreditor} from "./TrustedCreditor.sol";
 import {DebtToken} from "./DebtToken.sol";
@@ -128,13 +128,26 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param index The index of the Tranche for which a new interestWeight is being set
      * @param _weight The new interestWeight of the Tranche at the index
      * @dev The interestWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
-     * @dev ToDo: TBD of we want the interestWeight to be changeable?
+     * @dev ToDo: TBD if we want the interestWeight to be changeable?
      */
     function setInterestWeight(uint256 index, uint16 _weight) public onlyOwner {
-        require(index < tranches.length, "TR_SW: Inexisting Tranche");
+        require(index < tranches.length, "TR_SIW: Inexisting Tranche");
         totalInterestWeight = totalInterestWeight - interestWeightTranches[index] + _weight;
         interestWeightTranches[index] = _weight;
         interestWeight[tranches[index]] = _weight;
+    }
+
+    /**
+     * @notice Changes the liquidationWeight of a specific tranche
+     * @param index The index of the Tranche for which a new liquidationWeight is being set
+     * @param _weight The new liquidationWeight of the Tranche at the index
+     * @dev The liquidationWeight fee determines the relative share of the liquidation penalty that goes to its Liquidity providers
+     * @dev ToDo: TBD if we want the liquidationWeight to be changeable?
+     */
+    function setLiquidationWeight(uint256 index, uint16 _weight) public onlyOwner {
+        require(index < tranches.length, "TR_SLW: Inexisting Tranche");
+        totalLiquidationWeight = totalLiquidationWeight - liquidationWeightTranches[index] + _weight;
+        liquidationWeightTranches[index] = _weight;
     }
 
     /**
@@ -590,11 +603,11 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
                 uint256(totalRealisedLiquidity) + liquidationInitiatorReward + liquidationPenalty + remainder
             );
 
-            // ToDo:Process liquidationPenalty
+            _syncLiquidationPenaltyToLiquidityProviders(liquidationPenalty);
+
             if (remainder != 0) {
                 //Make remainder claimable by originalOwner
                 realisedLiquidityOf[originalOwner] += remainder;
-                _syncLiquidationPenaltyToLiquidityProviders(liquidationPenalty);
             }
         }
     }
@@ -659,8 +672,6 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         }
 
         unchecked {
-            totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
-
             // Add the remainingAssets to the treasury balance
             realisedLiquidityOf[treasury] += remainingAssets;
         }
