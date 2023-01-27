@@ -43,7 +43,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     uint24 public totalLiquidationWeight;
     uint16 public liquidationWeightTreasury;
 
-    uint128 public totalRealisedLiquidity; //32 + 8 + 24 + 16 + 24 + 16 + 128 = 248
+    uint128 public totalRealisedLiquidity;
     uint256 public supplyCap;
 
     address public treasury;
@@ -109,7 +109,6 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev The order of the tranches is important, the most senior tranche is at index 0, the most junior at the last index.
      * @dev Each Tranche is an ERC-4626 contract
      * @dev The interestWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
-     * @dev ToDo: For now manually add newly created tranche, do via factory in future?
      */
     function addTranche(address tranche, uint16 _interestWeight, uint16 liquidationWeight) public onlyOwner {
         require(!isTranche[tranche], "TR_AD: Already exists");
@@ -129,7 +128,6 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param index The index of the Tranche for which a new interestWeight is being set
      * @param _weight The new interestWeight of the Tranche at the index
      * @dev The interestWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
-     * @dev ToDo: TBD if we want the interestWeight to be changeable?
      */
     function setInterestWeight(uint256 index, uint16 _weight) public onlyOwner {
         require(index < tranches.length, "TR_SIW: Inexisting Tranche");
@@ -143,7 +141,6 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param index The index of the Tranche for which a new liquidationWeight is being set
      * @param _weight The new liquidationWeight of the Tranche at the index
      * @dev The liquidationWeight fee determines the relative share of the liquidation penalty that goes to its Liquidity providers
-     * @dev ToDo: TBD if we want the liquidationWeight to be changeable?
      */
     function setLiquidationWeight(uint256 index, uint16 _weight) public onlyOwner {
         require(index < tranches.length, "TR_SLW: Inexisting Tranche");
