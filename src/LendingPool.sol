@@ -43,7 +43,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     uint24 public totalLiquidationWeight;
     uint16 public liquidationWeightTreasury;
 
-    uint128 public totalRealisedLiquidity; //32 + 8 + 24 + 16 + 24 + 16 + 136 = 256
+    uint128 public totalRealisedLiquidity; //32 + 8 + 24 + 16 + 24 + 16 + 128 = 248
+    uint256 public supplyCap;
 
     address public treasury;
     address public liquidator;
@@ -213,6 +214,29 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     }
 
     /* //////////////////////////////////////////////////////////////
+                         PROTOCOL CAP LOGIC
+    ////////////////////////////////////////////////////////////// */
+    /**
+     * @notice Sets the maximum amount of borrows allowed
+     * @param borrowCap_ The new maximum amount of borrows
+     * @dev The borrowCap is the maximum amount of borrows that can be outstanding at any given time to individual borrowers.
+     * @dev If it is set to 0, there is no borrow cap.
+     */
+    function setBorrowCap(uint256 borrowCap_) external onlyOwner {
+        borrowCap = borrowCap_;
+    }
+    /**
+     * @notice Sets the maximum amount of supply allowed
+     * @param supplyCap_ The new maximum amount of supply
+     * @dev The supplyCap is the maximum amount of supply that can be outstanding at any given time pool wide.
+     * @dev If it is set to 0, there is no supply cap.
+     */
+
+    function setSupplyCap(uint256 supplyCap_) external onlyOwner {
+        supplyCap = supplyCap_;
+    }
+
+    /* //////////////////////////////////////////////////////////////
                         DEPOSIT/WITHDRAWAL LOGIC
     ////////////////////////////////////////////////////////////// */
 
@@ -231,6 +255,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         onlyTranche
         processInterests
     {
+        if (supplyCap > 0) require(totalRealisedLiquidity + assets <= supplyCap, "LP_DFLP: Supply cap exceeded");
         // Need to transfer before minting or ERC777s could reenter.
         // Address(this) is trusted -> no risk on re-entrancy attack after transfer
         asset.transferFrom(from, address(this), assets);
