@@ -545,14 +545,6 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param vault The vault address.
      * @dev At the start of the liquidation the debt tokens are burned,
      * as such interests are not accrued during the liquidation.
-     * @dev After the liquidation is finished, there are two options:
-     * 1) the collateral is auctioned for more than the debt position
-     * and liquidationInitiator reward. In this case the liquidator will transfer an equal amount
-     * as the debt position to the Lending Pool.
-     * 2) the collateral is auctioned for less than the debt position
-     * and liquidationInitiator reward fee -> the vault became under-collateralised and we have a default event.
-     * In this case the liquidator will call settleLiquidation() to settle the deficit.
-     * the Liquidator will transfer any remaining funds to the Lending Pool.
      */
     function liquidateVault(address vault) external whenLiquidationNotPaused processInterests {
         //Only Vaults can have debt, and debtTokens are non-transferrable.
@@ -595,16 +587,20 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         realisedLiquidityOf[liquidationInitiator[vault]] += liquidationInitiatorReward;
 
         if (badDebt != 0) {
+            //Collateral was auctioned for less than the liabilities (openDebt + Liquidation Initiator Reward)
+            //-> Default event, deduct badDebt from LPs, starting with most Junior Tranche.
             _processDefault(badDebt);
             totalRealisedLiquidity =
                 SafeCastLib.safeCastTo128(uint256(totalRealisedLiquidity) - badDebt + liquidationInitiatorReward);
         } else {
+            //Collateral was auctioned for more than the liabilities
+            //-> Pay out the Liquidation Penalty to treasury and Tranches
+            _syncLiquidationPenaltyToLiquidityProviders(liquidationPenalty);
             totalRealisedLiquidity = SafeCastLib.safeCastTo128(
                 uint256(totalRealisedLiquidity) + liquidationInitiatorReward + liquidationPenalty + remainder
             );
 
-            _syncLiquidationPenaltyToLiquidityProviders(liquidationPenalty);
-
+            //Any remaining assets after paying off liabilities and the penalty go back to the original Vault Owner.
             if (remainder != 0) {
                 //Make remainder claimable by originalOwner
                 realisedLiquidityOf[originalOwner] += remainder;
@@ -647,7 +643,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     /**
      * @notice Syncs liquidation penalties to the Lending providers and the treasury.
      * @param assets The total amount of underlying assets to be paid out as liquidation penalty.
-     * @dev The liquidationWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
+     * @dev The liquidationWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers.
      */
     function _syncLiquidationPenaltyToLiquidityProviders(uint256 assets) internal {
         uint256 remainingAssets = assets;

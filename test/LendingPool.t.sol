@@ -1822,7 +1822,9 @@ contract LiquidationTest is LendingPoolTest {
         vm.prank(creator);
         pool.setLiquidator(address(liquidator));
 
-        stdstore.target(address(pool)).sig(pool.liquidationInitiator.selector).with_key(address(vault)).checked_write(liquidationInitiatorAddr);
+        stdstore.target(address(pool)).sig(pool.liquidationInitiator.selector).with_key(address(vault)).checked_write(
+            liquidationInitiatorAddr
+        );
 
         // When: Liquidator settles a liquidation
         vm.prank(address(liquidator));
@@ -1979,7 +1981,9 @@ contract LiquidationTest is LendingPoolTest {
         vm.prank(creator);
         pool.setLiquidator(address(liquidator));
 
-        stdstore.target(address(pool)).sig(pool.liquidationInitiator.selector).with_key(address(vault)).checked_write(liquidationInitiatorAddr);
+        stdstore.target(address(pool)).sig(pool.liquidationInitiator.selector).with_key(address(vault)).checked_write(
+            liquidationInitiatorAddr
+        );
 
         // When: Liquidator settles a liquidation
         vm.prank(address(liquidator));
@@ -1987,13 +1991,21 @@ contract LiquidationTest is LendingPoolTest {
 
         address initiator = pool.liquidationInitiator(address(vault));
         // round up
-        uint256 liqPenaltyTreasury = uint256(liquidationPenalty) * pool.liquidationWeightTreasury() / pool.totalLiquidationWeight();
-        if (uint256(liqPenaltyTreasury) * pool.totalLiquidationWeight() < uint256(liquidationPenalty) * pool.liquidationWeightTreasury()) {
+        uint256 liqPenaltyTreasury =
+            uint256(liquidationPenalty) * pool.liquidationWeightTreasury() / pool.totalLiquidationWeight();
+        if (
+            uint256(liqPenaltyTreasury) * pool.totalLiquidationWeight()
+                < uint256(liquidationPenalty) * pool.liquidationWeightTreasury()
+        ) {
             liqPenaltyTreasury++;
         }
 
-        uint256 liqPenaltyJunior = uint256(liquidationPenalty) * pool.liquidationWeightTranches(1) / pool.totalLiquidationWeight();
-        if (uint256(liqPenaltyTreasury) * pool.totalLiquidationWeight() < uint256(liquidationPenalty) * pool.liquidationWeightTranches(1)) {
+        uint256 liqPenaltyJunior =
+            uint256(liquidationPenalty) * pool.liquidationWeightTranches(1) / pool.totalLiquidationWeight();
+        if (
+            uint256(liqPenaltyTreasury) * pool.totalLiquidationWeight()
+                < uint256(liquidationPenalty) * pool.liquidationWeightTranches(1)
+        ) {
             liqPenaltyTreasury--;
         }
 
@@ -2002,9 +2014,9 @@ contract LiquidationTest is LendingPoolTest {
         // And: The liquidity amount from the most senior tranche should remain the same
         assertEq(pool.realisedLiquidityOf(address(srTranche)), liquidity);
         // And: The jr tranche will get its part of the liquidationpenalty
-        assertEq(pool.realisedLiquidityOf(address(jrTranche)), liqPenaltyJunior); 
+        assertEq(pool.realisedLiquidityOf(address(jrTranche)), liqPenaltyJunior);
         // And: treasury will get its part of the liquidationpenalty
-        assertEq(pool.realisedLiquidityOf(address(treasury)), liqPenaltyTreasury); 
+        assertEq(pool.realisedLiquidityOf(address(treasury)), liqPenaltyTreasury);
         // And: The remaindershould be claimable by the original owner
         assertEq(pool.realisedLiquidityOf(vaultOwner), remainder);
         // And: The total realised liquidity should be updated
