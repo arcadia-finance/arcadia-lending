@@ -410,6 +410,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
     function testSuccess_depositInLendingPool_SupplyCapBackToZero(uint256 amount) public {
         // Given: amount should be greater than 1
         vm.assume(pool.totalRealisedLiquidity() + amount > 1);
+        vm.assume(amount <= type(uint128).max);
 
         // When: supply cap is set to 1
         vm.prank(creator);
@@ -435,6 +436,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
     }
 
     function testSuccess_depositInLendingPool_FirstDepositByTranche(uint256 amount) public {
+        vm.assume(amount <= type(uint128).max);
         vm.prank(address(srTranche));
         // When: srTranche deposit
         pool.depositInLendingPool(amount, liquidityProvider);
