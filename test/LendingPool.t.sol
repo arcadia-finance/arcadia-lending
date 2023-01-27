@@ -368,13 +368,15 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         pool.depositInLendingPool(amount1, liquidityProvider);
     }
 
-    function testRevert_depositInLendingPool_SupplyCap(uint256 amount) public {
+    function testRevert_depositInLendingPool_SupplyCap(uint256 amount, uint256 supplyCap) public {
         // Given: amount should be greater than 1
         vm.assume(amount > 1);
+        vm.assume(pool.totalRealisedLiquidity() + amount > supplyCap);
+        vm.assume(supplyCap > 0);
 
         // When: supply cap is set to 1
         vm.prank(creator);
-        pool.setSupplyCap(1);
+        pool.setSupplyCap(supplyCap);
 
         // Then: depositInLendingPool is reverted with SUPPLY_CAP_REACHED
         vm.expectRevert("LP_DFLP: Supply cap exceeded");
@@ -384,7 +386,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
 
     function testSuccess_depositInLendingPool_SupplyCapBackToZero(uint256 amount) public {
         // Given: amount should be greater than 1
-        vm.assume(amount > 1);
+        vm.assume(pool.totalRealisedLiquidity() + amount > 1);
 
         // When: supply cap is set to 1
         vm.prank(creator);
@@ -704,9 +706,13 @@ contract LendingLogicTest is LendingPoolTest {
         pool.borrow(amountLoaned, address(vault), to, emptyBytes3);
     }
 
-    function testRevert_borrow_BorrowCap(uint256 amountLoaned, uint256 collateralValue, uint128 liquidity, address to)
-        public
-    {
+    function testRevert_borrow_BorrowCap(
+        uint256 amountLoaned,
+        uint256 collateralValue,
+        uint128 liquidity,
+        address to,
+        uint256 borrowCap
+    ) public {
         // Given: collateralValue bigger than equal to amountLoaned, liquidity is bigger than 0 and amountLoaned,
         // to is not address 0, creator setDebtToken to debt, liquidityProvider approve pool to max value,
         // srTranche deposit liquidity, setTotalValue to collateral Value
@@ -715,6 +721,8 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(liquidity > amountLoaned);
         vm.assume(liquidity > 0);
         vm.assume(to != address(0));
+        vm.assume(borrowCap > 0);
+        vm.assume(borrowCap < amountLoaned);
 
         vm.prank(address(srTranche));
         pool.depositInLendingPool(liquidity, liquidityProvider);
@@ -722,7 +730,7 @@ contract LendingLogicTest is LendingPoolTest {
 
         // When: borrow cap is set to 1
         vm.prank(creator);
-        pool.setBorrowCap(1);
+        pool.setBorrowCap(borrowCap);
 
         // Then: borrow should revert with "LP_B: Borrow cap reached"
         vm.expectRevert("DT_D: BORROW_CAP_EXCEEDED");
