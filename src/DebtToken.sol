@@ -15,6 +15,7 @@ import {ERC20, ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
  */
 abstract contract DebtToken is ERC4626 {
     uint256 public realisedDebt;
+    uint256 public borrowCap;
 
     /**
      * @notice The constructor for the debt token
@@ -60,6 +61,7 @@ abstract contract DebtToken is ERC4626 {
     function _deposit(uint256 assets, address receiver) internal returns (uint256 shares) {
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDeposit(assets)) != 0, "DT_D: ZERO_SHARES");
+        if (borrowCap > 0) require(balanceOf[receiver] + assets <= borrowCap, "DT_D: BORROW_CAP_EXCEEDED");
 
         _mint(receiver, shares);
 
