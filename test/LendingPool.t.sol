@@ -741,7 +741,6 @@ contract LendingLogicTest is LendingPoolTest {
         asset.approve(address(pool), type(uint256).max);
     }
 
-    //approveBeneficiary
     function testRevert_approveBeneficiary_NonVault(address beneficiary, uint256 amount, address nonVault) public {
         // Given: nonVault is not vault
         vm.assume(nonVault != address(vault));
@@ -942,6 +941,8 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(liquidity > amountLoaned);
         vm.assume(liquidity > 0);
         vm.assume(to != address(0));
+        vm.assume(to != liquidityProvider);
+        vm.assume(to != address(pool));
 
         vm.prank(address(srTranche));
         pool.depositInLendingPool(liquidity, liquidityProvider);
@@ -986,6 +987,8 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(liquidity > amountLoaned);
         vm.assume(liquidity > 0);
         vm.assume(to != address(0));
+        vm.assume(to != liquidityProvider);
+        vm.assume(to != address(pool));
 
         vm.prank(address(srTranche));
         pool.depositInLendingPool(liquidity, liquidityProvider);
@@ -1033,6 +1036,7 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(amountLoaned > 0);
         vm.assume(to != address(0));
         vm.assume(to != liquidityProvider);
+        vm.assume(to != address(pool));
 
         vault.setTotalValue(collateralValue);
         vm.prank(liquidityProvider);
@@ -1072,6 +1076,7 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(beneficiary != vaultOwner);
         vm.assume(to != address(0));
         vm.assume(to != liquidityProvider);
+        vm.assume(to != address(pool));
 
         vault.setTotalValue(collateralValue);
         vm.prank(address(srTranche));
@@ -1143,6 +1148,7 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(collateralValue >= amountLoaned + (amountLoaned * originationFee / 10000));
         vm.assume(liquidity >= amountLoaned);
         vm.assume(amountLoaned > 0);
+        vm.assume(to != address(0));
         vm.assume(to != liquidityProvider);
         vm.assume(to != address(pool));
 
@@ -1190,6 +1196,7 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(amountLoaned > 0);
         vm.assume(to != address(0));
         vm.assume(to != liquidityProvider);
+        vm.assume(to != address(pool));
 
         uint256 amountLoanedWithFee = amountLoaned + (amountLoaned * originationFee / 10000);
 
