@@ -1144,6 +1144,7 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(liquidity >= amountLoaned);
         vm.assume(amountLoaned > 0);
         vm.assume(to != liquidityProvider);
+        vm.assume(to != address(pool));
 
         vm.prank(creator);
         pool.setOriginationFee(originationFee);
