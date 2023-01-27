@@ -10,12 +10,14 @@ import {Owned} from "../lib/solmate/src/auth/Owned.sol";
 import {Auth} from "../lib/solmate/src/auth/Auth.sol";
 import {ERC20, ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
+import {SafeCastLib} from "../lib/solmate/src/utils/SafeCastLib.sol";
 import {FixedPointMathLib} from "../lib/solmate/src/utils/FixedPointMathLib.sol";
 import {LogExpMath} from "./utils/LogExpMath.sol";
-import "./interfaces/ITranche.sol";
-import "./interfaces/IFactory.sol";
-import "./interfaces/IVault.sol";
-import "./interfaces/ILendingPool.sol";
+import {ITranche} from "./interfaces/ITranche.sol";
+import {IFactory} from "./interfaces/IFactory.sol";
+import {IVault} from "./interfaces/IVault.sol";
+import {ILendingPool} from "./interfaces/ILendingPool.sol";
+import {ILiquidator} from "./interfaces/ILiquidator.sol";
 import {TrustedCreditor} from "./TrustedCreditor.sol";
 import {DebtToken} from "./DebtToken.sol";
 import {DataTypes} from "./libraries/DataTypes.sol";
@@ -35,22 +37,27 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     uint256 public constant YEARLY_SECONDS = 31_536_000;
 
     uint32 public lastSyncedTimestamp;
-    uint8 public originationFee; //4 decimals precision (10 equals 0.001 or 0.1%)
-    uint256 public totalWeight;
-    uint256 public totalRealisedLiquidity;
-    uint256 public feeWeight;
+    uint8 public originationFee; //4 decimals precision (10 equals 0.001 or 0.1%), 255 = 2.55% max
+    uint24 public totalInterestWeight;
+    uint16 public interestWeightTreasury;
+    uint24 public totalLiquidationWeight;
+    uint16 public liquidationWeightTreasury;
+
+    uint128 public totalRealisedLiquidity; //32 + 8 + 24 + 16 + 24 + 16 + 128 = 248
     uint256 public supplyCap;
 
     address public treasury;
     address public liquidator;
     address public vaultFactory;
 
-    uint256[] public weights;
+    uint16[] public interestWeightTranches;
+    uint16[] public liquidationWeightTranches;
     address[] public tranches;
 
     mapping(address => bool) public isTranche;
-    mapping(address => uint256) public weight;
+    mapping(address => uint256) public interestWeight;
     mapping(address => uint256) public realisedLiquidityOf;
+    mapping(address => address) public liquidationInitiator;
     mapping(address => mapping(address => uint256)) public creditAllowance;
 
     event CreditApproval(address indexed vault, address indexed beneficiary, uint256 amount);
@@ -97,33 +104,51 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     /**
      * @notice Adds a tranche to the Lending Pool
      * @param tranche The address of the Tranche
-     * @param _weight The weight of the specific Tranche
+     * @param _interestWeight The interestWeight of the specific Tranche
+     * @param liquidationWeight The liquidationWeight of the specific Tranche
      * @dev The order of the tranches is important, the most senior tranche is at index 0, the most junior at the last index.
      * @dev Each Tranche is an ERC-4626 contract
-     * @dev The weight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
+     * @dev The interestWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
      * @dev ToDo: For now manually add newly created tranche, do via factory in future?
      */
-    function addTranche(address tranche, uint256 _weight) public onlyOwner {
+    function addTranche(address tranche, uint16 _interestWeight, uint16 liquidationWeight) public onlyOwner {
         require(!isTranche[tranche], "TR_AD: Already exists");
-        totalWeight += _weight;
-        weights.push(_weight);
-        weight[tranche] = _weight;
+        totalInterestWeight += _interestWeight;
+        interestWeightTranches.push(_interestWeight);
+        interestWeight[tranche] = _interestWeight;
+
+        totalLiquidationWeight += liquidationWeight;
+        liquidationWeightTranches.push(liquidationWeight);
+
         tranches.push(tranche);
         isTranche[tranche] = true;
     }
 
     /**
-     * @notice Changes the weight of a specific tranche
-     * @param index The index of the Tranche for which a new weight is being set
-     * @param _weight The new weight of the Tranche at the index
-     * @dev The weight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
-     * @dev ToDo: TBD of we want the weight to be changeable?
+     * @notice Changes the interestWeight of a specific tranche
+     * @param index The index of the Tranche for which a new interestWeight is being set
+     * @param _weight The new interestWeight of the Tranche at the index
+     * @dev The interestWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
+     * @dev ToDo: TBD if we want the interestWeight to be changeable?
      */
-    function setWeight(uint256 index, uint256 _weight) public onlyOwner {
-        require(index < tranches.length, "TR_SW: Inexisting Tranche");
-        totalWeight = totalWeight - weights[index] + _weight;
-        weights[index] = _weight;
-        weight[tranches[index]] = _weight;
+    function setInterestWeight(uint256 index, uint16 _weight) public onlyOwner {
+        require(index < tranches.length, "TR_SIW: Inexisting Tranche");
+        totalInterestWeight = totalInterestWeight - interestWeightTranches[index] + _weight;
+        interestWeightTranches[index] = _weight;
+        interestWeight[tranches[index]] = _weight;
+    }
+
+    /**
+     * @notice Changes the liquidationWeight of a specific tranche
+     * @param index The index of the Tranche for which a new liquidationWeight is being set
+     * @param _weight The new liquidationWeight of the Tranche at the index
+     * @dev The liquidationWeight fee determines the relative share of the liquidation penalty that goes to its Liquidity providers
+     * @dev ToDo: TBD if we want the liquidationWeight to be changeable?
+     */
+    function setLiquidationWeight(uint256 index, uint16 _weight) public onlyOwner {
+        require(index < tranches.length, "TR_SLW: Inexisting Tranche");
+        totalLiquidationWeight = totalLiquidationWeight - liquidationWeightTranches[index] + _weight;
+        liquidationWeightTranches[index] = _weight;
     }
 
     /**
@@ -136,9 +161,9 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * No need to be check if index and tranche are indeed of the last tranche since function is only called by _processDefault.
      */
     function _popTranche(uint256 index, address tranche) internal {
-        totalWeight -= weights[index];
+        totalInterestWeight -= interestWeightTranches[index];
         isTranche[tranche] = false;
-        weights.pop();
+        interestWeightTranches.pop();
         tranches.pop();
     }
 
@@ -147,15 +172,27 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     ////////////////////////////////////////////////////////////// */
 
     /**
-     * @notice Changes the weight of the protocol fee
-     * @param _feeWeight The new weight of the protocol fee
-     * @dev The weight the fee determines the relative share of the yield (interest payments) that goes to the protocol treasury
-     * @dev Setting feeWeight to a very high value will cause the protocol to collect all interest fees from that moment on.
-     * Although this will affect the future profits of liquidity providers, no funds nor realized interest is at risk for LPs.
+     * @notice Changes the interestWeight of the protocol fee
+     * @param interestWeightTreasury_ The new interestWeight of the protocol fee
+     * @dev The interestWeight fee determines the relative share of the yield (interest payments) that goes to the protocol treasury
+     * @dev Setting interestWeightTreasury to a very high value will cause the protocol to collect all interest fees from that moment on.
+     * Although this will affect the future profits of liquidity providers, no funds nor realized interest are at risk for LPs.
      */
-    function setFeeWeight(uint256 _feeWeight) external onlyOwner {
-        totalWeight = totalWeight - feeWeight + _feeWeight;
-        feeWeight = _feeWeight;
+    function setTreasuryInterestWeight(uint16 interestWeightTreasury_) external onlyOwner {
+        totalInterestWeight = totalInterestWeight - interestWeightTreasury + interestWeightTreasury_;
+        interestWeightTreasury = interestWeightTreasury_;
+    }
+
+    /**
+     * @notice Changes the liquidationWeight of the liquidation penalty fee
+     * @param liquidationWeightTreasury_ The new liquidationWeight of the liquidation penalty fee
+     * @dev The liquidationWeight fee determines the relative share of the liquidation penalty that goes to the protocol treasury
+     * @dev Setting liquidationWeightTreasury to a very high value will cause the protocol to collect all liquidation penalty fees from that moment on.
+     * Although this will affect the future profits of liquidity providers in the Jr tranche, no funds nor realized interest are at risk for LPs.
+     */
+    function setTreasuryLiquidationWeight(uint16 liquidationWeightTreasury_) external onlyOwner {
+        totalLiquidationWeight = totalLiquidationWeight - liquidationWeightTreasury + liquidationWeightTreasury_;
+        liquidationWeightTreasury = liquidationWeightTreasury_;
     }
 
     /**
@@ -169,6 +206,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     /**
      * @notice Sets the new origination fee
      * @param originationFee_ The new origination fee
+     * @dev originationFee is limited by being a uint8 -> max value is 2.55%
+     * 4 decimal precision (10 = 0.1%)
      */
     function setOriginationFee(uint8 originationFee_) external onlyOwner {
         originationFee = uint8(originationFee_);
@@ -223,7 +262,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         unchecked {
             realisedLiquidityOf[msg.sender] += assets;
-            totalRealisedLiquidity += assets;
+            totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
         }
     }
 
@@ -236,7 +275,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         require(realisedLiquidityOf[msg.sender] >= assets, "LP_WFLP: Amount exceeds balance");
 
         realisedLiquidityOf[msg.sender] -= assets;
-        totalRealisedLiquidity -= assets;
+        totalRealisedLiquidity -= SafeCastLib.safeCastTo128(assets);
 
         asset.safeTransfer(receiver, assets);
     }
@@ -406,7 +445,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         if (lastSyncedTimestamp != uint32(block.timestamp)) {
             // The total liquidity of a tranche equals the sum of the realised liquidity
             // of the tranche, and its pending interests
-            uint256 interest = calcUnrealisedDebt().mulDivUp(weight[owner_], totalWeight);
+            uint256 interest = uint256(calcUnrealisedDebt()).mulDivUp(interestWeight[owner_], totalInterestWeight);
             assets = realisedLiquidityOf[owner_] + interest;
         } else {
             assets = realisedLiquidityOf[owner_];
@@ -450,6 +489,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     function calcUnrealisedDebt() public view returns (uint256 unrealisedDebt) {
         uint256 base;
         uint256 exponent;
+        uint256 unrealisedDebt256;
 
         unchecked {
             //gas: can't overflow for reasonable interest rates
@@ -465,21 +505,23 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             //over a period of 5 years
             //this won't overflow as long as opendebt < 3402823669209384912995114146594816
             //which is 3.4 million billion *10**18 decimals
-            unrealisedDebt = (realisedDebt * (LogExpMath.pow(base, exponent) - 1e18)) / 1e18;
+            unrealisedDebt256 = (uint256(realisedDebt) * (LogExpMath.pow(base, exponent) - 1e18)) / 1e18;
         }
+
+        return SafeCastLib.safeCastTo128(unrealisedDebt256);
     }
 
     /**
      * @notice Syncs interest payments to the Lending providers and the treasury.
      * @param assets The total amount of underlying assets to be paid out as interests.
-     * @dev The weight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
+     * @dev The interestWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
      */
     function _syncInterestsToLiquidityProviders(uint256 assets) internal {
         uint256 remainingAssets = assets;
 
         uint256 trancheShare;
         for (uint256 i; i < tranches.length;) {
-            trancheShare = assets.mulDivDown(weights[i], totalWeight);
+            trancheShare = uint256(assets).mulDivDown(interestWeightTranches[i], totalInterestWeight);
             unchecked {
                 realisedLiquidityOf[tranches[i]] += trancheShare;
                 remainingAssets -= trancheShare;
@@ -487,7 +529,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             }
         }
         unchecked {
-            totalRealisedLiquidity += assets;
+            totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
 
             // Add the remainingAssets to the treasury balance
             realisedLiquidityOf[treasury] += remainingAssets;
@@ -524,62 +566,81 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     }
 
     /**
-     * @notice Called by a vault when it is being liquidated (auctioned) to repay an amount of debt.
-     * @param debt The amount of debt that will be repaid.
+     * @notice Starts liquidation of a Vault.
+     * @param vault The vault address.
      * @dev At the start of the liquidation the debt tokens are burned,
      * as such interests are not accrued during the liquidation.
-     * @dev After the liquidation is finished, there are two options:
-     * 1) the collateral is auctioned for more than the debt position
-     * and liquidationInitiator reward. In this case the liquidator will transfer an equal amount
-     * as the debt position to the Lending Pool.
-     * 2) the collateral is auctioned for less than the debt position
-     * and liquidationInitiator reward fee -> the vault became under-collateralised and we have a default event.
-     * In this case the liquidator will call settleLiquidation() to settle the deficit.
-     * the Liquidator will transfer any remaining funds to the Lending Pool.
      */
-    function liquidateVault(uint256 debt) public override whenLiquidationNotPaused {
-        //Function can only be called by Vaults with debt.
-        //Only Vaults can have debt, debtTokens are non-transferrable, and only Vaults can call borrow().
-        //Since DebtTokens are non-transferrable, only vaults can have debt.
-        //Hence by checking that the balance of msg.sender is not 0, we know the sender is
-        //indeed a vault and has debt.
-        require(balanceOf[msg.sender] != 0, "LP_LV: Not a Vault with debt");
+    function liquidateVault(address vault) external whenLiquidationNotPaused processInterests {
+        //Only Vaults can have debt, and debtTokens are non-transferrable.
+        //Hence by checking that the balance of the address passed as vault is not 0, we know the address
+        //passed as vault is indeed a vault and has debt.
+        uint256 openDebt = balanceOf[vault];
+        require(openDebt != 0, "LP_LV: Not a Vault with debt");
+
+        //Store liquidation initiator to pay out initiator reward when auction is finished.
+        liquidationInitiator[vault] = msg.sender;
+
+        //Start the auction of the collateralised assets to repay debt
+        ILiquidator(liquidator).startAuction(vault, openDebt);
 
         //Remove debt from Vault (burn DebtTokens)
-        _withdraw(debt, msg.sender, msg.sender);
+        _withdraw(openDebt, vault, vault);
     }
 
     /**
-     * @notice Settles bad debt of liquidations.
-     * @param default_ The amount of debt.that was not recouped by the auction
-     * @param deficit The amount of debt that has to be repaid to the liquidation initiator,
-     * in the edge case that the liquidation fee was bigger than the auction proceeds
-     * @dev This function is called by the Liquidator after a liquidation is finished,
-     * but only if there is bad debt.
+     * @notice Settles the liquidation after the auction is finished with the Creditor, Original owner and Service providers.
+     * @param vault The contract address of the vault.
+     * @param originalOwner The original owner of the vault before the auction.
+     * @param badDebt The amount of liabilities that was not recouped by the auction.
+     * @param liquidationInitiatorReward The Reward for the Liquidation Initiator.
+     * @param liquidationPenalty The additional penalty the `originalOwner` has to pay to the protocol.
+     * @param remainder Any funds remaining after the auction are returned back to the `originalOwner`.
+     * @dev This function is called by the Liquidator after a liquidation is finished.
      * @dev The liquidator will transfer the auction proceeds (the underlying asset)
-     * Directly back to the liquidity pool after liquidation.
+     * back to the liquidity pool after liquidation.
      */
-    function settleLiquidation(uint256 default_, uint256 deficit) public onlyLiquidator {
-        if (deficit != 0) {
-            //ToDo: The unhappy flow when there is not enough liquidity in the pool
-            asset.transfer(liquidator, deficit);
+    function settleLiquidation(
+        address vault,
+        address originalOwner,
+        uint256 badDebt,
+        uint256 liquidationInitiatorReward,
+        uint256 liquidationPenalty,
+        uint256 remainder
+    ) external onlyLiquidator processInterests {
+        //Make Initiator rewards claimable for liquidationInitiator[vault]
+        realisedLiquidityOf[liquidationInitiator[vault]] += liquidationInitiatorReward;
+
+        if (badDebt != 0) {
+            //Collateral was auctioned for less than the liabilities (openDebt + Liquidation Initiator Reward)
+            //-> Default event, deduct badDebt from LPs, starting with most Junior Tranche.
+            _processDefault(badDebt);
+            totalRealisedLiquidity =
+                SafeCastLib.safeCastTo128(uint256(totalRealisedLiquidity) - badDebt + liquidationInitiatorReward);
+        } else {
+            //Collateral was auctioned for more than the liabilities
+            //-> Pay out the Liquidation Penalty to treasury and Tranches
+            _syncLiquidationPenaltyToLiquidityProviders(liquidationPenalty);
+            totalRealisedLiquidity = SafeCastLib.safeCastTo128(
+                uint256(totalRealisedLiquidity) + liquidationInitiatorReward + liquidationPenalty + remainder
+            );
+
+            //Any remaining assets after paying off liabilities and the penalty go back to the original Vault Owner.
+            if (remainder != 0) {
+                //Make remainder claimable by originalOwner
+                realisedLiquidityOf[originalOwner] += remainder;
+            }
         }
-        _processDefault(default_);
     }
 
     /**
      * @notice Handles the bookkeeping in case of bad debt (Vault became undercollateralised).
-     * @param assets The total amount of underlying assets that need to be written off as bad debt.
+     * @param badDebt The total amount of underlying assets that need to be written off as bad debt.
      * @dev The order of the tranches is important, the most senior tranche is at index 0, the most junior at the last index.
-     * @dev The most junior tranche will loose its underlying capital first. If all liquidty of a certain Tranche is written off,
+     * @dev The most junior tranche will loose its underlying assets first. If all liquidty of a certain Tranche is written off,
      * the complete tranche is locked and removed. If there is still remaining bad debt, the next Tranche starts losing capital.
      */
-    function _processDefault(uint256 assets) internal {
-        if (totalRealisedLiquidity < assets) {
-            //Should never be possible, this means the total protocol has more debt than claimable liquidity.
-            assets = totalRealisedLiquidity;
-        }
-
+    function _processDefault(uint256 badDebt) internal {
         address tranche;
         uint256 maxBurned;
         for (uint256 i = tranches.length; i > 0;) {
@@ -588,25 +649,53 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             }
             tranche = tranches[i];
             maxBurned = realisedLiquidityOf[tranche];
-            if (assets < maxBurned) {
+            if (badDebt < maxBurned) {
                 // burn
-                realisedLiquidityOf[tranche] -= assets;
-                totalRealisedLiquidity -= assets;
+                realisedLiquidityOf[tranche] -= badDebt;
                 break;
             } else {
-                ITranche(tranche).lock();
+                ITranche(tranche).lock(); //todo gas: can be removed
                 // burn
                 realisedLiquidityOf[tranche] -= maxBurned;
-                totalRealisedLiquidity -= maxBurned;
                 _popTranche(i, tranche);
                 unchecked {
-                    assets -= maxBurned;
+                    badDebt -= maxBurned;
                 }
             }
         }
+    }
 
-        //ToDo Although it should be an impossible state if the protocol functions as it should,
-        //What if there is still more liquidity in the pool than totalRealisedLiquidity, start an emergency procedure?
+    /**
+     * @notice Syncs liquidation penalties to the Lending providers and the treasury.
+     * @param assets The total amount of underlying assets to be paid out as liquidation penalty.
+     * @dev The liquidationWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers.
+     */
+    function _syncLiquidationPenaltyToLiquidityProviders(uint256 assets) internal {
+        uint256 remainingAssets = assets;
+
+        uint256 trancheShare;
+        uint256 weightOfTranche;
+        for (uint256 i; i < tranches.length;) {
+            weightOfTranche = liquidationWeightTranches[i];
+
+            if (weightOfTranche != 0) {
+                //skip if weight is zero, which is the case for Sr tranche
+                trancheShare = uint256(assets).mulDivDown(weightOfTranche, totalLiquidationWeight);
+                unchecked {
+                    realisedLiquidityOf[tranches[i]] += trancheShare;
+                    remainingAssets -= trancheShare;
+                }
+            }
+
+            unchecked {
+                ++i;
+            }
+        }
+
+        unchecked {
+            // Add the remainingAssets to the treasury balance
+            realisedLiquidityOf[treasury] += remainingAssets;
+        }
     }
 
     /* //////////////////////////////////////////////////////////////
