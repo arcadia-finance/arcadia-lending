@@ -7,7 +7,7 @@
 pragma solidity ^0.8.13;
 
 import "../lib/forge-std/src/Test.sol";
-import "../src/libraries/InterestRateModule.sol";
+import "../src/InterestRateModule.sol";
 
 contract InterestRateModuleMockUpTest is InterestRateModule {
     //Extensions to test internal functions

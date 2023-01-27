@@ -28,4 +28,6 @@ contract Vault {
             return false;
         }
     }
+
+    function vaultManagementAction(address actionHandler, bytes calldata actionData) external {}
 }
