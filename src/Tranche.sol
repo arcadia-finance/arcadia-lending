@@ -7,8 +7,7 @@
 pragma solidity ^0.8.13;
 
 import {Owned} from "../lib/solmate/src/auth/Owned.sol";
-import {ERC20, ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
-import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
+import {ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
 import {ILendingPool} from "./interfaces/ILendingPool.sol";
 
 /**
@@ -18,10 +17,8 @@ import {ILendingPool} from "./interfaces/ILendingPool.sol";
  * @dev Protocol is according the ERC4626 standard, with a certain ERC20 as underlying
  */
 contract Tranche is ERC4626, Owned {
-    using SafeTransferLib for ERC20;
-
-    ILendingPool public lendingPool;
     bool public locked = false;
+    ILendingPool public lendingPool;
 
     modifier notLocked() {
         require(!locked, "TRANCHE: LOCKED");
