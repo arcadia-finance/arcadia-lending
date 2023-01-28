@@ -681,7 +681,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
             if (weightOfTranche != 0) {
                 //skip if weight is zero, which is the case for Sr tranche
-                trancheShare = uint256(assets).mulDivDown(weightOfTranche, totalLiquidationWeight);
+                trancheShare = assets.mulDivDown(weightOfTranche, totalLiquidationWeight);
                 unchecked {
                     realisedLiquidityOf[tranches[i]] += trancheShare;
                     remainingAssets -= trancheShare;
