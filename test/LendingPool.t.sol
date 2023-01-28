@@ -746,8 +746,8 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(nonVault != address(vault));
         // When: approveBeneficiary with nonVault input on vault
 
-        // Then: approveBeneficiary should revert with "LP_AB: Not a vault"
-        vm.expectRevert("LP_AB: Not a vault");
+        // Then: approveBeneficiary should revert with "LP_AB: UNAUTHORIZED"
+        vm.expectRevert("LP_AB: UNAUTHORIZED");
         pool.approveBeneficiary(beneficiary, amount, nonVault);
     }
 
@@ -1216,16 +1216,6 @@ contract LendingLogicTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testRevert_repay_NonVault(uint256 amount, address nonVault) public {
-        // Given: nonVault is not vault
-        vm.assume(nonVault != address(vault));
-        // When: repay amount to nonVault
-
-        // Then: repay should revert with "LP_R: Not a vault"
-        vm.expectRevert("LP_R: Not a vault");
-        pool.repay(amount, nonVault);
-    }
-
     function testRevert_repay_InsufficientFunds(uint128 amountLoaned, uint256 availablefunds, address sender) public {
         // Given: amountLoaned is bigger than availablefunds, availablefunds bigger than 0,
         // sender is not zero address, liquidityProvider or vaultOwner, creator setDebtToken to debt,
@@ -1284,6 +1274,24 @@ contract LendingLogicTest is LendingPoolTest {
         vm.expectRevert("Guardian: repay paused");
         pool.repay(amountLoaned, address(vault));
         vm.stopPrank();
+    }
+
+    function testSuccess_repay_NonVault(uint128 availablefunds, uint256 amountRepaid, address sender, address nonVault)
+        public
+    {
+        // Given: nonVault is not vault
+        vm.assume(nonVault != address(vault));
+        vm.assume(availablefunds > amountRepaid);
+        vm.prank(liquidityProvider);
+        asset.transfer(sender, availablefunds);
+
+        // When: repay amount to nonVault
+        vm.prank(sender);
+        pool.repay(amountRepaid, nonVault);
+
+        // Then: no funds are actually transferred
+        assertEq(asset.balanceOf(address(pool)), 0);
+        assertEq(asset.balanceOf(sender), availablefunds);
     }
 
     function testSuccess_repay_AmountInferiorLoan(uint128 amountLoaned, uint256 amountRepaid, address sender) public {
@@ -2456,21 +2464,10 @@ contract VaultTest is LendingPoolTest {
         assertTrue(!pool.isValidVersion(vaultVersion));
     }
 
-    function testRevert_openMarginAccount_NonVault(address unprivilegedAddress, uint256 vaultVersion) public {
-        // Given: sender is not a vault
-        vm.assume(unprivilegedAddress != address(vault));
-
-        // When: sender wants to open a margin account
-        // Then: openMarginAccount should revert with "LP_OMA: Not a vault"
-        vm.startPrank(unprivilegedAddress);
-        vm.expectRevert("LP_OMA: Not a vault");
-        pool.openMarginAccount(vaultVersion);
-        vm.stopPrank();
-    }
-
     function testSuccess_openMarginAccount_InvalidVaultVersion(uint256 vaultVersion) public {
-        // Given: sender is a vault
-        vm.startPrank(address(vault));
+        // Given: vaultVersion is invalid
+        vm.prank(creator);
+        pool.setVaultVersion(vaultVersion, false);
 
         // When: vault opens a margin account
         (bool success, address basecurrency, address liquidator_) = pool.openMarginAccount(vaultVersion);
@@ -2485,9 +2482,6 @@ contract VaultTest is LendingPoolTest {
         // Given: vaultVersion is valid
         vm.prank(creator);
         pool.setVaultVersion(vaultVersion, true);
-
-        // And: sender is a vault
-        vm.startPrank(address(vault));
 
         // When: vault opens a margin account
         (bool success, address basecurrency, address liquidator_) = pool.openMarginAccount(vaultVersion);

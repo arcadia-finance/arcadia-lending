@@ -13,4 +13,11 @@ interface IFactory {
      * @return bool Whether the address is a vault or not.
      */
     function isVault(address vault) external view returns (bool);
+
+    /**
+     * @notice Returns the owner of a vault.
+     * @param vault The Vault address.
+     * @return owner_ The Vault owner.
+     */
+    function ownerOfVault(address vault) external view returns (address);
 }
