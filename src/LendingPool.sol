@@ -240,13 +240,10 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     ////////////////////////////////////////////////////////////// */
 
     /**
-     * @notice Deposit assets in the Lending Pool
-     * @param assets the amount of assets of the underlying ERC-20 token being deposited
-     * @param from The address of the origin of the underlying ERC-20 token, who deposits assets via a Tranche
+     * @notice Deposit assets in the Lending Pool.
+     * @param assets The amount of assets of the underlying ERC-20 tokens being deposited.
+     * @param from The address of the Liquidity Provider who deposits the underlying ERC-20 token via a Tranche.
      * @dev This function can only be called by Tranches.
-     * @dev IMPORTANT, this function deviates from the standard, instead of the parameter 'receiver':
-     * (this is always msg.sender, a tranche), the second parameter is 'from':
-     * (the origin of the underlying ERC-20 token, who deposits assets via a Tranche)
      */
     function depositInLendingPool(uint256 assets, address from)
         public
@@ -266,9 +263,11 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     }
 
     /**
-     * @notice Withdraw assets from the Lending Pool
-     * @param assets the amount of assets of the underlying ERC-20 token being withdrawn
-     * @param receiver The address of the receiver of the underlying ERC-20 tokens
+     * @notice Withdraw assets from the Lending Pool.
+     * @param assets The amount of assets of the underlying ERC-20 tokens being withdrawn.
+     * @param receiver The address of the receiver of the underlying ERC-20 tokens.
+     * @dev This function can be called by anyone with an open balance (realisedLiquidityOf[address] bigger than 0),
+     * which can be both Tranches as other other address (treasury, Liquidation Initiators, Liquidated Vault Owner...).
      */
     function withdrawFromLendingPool(uint256 assets, address receiver) public whenWithdrawNotPaused processInterests {
         require(realisedLiquidityOf[msg.sender] >= assets, "LP_WFLP: Amount exceeds balance");
@@ -435,7 +434,6 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     /**
      * @notice Returns the redeemable amount of liquidity in the underlying asset of an address
      * @param owner_ The address of the liquidity provider
-     * @dev For this implementation, owner_ is or an address of a tranche, or an address of a treasury
      * @return assets The redeemable amount of liquidity in the underlying asset
      */
     function liquidityOf(address owner_) public view returns (uint256 assets) {
