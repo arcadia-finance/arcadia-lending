@@ -10,13 +10,6 @@ import {ERC20} from "../../lib/solmate/src/tokens/ERC20.sol";
 
 interface ILendingPool {
     /**
-     * @notice Returns the redeemable amount of liquidity in the underlying asset of an address.
-     * @param owner The address of the liquidity provider.
-     * @return assets The redeemable amount of liquidity in the underlying asset.
-     */
-    function liquidityOf(address owner) external view returns (uint256);
-
-    /**
      * @notice Returns the underlying ERC-20 token of the Lending Pool
      * @return ERC20 The underlying ERC-20 token
      */
@@ -35,4 +28,11 @@ interface ILendingPool {
      * @param receiver The address of the receiver of the underlying ERC-20 tokens.
      */
     function withdrawFromLendingPool(uint256 assets, address receiver) external;
+
+    /**
+     * @notice Returns the redeemable amount of liquidity in the underlying asset of an address.
+     * @param owner The address of the liquidity provider.
+     * @return assets The redeemable amount of liquidity in the underlying asset.
+     */
+    function liquidityOf(address owner) external view returns (uint256);
 }
