@@ -209,7 +209,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * 4 decimal precision (10 = 0.1%)
      */
     function setOriginationFee(uint8 originationFee_) external onlyOwner {
-        originationFee = uint8(originationFee_);
+        originationFee = originationFee_;
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -444,7 +444,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         if (lastSyncedTimestamp != uint32(block.timestamp)) {
             // The total liquidity of a tranche equals the sum of the realised liquidity
             // of the tranche, and its pending interests
-            uint256 interest = uint256(calcUnrealisedDebt()).mulDivUp(interestWeight[owner_], totalInterestWeight);
+            uint256 interest = calcUnrealisedDebt().mulDivUp(interestWeight[owner_], totalInterestWeight);
             assets = realisedLiquidityOf[owner_] + interest;
         } else {
             assets = realisedLiquidityOf[owner_];
@@ -504,7 +504,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             //over a period of 5 years
             //this won't overflow as long as opendebt < 3402823669209384912995114146594816
             //which is 3.4 million billion *10**18 decimals
-            unrealisedDebt256 = (uint256(realisedDebt) * (LogExpMath.pow(base, exponent) - 1e18)) / 1e18;
+            unrealisedDebt256 = (realisedDebt * (LogExpMath.pow(base, exponent) - 1e18)) / 1e18;
         }
 
         return SafeCastLib.safeCastTo128(unrealisedDebt256);
@@ -520,7 +520,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         uint256 trancheShare;
         for (uint256 i; i < tranches.length;) {
-            trancheShare = uint256(assets).mulDivDown(interestWeightTranches[i], totalInterestWeight);
+            trancheShare = assets.mulDivDown(interestWeightTranches[i], totalInterestWeight);
             unchecked {
                 realisedLiquidityOf[tranches[i]] += trancheShare;
                 remainingAssets -= trancheShare;
@@ -641,24 +641,26 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      */
     function _processDefault(uint256 badDebt) internal {
         address tranche;
-        uint256 maxBurned;
+        uint256 maxBurnable;
         for (uint256 i = tranches.length; i > 0;) {
             unchecked {
                 --i;
             }
             tranche = tranches[i];
-            maxBurned = realisedLiquidityOf[tranche];
-            if (badDebt < maxBurned) {
+            maxBurnable = realisedLiquidityOf[tranche];
+            if (badDebt < maxBurnable) {
                 // burn
-                realisedLiquidityOf[tranche] -= badDebt;
+                unchecked{
+                    realisedLiquidityOf[tranche] -= badDebt;
+                }
                 break;
             } else {
                 ITranche(tranche).lock(); //todo gas: can be removed
                 // burn
-                realisedLiquidityOf[tranche] -= maxBurned;
+                realisedLiquidityOf[tranche] = 0;
                 _popTranche(i, tranche);
                 unchecked {
-                    badDebt -= maxBurned;
+                    badDebt -= maxBurnable;
                 }
             }
         }
