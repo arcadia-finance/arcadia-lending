@@ -288,11 +288,10 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param amount The amount of underlying ERC-20 tokens to be lent out
      * @param vault The address of the Arcadia Vault backing the loan
      * @dev todo also implement permit (EIP-2612)?
-     * @dev todo If we keep a mapping from vaultaddress to owner on factory, we can do two requires at once and avoid two call to vault
      */
     function approveBeneficiary(address beneficiary, uint256 amount, address vault) public returns (bool) {
-        require(IFactory(vaultFactory).isVault(vault), "LP_AB: Not a vault");
-        require(IVault(vault).owner() == msg.sender, "LP_AB: UNAUTHORIZED");
+        //If vault is not an actual address of a vault, ownerOfVault(address) will return the zero address
+        require(IFactory(vaultFactory).ownerOfVault(vault) == msg.sender, "LP_AB: UNAUTHORIZED");
 
         creditAllowance[vault][beneficiary] = amount;
 
@@ -313,20 +312,21 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         whenBorrowNotPaused
         processInterests
     {
-        require(IFactory(vaultFactory).isVault(vault), "LP_B: Not a vault");
+        //If vault is not an actual address of a vault, ownerOfVault(address) will return the zero address.
+        address vaultOwner = IFactory(vaultFactory).ownerOfVault(vault);
+        require(vaultOwner != address(0), "LP_B: Not a vault");
 
         uint256 amountWithFee = amount + (amount * originationFee) / 10_000;
 
         //Check allowances to take debt
-        if (IVault(vault).owner() != msg.sender) {
+        if (vaultOwner != msg.sender) {
             uint256 allowed = creditAllowance[vault][msg.sender];
             if (allowed != type(uint256).max) {
                 creditAllowance[vault][msg.sender] = allowed - amountWithFee;
             }
         }
 
-        //Call vault to check if there is sufficient collateral.
-        //If so calculate and store the liquidation threshold.
+        //Call vault to check if there is sufficient free margin to increase debt with amountWithFee.
         require(IVault(vault).increaseMarginPosition(address(asset), amountWithFee), "LP_B: Reverted");
 
         //Mint debt tokens to the vault
@@ -346,10 +346,10 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @notice repays a loan
      * @param amount The amount of underlying ERC-20 tokens to be repaid
      * @param vault The address of the Arcadia Vault backing the loan
+     * @dev if vault is not an actual address of a vault, maxWithdraw(vault) will always return 0.
+     * Function will not revert, but transferAmount is always 0.
      */
     function repay(uint256 amount, address vault) public whenRepayNotPaused processInterests {
-        require(IFactory(vaultFactory).isVault(vault), "LP_R: Not a vault");
-
         uint256 vaultDebt = maxWithdraw(vault);
         uint256 transferAmount = vaultDebt > amount ? amount : vaultDebt;
 
@@ -380,12 +380,14 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         bytes calldata actionData,
         bytes3 referrer
     ) public whenBorrowNotPaused processInterests {
-        require(IFactory(vaultFactory).isVault(vault), "LP_DAWL: Not a vault");
+        //If vault is not an actual address of a vault, ownerOfVault(address) will return the zero address
+        address vaultOwner = IFactory(vaultFactory).ownerOfVault(vault);
+        require(vaultOwner != address(0), "LP_DAWL: Not a vault");
 
         uint256 amountBorrowedWithFee = amountBorrowed + (amountBorrowed * originationFee) / 10_000;
 
         //Check allowances to take debt
-        if (IVault(vault).owner() != msg.sender) {
+        if (vaultOwner != msg.sender) {
             uint256 allowed = creditAllowance[vault][msg.sender];
             if (allowed != type(uint256).max) {
                 creditAllowance[vault][msg.sender] = allowed - amountBorrowedWithFee;
@@ -719,9 +721,6 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         override
         returns (bool success, address baseCurrency, address liquidator_)
     {
-        //ToDo: Remove first check? view function that not interacts with other contracts -> doesn't matter that sender is not a vault
-        require(IFactory(vaultFactory).isVault(msg.sender), "LP_OMA: Not a vault");
-
         if (isValidVersion[vaultVersion]) {
             success = true;
             baseCurrency = address(asset);

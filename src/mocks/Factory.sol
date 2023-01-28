@@ -9,7 +9,10 @@ pragma solidity ^0.8.13;
 import "./Vault.sol";
 
 contract Factory {
-    mapping(address => bool) public isVault;
+    mapping(address => uint256) public vaultIndex;
+    mapping(uint256 => address) public ownerOf;
+
+    address[] public allVaults;
 
     constructor() {}
 
@@ -20,6 +23,17 @@ contract Factory {
             )
         );
 
-        isVault[vault] = true;
+        allVaults.push(vault);
+        uint256 index = allVaults.length;
+        vaultIndex[vault] = index;
+        ownerOf[index] = msg.sender;
+    }
+
+    function isVault(address vault) public view returns (bool) {
+        return vaultIndex[vault] > 0;
+    }
+
+    function ownerOfVault(address vault) public view returns (address owner_) {
+        owner_ = ownerOf[vaultIndex[vault]];
     }
 }
