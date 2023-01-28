@@ -663,7 +663,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
 
     function testSuccess_donateToPool(uint8 index, uint128 assets, address donator) public {
         vm.assume(assets > 0);
-        vm.assume(assets  <= type(uint128).max - pool.totalRealisedLiquidity());
+        vm.assume(assets <= type(uint128).max - pool.totalRealisedLiquidity());
         vm.assume(index < pool.numberOfTranches());
 
         vm.prank(creator);
