@@ -104,17 +104,17 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     /**
      * @notice Adds a tranche to the Lending Pool
      * @param tranche The address of the Tranche
-     * @param _interestWeight The interestWeight of the specific Tranche
+     * @param interestWeight_ The interestWeight of the specific Tranche
      * @param liquidationWeight The liquidationWeight of the specific Tranche
      * @dev The order of the tranches is important, the most senior tranche is at index 0, the most junior at the last index.
      * @dev Each Tranche is an ERC-4626 contract
      * @dev The interestWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
      */
-    function addTranche(address tranche, uint16 _interestWeight, uint16 liquidationWeight) public onlyOwner {
+    function addTranche(address tranche, uint16 interestWeight_, uint16 liquidationWeight) public onlyOwner {
         require(!isTranche[tranche], "TR_AD: Already exists");
-        totalInterestWeight += _interestWeight;
-        interestWeightTranches.push(_interestWeight);
-        interestWeight[tranche] = _interestWeight;
+        totalInterestWeight += interestWeight_;
+        interestWeightTranches.push(interestWeight_);
+        interestWeight[tranche] = interestWeight_;
 
         totalLiquidationWeight += liquidationWeight;
         liquidationWeightTranches.push(liquidationWeight);
