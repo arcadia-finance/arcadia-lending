@@ -6,9 +6,6 @@
  */
 pragma solidity ^0.8.13;
 
-import {Owned} from "../lib/solmate/src/auth/Owned.sol";
-import {Auth} from "../lib/solmate/src/auth/Auth.sol";
-import {ERC20, ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
 import {SafeCastLib} from "../lib/solmate/src/utils/SafeCastLib.sol";
 import {FixedPointMathLib} from "../lib/solmate/src/utils/FixedPointMathLib.sol";
@@ -16,12 +13,10 @@ import {LogExpMath} from "./utils/LogExpMath.sol";
 import {ITranche} from "./interfaces/ITranche.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
 import {IVault} from "./interfaces/IVault.sol";
-import {ILendingPool} from "./interfaces/ILendingPool.sol";
 import {ILiquidator} from "./interfaces/ILiquidator.sol";
 import {TrustedCreditor} from "./TrustedCreditor.sol";
-import {DebtToken} from "./DebtToken.sol";
-import {DataTypes} from "./libraries/DataTypes.sol";
-import {InterestRateModule} from "./InterestRateModule.sol";
+import {ERC20, DebtToken} from "./DebtToken.sol";
+import {InterestRateModule, DataTypes} from "./InterestRateModule.sol";
 import {Guardian} from "./security/Guardian.sol";
 
 /**

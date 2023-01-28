@@ -6,10 +6,10 @@
  */
 pragma solidity ^0.8.13;
 
-import "../lib/solmate/src/auth/Owned.sol";
-import "../lib/solmate/src/mixins/ERC4626.sol";
+import {Owned} from "../lib/solmate/src/auth/Owned.sol";
+import {ERC20, ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
 import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
-import "./interfaces/ILendingPool.sol";
+import {ILendingPool} from "./interfaces/ILendingPool.sol";
 
 /**
  * @title Tranche
