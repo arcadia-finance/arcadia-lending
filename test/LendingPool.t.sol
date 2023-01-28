@@ -57,6 +57,14 @@ contract LendingPoolExtension is LendingPool {
     function setIsValidVersion(uint256 version, bool allowed) public {
         isValidVersion[version] = allowed;
     }
+
+    function numberOfTranches() public view returns (uint256) {
+        return tranches.length;
+    }
+
+    function setAuctionsInProgress(uint96 amount) public {
+        auctionsInProgress = amount;
+    }
 }
 
 abstract contract LendingPoolTest is Test {
@@ -2117,6 +2125,8 @@ contract LiquidationTest is LendingPoolTest {
         vm.prank(creator);
         pool.setLiquidator(address(liquidator));
 
+        uint256 auctionsInProgressPre = pool.auctionsInProgress();
+
         // When: Liquidator calls liquidateVault
         vm.prank(liquidationInitiator);
         pool.liquidateVault(address(vault));
@@ -2127,6 +2137,12 @@ contract LiquidationTest is LendingPoolTest {
         // Then: The debt of the vault should be decreased with amountLiquidated
         assertEq(debt.balanceOf(address(vault)), 0);
         assertEq(debt.totalSupply(), 0);
+
+        // Then: auctionsInProgress should increase
+        assertEq(pool.auctionsInProgress(), auctionsInProgressPre + 1);
+        // and the most junior tranche should be locked
+        assertTrue(jrTranche.auctionInProgress());
+        assertFalse(srTranche.auctionInProgress());
     }
 
     function testRevert_settleLiquidation_Unauthorised(
@@ -2243,6 +2259,10 @@ contract LiquidationTest is LendingPoolTest {
         assertEq(pool.totalRealisedLiquidity(), 0);
         assertFalse(pool.isTranche(address(jrTranche)));
         assertFalse(pool.isTranche(address(srTranche)));
+
+        // since this flow doesn't go through pool.liquidateVault(),
+        // auctionsInProgress will be 0 when this liquidation is settled.
+        assertEq(pool.auctionsInProgress(), type(uint96).max);
     }
 
     function testRevert_settleLiquidation_ExcessBadDebt(
@@ -2298,6 +2318,10 @@ contract LiquidationTest is LendingPoolTest {
             liquidationInitiatorAddr
         );
 
+        pool.setAuctionsInProgress(1);
+        vm.prank(address(pool));
+        jrTranche.setAuctionInProgress(true);
+
         // When: Liquidator settles a liquidation
         vm.prank(address(liquidator));
         pool.settleLiquidation(address(vault), vaultOwner, 0, liquidationInitiatorReward, liquidationPenalty, remainder);
@@ -2334,6 +2358,10 @@ contract LiquidationTest is LendingPoolTest {
         assertEq(pool.realisedLiquidityOf(vaultOwner), remainder);
         // And: The total realised liquidity should be updated
         assertEq(pool.totalRealisedLiquidity(), liquidity + liquidationInitiatorReward + liquidationPenalty + remainder);
+
+        assertEq(pool.auctionsInProgress(), 0);
+        assertFalse(jrTranche.auctionInProgress());
+        assertFalse(srTranche.auctionInProgress());
     }
 
     function testSuccess_settleLiquidation_ProcessDefault(

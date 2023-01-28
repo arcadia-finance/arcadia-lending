@@ -17,11 +17,17 @@ import {ILendingPool} from "./interfaces/ILendingPool.sol";
  * @dev Protocol is according the ERC4626 standard, with a certain ERC20 as underlying
  */
 contract Tranche is ERC4626, Owned {
-    bool public locked = false;
+    bool public locked;
+    bool public auctionInProgress;
     ILendingPool public lendingPool;
 
     modifier notLocked() {
         require(!locked, "TRANCHE: LOCKED");
+        _;
+    }
+
+    modifier notWhenAuctionInProgress() {
+        require(!auctionInProgress, "TRANCHE: AUCTION IN PROGRESS");
         _;
     }
 
@@ -51,7 +57,7 @@ contract Tranche is ERC4626, Owned {
      * @notice Locks the tranche in case all liquidity of the tranche is written of due to bad debt
      * @dev Only the Lending Pool can call this function, only trigger is a severe default event.
      */
-    function lock() public {
+    function lock() external {
         require(msg.sender == address(lendingPool), "T_L: UNAUTHORIZED");
         locked = true;
     }
@@ -61,8 +67,19 @@ contract Tranche is ERC4626, Owned {
      * @dev Only the Owner can call this function, since tranches are locked due to complete defaults,
      * This function will only be called to partially refund existing share-holders after a default.
      */
-    function unLock() public onlyOwner {
+    function unLock() external onlyOwner {
         locked = false;
+    }
+
+    /**
+     * @notice Locks the tranche when an auction is in progress
+     * @dev Only the Lending Pool can call this function.
+     * This function is to make sure no JIT liquidity is provided during a positive auction,
+     * and that no liquidity can be withdrawn during a negative auction.
+     */
+    function setAuctionInProgress(bool _auctionInProgress) external {
+        require(msg.sender == address(lendingPool), "T_SAIP: UNAUTHORIZED");
+        auctionInProgress = _auctionInProgress;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -78,7 +95,13 @@ contract Tranche is ERC4626, Owned {
      * Instead it calls the deposit of the Lending Pool which calls the transferFrom of the underlying assets.
      * Hence the sender should not give this contract an allowance to transfer the underlying asset but the Lending Pool.
      */
-    function deposit(uint256 assets, address receiver) public override notLocked returns (uint256 shares) {
+    function deposit(uint256 assets, address receiver)
+        public
+        override
+        notLocked
+        notWhenAuctionInProgress
+        returns (uint256 shares)
+    {
         //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDeposit(assets)) != 0, "T_D: ZERO_SHARES");
@@ -100,7 +123,13 @@ contract Tranche is ERC4626, Owned {
      * Instead it calls the deposit of the Lending Pool which calls the transferFrom of the underlying assets.
      * Hence the sender should not give this contract an allowance to transfer the underlying asset but the Lending Pool.
      */
-    function mint(uint256 shares, address receiver) public override notLocked returns (uint256 assets) {
+    function mint(uint256 shares, address receiver)
+        public
+        override
+        notLocked
+        notWhenAuctionInProgress
+        returns (uint256 assets)
+    {
         //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
         assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
 
@@ -123,6 +152,7 @@ contract Tranche is ERC4626, Owned {
         public
         override
         notLocked
+        notWhenAuctionInProgress
         returns (uint256 shares)
     {
         //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
@@ -154,6 +184,7 @@ contract Tranche is ERC4626, Owned {
         public
         override
         notLocked
+        notWhenAuctionInProgress
         returns (uint256 assets)
     {
         if (msg.sender != owner_) {

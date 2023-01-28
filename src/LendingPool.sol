@@ -40,9 +40,10 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
     uint128 public totalRealisedLiquidity;
     uint256 public supplyCap;
+    uint96 public auctionsInProgress;
 
-    address public treasury;
     address public liquidator;
+    address public treasury;
     address public vaultFactory;
 
     uint16[] public interestWeightTranches;
@@ -577,6 +578,11 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         //Start the auction of the collateralised assets to repay debt
         ILiquidator(liquidator).startAuction(vault, openDebt);
+        unchecked {
+            auctionsInProgress++;
+        }
+
+        ITranche(tranches[tranches.length - 1]).setAuctionInProgress(true);
 
         //Remove debt from Vault (burn DebtTokens)
         _withdraw(openDebt, vault, vault);
@@ -592,7 +598,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param remainder Any funds remaining after the auction are returned back to the `originalOwner`.
      * @dev This function is called by the Liquidator after a liquidation is finished.
      * @dev The liquidator will transfer the auction proceeds (the underlying asset)
-     * back to the liquidity pool after liquidation.
+     * back to the liquidity pool after liquidation, before calling this function.
      */
     function settleLiquidation(
         address vault,
@@ -624,6 +630,13 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
                 //Make remainder claimable by originalOwner
                 realisedLiquidityOf[originalOwner] += remainder;
             }
+        }
+
+        unchecked {
+            auctionsInProgress--;
+        }
+        if (auctionsInProgress == 0) {
+            ITranche(tranches[tranches.length - 1]).setAuctionInProgress(false);
         }
     }
 
