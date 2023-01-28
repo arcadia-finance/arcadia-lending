@@ -650,7 +650,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             maxBurnable = realisedLiquidityOf[tranche];
             if (badDebt < maxBurnable) {
                 // burn
-                unchecked{
+                unchecked {
                     realisedLiquidityOf[tranche] -= badDebt;
                 }
                 break;
