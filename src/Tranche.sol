@@ -12,7 +12,7 @@ import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
 import "./interfaces/ILendingPool.sol";
 
 /**
- * @title tranche
+ * @title Tranche
  * @author Arcadia Finance
  * @notice The Logic to provide Lending for a lending pool for a certain ERC20 token
  * @dev Protocol is according the ERC4626 standard, with a certain ERC20 as underlying
