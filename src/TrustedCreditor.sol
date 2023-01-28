@@ -18,16 +18,6 @@ abstract contract TrustedCreditor {
     constructor() {}
 
     /* //////////////////////////////////////////////////////////////
-                        LIQUIDATION LOGIC
-    ////////////////////////////////////////////////////////////// */
-
-    /**
-     * @notice Called by a vault when it is being liquidated (auctioned) to repay an amount of debt.
-     * @param debt The amount of debt that will be repaid after the auction.
-     */
-    function liquidateVault(uint256 debt) public virtual;
-
-    /* //////////////////////////////////////////////////////////////
                             VAULT LOGIC
     ////////////////////////////////////////////////////////////// */
 
