@@ -57,6 +57,32 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
     event CreditApproval(address indexed vault, address indexed beneficiary, uint256 amount);
     event Borrow(address indexed vault, bytes3 indexed referrer, uint256 amount);
+    event TrancheAdded(address tranche, uint16 interestWeight_, uint16 liquidationWeight);
+    event TrancheInterestWeightChanged(uint256 index, uint16 _weight);
+    event TrancheLiquidationWeightChanged(uint256 index, uint16 _weight);
+    event InterestWeightTreasuryChanged(uint16 interestWeightTreasury_);
+    event LiquidationWeightTreasuryChanged(uint16 liquidationWeightTreasury_);
+    event TreasuryChanged(address treasury_);
+    event OriginationFeeChanged(uint8 originationFee_);
+    event BorrowCapChanged(uint256 borrowCap_);
+    event SupplyCapChanged(uint256 supplyCap_);
+    event Deposit(address indexed from, uint256 assets);
+    event Withdraw(address indexed receiver, uint256 assets);
+    event Repay(address indexed from, uint256 amount, address indexed vault);
+    event LeveragedAction(
+        address indexed vault, address indexed actionHandler, uint256 amountBorrowed, bytes actionData
+    );
+    event LiquidationStarted(address vault);
+    event LiquidationSettled(
+        address vault,
+        address originalOwner,
+        uint256 badDebt,
+        uint256 liquidationInitiatorReward,
+        uint256 liquidationPenalty,
+        uint256 remainder
+    );
+    event VaultVersionSet(address vaultVersion, bool valid);
+    event MarginAccountOpened(address indexed vault, address indexed owner);
 
     modifier onlyLiquidator() {
         require(liquidator == msg.sender, "UNAUTHORIZED");
@@ -105,6 +131,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev Each Tranche is an ERC-4626 contract
      * @dev The interestWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
      */
+
     function addTranche(address tranche, uint16 interestWeight_, uint16 liquidationWeight) public onlyOwner {
         require(!isTranche[tranche], "TR_AD: Already exists");
         totalInterestWeight += interestWeight_;
@@ -116,6 +143,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         tranches.push(tranche);
         isTranche[tranche] = true;
+        emit TrancheAdded(tranche, interestWeight_, liquidationWeight);
     }
 
     /**
@@ -124,11 +152,13 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param _weight The new interestWeight of the Tranche at the index
      * @dev The interestWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
      */
+
     function setInterestWeight(uint256 index, uint16 _weight) public onlyOwner {
         require(index < tranches.length, "TR_SIW: Inexisting Tranche");
         totalInterestWeight = totalInterestWeight - interestWeightTranches[index] + _weight;
         interestWeightTranches[index] = _weight;
         interestWeight[tranches[index]] = _weight;
+        emit TrancheInterestWeightChanged(index, _weight);
     }
 
     /**
@@ -137,10 +167,12 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param _weight The new liquidationWeight of the Tranche at the index
      * @dev The liquidationWeight fee determines the relative share of the liquidation penalty that goes to its Liquidity providers
      */
+
     function setLiquidationWeight(uint256 index, uint16 _weight) public onlyOwner {
         require(index < tranches.length, "TR_SLW: Inexisting Tranche");
         totalLiquidationWeight = totalLiquidationWeight - liquidationWeightTranches[index] + _weight;
         liquidationWeightTranches[index] = _weight;
+        emit TrancheLiquidationWeightChanged(index, _weight);
     }
 
     /**
@@ -172,9 +204,11 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev Setting interestWeightTreasury to a very high value will cause the protocol to collect all interest fees from that moment on.
      * Although this will affect the future profits of liquidity providers, no funds nor realized interest are at risk for LPs.
      */
+
     function setTreasuryInterestWeight(uint16 interestWeightTreasury_) external onlyOwner {
         totalInterestWeight = totalInterestWeight - interestWeightTreasury + interestWeightTreasury_;
         interestWeightTreasury = interestWeightTreasury_;
+        emit InterestWeightTreasuryChanged(interestWeightTreasury_);
     }
 
     /**
@@ -184,17 +218,21 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev Setting liquidationWeightTreasury to a very high value will cause the protocol to collect all liquidation penalty fees from that moment on.
      * Although this will affect the future profits of liquidity providers in the Jr tranche, no funds nor realized interest are at risk for LPs.
      */
+
     function setTreasuryLiquidationWeight(uint16 liquidationWeightTreasury_) external onlyOwner {
         totalLiquidationWeight = totalLiquidationWeight - liquidationWeightTreasury + liquidationWeightTreasury_;
         liquidationWeightTreasury = liquidationWeightTreasury_;
+        emit LiquidationWeightTreasuryChanged(liquidationWeightTreasury_);
     }
 
     /**
      * @notice Sets new treasury address
      * @param treasury_ The new address of the treasury
      */
+
     function setTreasury(address treasury_) external onlyOwner {
         treasury = treasury_;
+        emit TreasuryChanged(treasury_);
     }
 
     /**
@@ -203,8 +241,10 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev originationFee is limited by being a uint8 -> max value is 2.55%
      * 4 decimal precision (10 = 0.1%)
      */
+
     function setOriginationFee(uint8 originationFee_) external onlyOwner {
         originationFee = originationFee_;
+        emit OriginationFeeChanged(originationFee_);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -216,8 +256,10 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev The borrowCap is the maximum amount of borrows that can be outstanding at any given time to individual borrowers.
      * @dev If it is set to 0, there is no borrow cap.
      */
+
     function setBorrowCap(uint256 borrowCap_) external onlyOwner {
         borrowCap = borrowCap_;
+        emit BorrowCapChanged(borrowCap_);
     }
     /**
      * @notice Sets the maximum amount of supply allowed
@@ -228,6 +270,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
     function setSupplyCap(uint256 supplyCap_) external onlyOwner {
         supplyCap = supplyCap_;
+        emit SupplyCapChanged(supplyCap_);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -240,6 +283,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param from The address of the Liquidity Provider who deposits the underlying ERC-20 token via a Tranche.
      * @dev This function can only be called by Tranches.
      */
+
     function depositInLendingPool(uint256 assets, address from)
         public
         whenDepositNotPaused
@@ -255,6 +299,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             realisedLiquidityOf[msg.sender] += assets;
             totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
         }
+        emit Deposit(from, assets);
     }
 
     /**
@@ -264,6 +309,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev This function can be called by anyone with an open balance (realisedLiquidityOf[address] bigger than 0),
      * which can be both Tranches as other other address (treasury, Liquidation Initiators, Liquidated Vault Owner...).
      */
+
     function withdrawFromLendingPool(uint256 assets, address receiver) public whenWithdrawNotPaused processInterests {
         require(realisedLiquidityOf[msg.sender] >= assets, "LP_WFLP: Amount exceeds balance");
 
@@ -271,6 +317,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         totalRealisedLiquidity -= SafeCastLib.safeCastTo128(assets);
 
         asset.safeTransfer(receiver, assets);
+        emit Withdraw(receiver, assets);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -344,6 +391,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev if vault is not an actual address of a vault, maxWithdraw(vault) will always return 0.
      * Function will not revert, but transferAmount is always 0.
      */
+
     function repay(uint256 amount, address vault) public whenRepayNotPaused processInterests {
         uint256 vaultDebt = maxWithdraw(vault);
         uint256 transferAmount = vaultDebt > amount ? amount : vaultDebt;
@@ -353,6 +401,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         asset.transferFrom(msg.sender, address(this), transferAmount);
 
         _withdraw(transferAmount, vault, vault);
+        emit Repay(msg.sender, transferAmount, vault);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -408,6 +457,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         //As last step, after all assets are deposited back into the vault a final health check is done:
         //The Collateral Value of all assets in the vault is bigger than the total liabilities against the vault (including the margin taken during this function).
         IVault(vault).vaultManagementAction(actionHandler, actionData);
+        emit LeveragedAction(vault, actionHandler, amountBorrowed, actionData, referrer);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -555,8 +605,11 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @notice Set's the contract address of the liquidator.
      * @param liquidator_ The contract address of the liquidator
      */
+    event LiquidatorSet(address liquidator_);
+
     function setLiquidator(address liquidator_) public onlyOwner {
         liquidator = liquidator_;
+        emit LiquidatorSet(liquidator_);
     }
 
     /**
@@ -565,6 +618,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev At the start of the liquidation the debt tokens are burned,
      * as such interests are not accrued during the liquidation.
      */
+
     function liquidateVault(address vault) external whenLiquidationNotPaused processInterests {
         //Only Vaults can have debt, and debtTokens are non-transferrable.
         //Hence by checking that the balance of the address passed as vault is not 0, we know the address
@@ -580,6 +634,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         //Remove debt from Vault (burn DebtTokens)
         _withdraw(openDebt, vault, vault);
+        emit LiquidationStarted(vault);
     }
 
     /**
@@ -594,6 +649,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev The liquidator will transfer the auction proceeds (the underlying asset)
      * back to the liquidity pool after liquidation.
      */
+
     function settleLiquidation(
         address vault,
         address originalOwner,
@@ -625,6 +681,9 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
                 realisedLiquidityOf[originalOwner] += remainder;
             }
         }
+        emit LiquidationSettled(
+            vault, originalOwner, badDebt, liquidationInitiatorReward, liquidationPenalty, remainder
+            );
     }
 
     /**
@@ -705,6 +764,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      */
     function setVaultVersion(uint256 vaultVersion, bool valid) external onlyOwner {
         _setVaultVersion(vaultVersion, valid);
+        emit VaultVersionSet(address(vaultVersion), valid);
     }
 
     /**
@@ -720,6 +780,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             success = true;
             baseCurrency = address(asset);
             liquidator_ = liquidator;
+            emit MarginAccountOpened(msg.sender, msg.sender);
         }
     }
 
