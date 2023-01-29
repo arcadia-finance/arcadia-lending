@@ -2171,6 +2171,18 @@ contract LiquidationTest is LendingPoolTest {
         vm.stopPrank();
     }
 
+    function testRevert_setLiquidator_OnlyOnce(address liquidator_) public {
+        // When: The owner sets the Liquidator
+        vm.prank(creator);
+        pool.setLiquidator(liquidator_);
+
+        // and: then tries to set it again
+        // it should revert with "LP_SL: Already set"
+        vm.prank(creator);
+        vm.expectRevert("LP_SL: Already set");
+        pool.setLiquidator(liquidator_);
+    }
+
     function testSuccess_setLiquidator(address liquidator_) public {
         // Given: all neccesary contracts are deployed on the setup
 
