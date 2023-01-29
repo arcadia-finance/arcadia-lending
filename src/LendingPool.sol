@@ -671,7 +671,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @notice Handles the bookkeeping in case of bad debt (Vault became undercollateralised).
      * @param badDebt The total amount of underlying assets that need to be written off as bad debt.
      * @dev The order of the tranches is important, the most senior tranche is at index 0, the most junior at the last index.
-     * @dev The most junior tranche will loose its underlying assets first. If all liquidity of a certain Tranche is written off,
+     * @dev The most junior tranche will lose its underlying assets first. If all liquidity of a certain Tranche is written off,
      * the complete tranche is locked and removed. If there is still remaining bad debt, the next Tranche starts losing capital.
      */
     function _processDefault(uint256 badDebt) internal {
@@ -684,7 +684,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             tranche = tranches[i];
             maxBurnable = realisedLiquidityOf[tranche];
             if (badDebt < maxBurnable) {
-                //Deduct badDebt from balance most junior tranche
+                //Deduct badDebt from the balance of the most junior tranche
                 unchecked {
                     realisedLiquidityOf[tranche] -= badDebt;
                 }
