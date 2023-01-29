@@ -61,6 +61,10 @@ contract LendingPoolExtension is LendingPool {
     function numberOfTranches() public view returns (uint256) {
         return tranches.length;
     }
+
+    function setAuctionsInProgress(uint96 amount) public {
+        auctionsInProgress = amount;
+    }
 }
 
 abstract contract LendingPoolTest is Test {
@@ -2167,7 +2171,7 @@ contract LiquidationTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_liquidateVault(address liquidationInitiator, uint128 amountLoaned) public {
+    function testSuccess_liquidateVault_NoOngoingAuctions(address liquidationInitiator, uint128 amountLoaned) public {
         // Given: all necessary contracts are deployed on the setup
         // And: The vault has debt
         vm.assume(amountLoaned > 0);
@@ -2192,6 +2196,57 @@ contract LiquidationTest is LendingPoolTest {
         // Then: The debt of the vault should be decreased with amountLiquidated
         assertEq(debt.balanceOf(address(vault)), 0);
         assertEq(debt.totalSupply(), 0);
+
+        // Then: auctionsInProgress should increase
+        assertEq(pool.auctionsInProgress(), 1);
+        // and the most junior tranche should be locked
+        // ToDo: Check for emit
+        assertTrue(jrTranche.auctionInProgress());
+        assertFalse(srTranche.auctionInProgress());
+    }
+
+    function testSuccess_liquidateVault_WithOngoingAuctions(
+        address liquidationInitiator,
+        uint128 amountLoaned,
+        uint96 auctionsInProgress
+    ) public {
+        // Given: all necessary contracts are deployed on the setup
+        // And: The vault has debt
+        vm.assume(amountLoaned > 0);
+        vault.setTotalValue(amountLoaned);
+        vm.prank(liquidityProvider);
+        asset.approve(address(pool), type(uint256).max);
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(amountLoaned, liquidityProvider);
+        vm.prank(vaultOwner);
+        pool.borrow(amountLoaned, address(vault), vaultOwner, emptyBytes3);
+        // And: The liquidator is set
+        vm.prank(creator);
+        pool.setLiquidator(address(liquidator));
+
+        //And: an auction is ongoing
+        vm.assume(auctionsInProgress > 0);
+        vm.assume(auctionsInProgress < type(uint96).max);
+        pool.setAuctionsInProgress(auctionsInProgress);
+        vm.prank(address(pool));
+        jrTranche.setAuctionInProgress(true);
+
+        // When: Liquidator calls liquidateVault
+        vm.prank(liquidationInitiator);
+        pool.liquidateVault(address(vault));
+
+        // Then: liquidationInitiator should be set
+        assertEq(pool.liquidationInitiator(address(vault)), liquidationInitiator);
+
+        // Then: The debt of the vault should be decreased with amountLiquidated
+        assertEq(debt.balanceOf(address(vault)), 0);
+        assertEq(debt.totalSupply(), 0);
+
+        // Then: auctionsInProgress should increase
+        assertEq(pool.auctionsInProgress(), auctionsInProgress + 1);
+        // and the most junior tranche should be locked
+        assertTrue(jrTranche.auctionInProgress());
+        assertFalse(srTranche.auctionInProgress());
     }
 
     function testRevert_settleLiquidation_Unauthorised(
@@ -2215,126 +2270,6 @@ contract LiquidationTest is LendingPoolTest {
             address(vault), vaultOwner, badDebt, liquidationInitiatorReward, liquidationPenalty, remainder
         );
         vm.stopPrank();
-    }
-
-    function testSuccess_settleLiquidation_BadDebtWithOneTranche(
-        uint128 liquiditySenior,
-        uint128 liquidityJunior,
-        uint128 badDebt
-    ) public {
-        // srTranche calls depositInLendingPool for liquiditySenior, jrTranche calls depositInLendingPool for liquidityJunior
-        vm.assume(liquiditySenior <= type(uint128).max - liquidityJunior);
-        uint256 totalAmount = uint256(liquiditySenior) + uint256(liquidityJunior);
-        vm.assume(badDebt < liquidityJunior);
-
-        vm.prank(address(srTranche));
-        pool.depositInLendingPool(liquiditySenior, liquidityProvider);
-        vm.prank(address(jrTranche));
-        pool.depositInLendingPool(liquidityJunior, liquidityProvider);
-
-        // And: The liquidator is set
-        vm.prank(creator);
-        pool.setLiquidator(address(liquidator));
-
-        // When: Liquidator settles a liquidation
-        vm.prank(address(liquidator));
-        pool.settleLiquidation(address(vault), vaultOwner, badDebt, 0, 0, 0);
-
-        // Then: realisedLiquidityOf for srTranche should be liquiditySenior, realisedLiquidityOf jrTranche should be liquidityJunior minus badDebt,
-        // totalRealisedLiquidity should be equal to totalAmount minus badDebt
-        assertEq(pool.realisedLiquidityOf(address(srTranche)), liquiditySenior);
-        assertEq(pool.realisedLiquidityOf(address(jrTranche)), liquidityJunior - badDebt);
-        assertEq(pool.totalRealisedLiquidity(), totalAmount - badDebt);
-    }
-
-    function testSuccess_settleLiquidation_BadDebtWithTwoTranches(
-        uint128 liquiditySenior,
-        uint128 liquidityJunior,
-        uint128 badDebt
-    ) public {
-        vm.assume(badDebt > 0);
-        // Given: srTranche deposit liquiditySenior, jrTranche deposit liquidityJunior
-        vm.assume(liquiditySenior <= type(uint128).max - liquidityJunior);
-        uint256 totalAmount = uint256(liquiditySenior) + uint256(liquidityJunior);
-        vm.assume(badDebt < totalAmount);
-        vm.assume(badDebt >= liquidityJunior);
-
-        vm.prank(address(srTranche));
-        pool.depositInLendingPool(liquiditySenior, liquidityProvider);
-        vm.prank(address(jrTranche));
-        pool.depositInLendingPool(liquidityJunior, liquidityProvider);
-
-        // And: The liquidator is set
-        vm.prank(creator);
-        pool.setLiquidator(address(liquidator));
-
-        // When: Liquidator settles a liquidation
-        vm.prank(address(liquidator));
-        pool.settleLiquidation(address(vault), vaultOwner, badDebt, 0, 0, 0);
-
-        // Then: supplyBalances srTranche should be totalAmount minus badDebt, supplyBalances jrTranche should be 0,
-        // totalSupply should be equal to totalAmount minus badDebt, isTranche for jrTranche should return false
-        assertEq(pool.realisedLiquidityOf(address(srTranche)), totalAmount - badDebt);
-        assertEq(pool.realisedLiquidityOf(address(jrTranche)), 0);
-        assertEq(pool.totalRealisedLiquidity(), totalAmount - badDebt);
-        assertFalse(pool.isTranche(address(jrTranche)));
-    }
-
-    function testSuccess_settleLiquidation_MaxBadDebtWithTwoTranches(uint128 liquiditySenior, uint128 liquidityJunior)
-        public
-    {
-        // Given: srTranche deposit liquiditySenior, jrTranche deposit liquidityJunior
-        vm.assume(liquiditySenior <= type(uint128).max - liquidityJunior);
-        uint128 badDebt = liquiditySenior + liquidityJunior;
-        vm.assume(badDebt > 0);
-
-        vm.prank(address(srTranche));
-        pool.depositInLendingPool(liquiditySenior, liquidityProvider);
-        vm.prank(address(jrTranche));
-        pool.depositInLendingPool(liquidityJunior, liquidityProvider);
-
-        // And: The liquidator is set
-        vm.prank(creator);
-        pool.setLiquidator(address(liquidator));
-
-        // When: Liquidator settles a liquidation
-        vm.prank(address(liquidator));
-        pool.settleLiquidation(address(vault), vaultOwner, badDebt, 0, 0, 0);
-
-        // Then: supplyBalances srTranche should be totalAmount minus badDebt, supplyBalances jrTranche should be 0,
-        // totalSupply should be equal to totalAmount minus badDebt, isTranche for jrTranche should return false
-        assertEq(pool.realisedLiquidityOf(address(srTranche)), 0);
-        assertEq(pool.realisedLiquidityOf(address(jrTranche)), 0);
-        assertEq(pool.totalRealisedLiquidity(), 0);
-        assertFalse(pool.isTranche(address(jrTranche)));
-        assertFalse(pool.isTranche(address(srTranche)));
-    }
-
-    function testRevert_settleLiquidation_ExcessBadDebt(
-        uint128 liquiditySenior,
-        uint128 liquidityJunior,
-        uint128 badDebt
-    ) public {
-        // Given: badDebt, liquidityJunior and liquiditySenior bigger than 0,
-        // srTranche calls depositInLendingPool for liquiditySenior, jrTranche calls depositInLendingPool for liquidityJunior
-        // vm.assume(liquiditySenior <= type(uint256).max - liquidityJunior);
-        uint256 totalAmount = uint256(liquiditySenior) + uint256(liquidityJunior);
-        vm.assume(badDebt > totalAmount);
-        vm.assume(badDebt > 0);
-
-        vm.prank(address(srTranche));
-        pool.depositInLendingPool(liquiditySenior, liquidityProvider);
-        vm.prank(address(jrTranche));
-        pool.depositInLendingPool(liquidityJunior, liquidityProvider);
-
-        // And: The liquidator is set
-        vm.prank(creator);
-        pool.setLiquidator(address(liquidator));
-
-        // When: Liquidator settles a liquidation
-        vm.expectRevert(stdError.arithmeticError);
-        vm.prank(address(liquidator));
-        pool.settleLiquidation(address(vault), vaultOwner, badDebt, 0, 0, 0);
     }
 
     function testSuccess_settleLiquidation_Surplus(
@@ -2362,6 +2297,10 @@ contract LiquidationTest is LendingPoolTest {
         stdstore.target(address(pool)).sig(pool.liquidationInitiator.selector).with_key(address(vault)).checked_write(
             liquidationInitiatorAddr
         );
+
+        pool.setAuctionsInProgress(1);
+        vm.prank(address(pool));
+        jrTranche.setAuctionInProgress(true);
 
         // When: Liquidator settles a liquidation
         vm.prank(address(liquidator));
@@ -2399,6 +2338,11 @@ contract LiquidationTest is LendingPoolTest {
         assertEq(pool.realisedLiquidityOf(vaultOwner), remainder);
         // And: The total realised liquidity should be updated
         assertEq(pool.totalRealisedLiquidity(), liquidity + liquidationInitiatorReward + liquidationPenalty + remainder);
+
+        //ToDo: check emit Tranche
+        assertEq(pool.auctionsInProgress(), 0);
+        assertFalse(jrTranche.auctionInProgress());
+        assertFalse(srTranche.auctionInProgress());
     }
 
     function testSuccess_settleLiquidation_ProcessDefault(
@@ -2439,6 +2383,178 @@ contract LiquidationTest is LendingPoolTest {
 
         // And: The total realised liquidity should be updated
         assertEq(pool.totalRealisedLiquidity(), uint256(liquidity) + liquidationInitiatorReward - badDebt);
+    }
+
+    function testSuccess_settleLiquidation_MultipleAuctionsOngoing(uint128 liquidity, uint96 auctionsInProgress)
+        public
+    {
+        // Given: Liquidity is deposited in Lending Pool
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(liquidity, liquidityProvider);
+
+        // And: The liquidator is set
+        vm.prank(creator);
+        pool.setLiquidator(address(liquidator));
+
+        // And multiple auctions are ongoing
+        vm.assume(auctionsInProgress > 1);
+        pool.setAuctionsInProgress(auctionsInProgress);
+        vm.prank(address(pool));
+        jrTranche.setAuctionInProgress(true);
+
+        // When: Liquidator settles a liquidation
+        vm.prank(address(liquidator));
+        pool.settleLiquidation(address(vault), vaultOwner, 0, 0, 0, 0);
+
+        //ToDo: check emit Tranche
+        assertEq(pool.auctionsInProgress(), auctionsInProgress - 1);
+        assertTrue(jrTranche.auctionInProgress());
+        assertFalse(srTranche.auctionInProgress());
+    }
+
+    function testSuccess_settleLiquidation_ProcessDefaultNoTrancheWiped(
+        uint128 liquiditySenior,
+        uint128 liquidityJunior,
+        uint128 badDebt
+    ) public {
+        // srTranche calls depositInLendingPool for liquiditySenior, jrTranche calls depositInLendingPool for liquidityJunior
+        vm.assume(liquiditySenior <= type(uint128).max - liquidityJunior);
+        uint256 totalAmount = uint256(liquiditySenior) + uint256(liquidityJunior);
+        vm.assume(badDebt < liquidityJunior);
+
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(liquiditySenior, liquidityProvider);
+        vm.prank(address(jrTranche));
+        pool.depositInLendingPool(liquidityJunior, liquidityProvider);
+
+        // And: The liquidator is set
+        vm.prank(creator);
+        pool.setLiquidator(address(liquidator));
+
+        // When: Liquidator settles a liquidation
+        vm.prank(address(liquidator));
+        pool.settleLiquidation(address(vault), vaultOwner, badDebt, 0, 0, 0);
+
+        // Then: realisedLiquidityOf for srTranche should be liquiditySenior, realisedLiquidityOf jrTranche should be liquidityJunior minus badDebt,
+        // totalRealisedLiquidity should be equal to totalAmount minus badDebt
+        assertEq(pool.realisedLiquidityOf(address(srTranche)), liquiditySenior);
+        assertEq(pool.realisedLiquidityOf(address(jrTranche)), liquidityJunior - badDebt);
+        assertEq(pool.totalRealisedLiquidity(), totalAmount - badDebt);
+    }
+
+    function testSuccess_settleLiquidation_ProcessDefaultOneTrancheWiped(
+        uint128 liquiditySenior,
+        uint128 liquidityJunior,
+        uint128 badDebt,
+        uint96 auctionsInProgress
+    ) public {
+        vm.assume(badDebt > 0);
+        // Given: srTranche deposit liquiditySenior, jrTranche deposit liquidityJunior
+        vm.assume(liquiditySenior <= type(uint128).max - liquidityJunior);
+        uint256 totalAmount = uint256(liquiditySenior) + uint256(liquidityJunior);
+        vm.assume(badDebt < totalAmount);
+        vm.assume(badDebt >= liquidityJunior);
+
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(liquiditySenior, liquidityProvider);
+        vm.prank(address(jrTranche));
+        pool.depositInLendingPool(liquidityJunior, liquidityProvider);
+
+        // And: The liquidator is set
+        vm.prank(creator);
+        pool.setLiquidator(address(liquidator));
+
+        // And multiple auctions are ongoing
+        vm.assume(auctionsInProgress > 1);
+        pool.setAuctionsInProgress(auctionsInProgress);
+        vm.prank(address(pool));
+        jrTranche.setAuctionInProgress(true);
+
+        // When: Liquidator settles a liquidation
+        vm.prank(address(liquidator));
+        pool.settleLiquidation(address(vault), vaultOwner, badDebt, 0, 0, 0);
+
+        // Then: supplyBalances srTranche should be totalAmount minus badDebt, supplyBalances jrTranche should be 0,
+        // totalSupply should be equal to totalAmount minus badDebt, isTranche for jrTranche should return false
+        assertEq(pool.realisedLiquidityOf(address(srTranche)), totalAmount - badDebt);
+        assertEq(pool.realisedLiquidityOf(address(jrTranche)), 0);
+        assertEq(pool.totalRealisedLiquidity(), totalAmount - badDebt);
+        assertFalse(pool.isTranche(address(jrTranche)));
+
+        //ToDo: check emits Tranche
+        assertEq(pool.auctionsInProgress(), auctionsInProgress - 1);
+        assertFalse(jrTranche.auctionInProgress());
+        assertTrue(srTranche.auctionInProgress());
+    }
+
+    function testSuccess_settleLiquidation_ProcessDefaultAllTranchesWiped(
+        uint128 liquiditySenior,
+        uint128 liquidityJunior,
+        uint96 auctionsInProgress
+    ) public {
+        // Given: srTranche deposit liquiditySenior, jrTranche deposit liquidityJunior
+        vm.assume(liquiditySenior <= type(uint128).max - liquidityJunior);
+        uint128 badDebt = liquiditySenior + liquidityJunior;
+        vm.assume(badDebt > 0);
+
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(liquiditySenior, liquidityProvider);
+        vm.prank(address(jrTranche));
+        pool.depositInLendingPool(liquidityJunior, liquidityProvider);
+
+        // And: The liquidator is set
+        vm.prank(creator);
+        pool.setLiquidator(address(liquidator));
+
+        // And multiple auctions are ongoing
+        vm.assume(auctionsInProgress > 1);
+        pool.setAuctionsInProgress(auctionsInProgress);
+        vm.prank(address(pool));
+        jrTranche.setAuctionInProgress(true);
+
+        // When: Liquidator settles a liquidation
+        vm.prank(address(liquidator));
+        pool.settleLiquidation(address(vault), vaultOwner, badDebt, 0, 0, 0);
+
+        // Then: supplyBalances srTranche should be totalAmount minus badDebt, supplyBalances jrTranche should be 0,
+        // totalSupply should be equal to totalAmount minus badDebt, isTranche for jrTranche should return false
+        assertEq(pool.realisedLiquidityOf(address(srTranche)), 0);
+        assertEq(pool.realisedLiquidityOf(address(jrTranche)), 0);
+        assertEq(pool.totalRealisedLiquidity(), 0);
+        assertFalse(pool.isTranche(address(jrTranche)));
+        assertFalse(pool.isTranche(address(srTranche)));
+
+        //ToDo: check emits Tranche
+        assertEq(pool.auctionsInProgress(), auctionsInProgress - 1);
+        assertFalse(jrTranche.auctionInProgress());
+        assertFalse(srTranche.auctionInProgress());
+    }
+
+    function testRevert_settleLiquidation_ExcessBadDebt(
+        uint128 liquiditySenior,
+        uint128 liquidityJunior,
+        uint128 badDebt
+    ) public {
+        // Given: badDebt, liquidityJunior and liquiditySenior bigger than 0,
+        // srTranche calls depositInLendingPool for liquiditySenior, jrTranche calls depositInLendingPool for liquidityJunior
+        // vm.assume(liquiditySenior <= type(uint256).max - liquidityJunior);
+        uint256 totalAmount = uint256(liquiditySenior) + uint256(liquidityJunior);
+        vm.assume(badDebt > totalAmount);
+        vm.assume(badDebt > 0);
+
+        vm.prank(address(srTranche));
+        pool.depositInLendingPool(liquiditySenior, liquidityProvider);
+        vm.prank(address(jrTranche));
+        pool.depositInLendingPool(liquidityJunior, liquidityProvider);
+
+        // And: The liquidator is set
+        vm.prank(creator);
+        pool.setLiquidator(address(liquidator));
+
+        // When: Liquidator settles a liquidation
+        vm.expectRevert(stdError.arithmeticError);
+        vm.prank(address(liquidator));
+        pool.settleLiquidation(address(vault), vaultOwner, badDebt, 0, 0, 0);
     }
 
     function testSuccess_syncLiquidationPenaltyToLiquidityProviders(
