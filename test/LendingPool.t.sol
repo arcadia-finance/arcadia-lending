@@ -638,19 +638,19 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         assertEq(asset.balanceOf(address(pool)), totalAmount);
     }
 
-    function testRevert_donateToPool_indexIsNoTranche(uint256 index) public {
+    function testRevert_donateToTranche_indexIsNoTranche(uint256 index) public {
         vm.assume(index >= pool.numberOfTranches());
 
-        vm.expectRevert("LP_DTP: Tranche index OOB");
+        vm.expectRevert("LP_DTT: Tranche index OOB");
         pool.donateToTranche(index, 1);
     }
 
-    function testRevert_donateToPool_zeroAssets() public {
-        vm.expectRevert("LP_DTP: Amount is 0");
+    function testRevert_donateToTranche_zeroAssets() public {
+        vm.expectRevert("LP_DTT: Amount is 0");
         pool.donateToTranche(1, 0);
     }
 
-    function testRevert_donateToPool_SupplyCap(uint256 amount, uint256 supplyCap) public {
+    function testRevert_donateToTranche_SupplyCap(uint256 amount, uint256 supplyCap) public {
         // Given: amount should be greater than 1
         vm.assume(amount > 1);
         vm.assume(pool.totalRealisedLiquidity() + amount > supplyCap);
@@ -661,11 +661,11 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         pool.setSupplyCap(supplyCap);
 
         // Then: depositInLendingPool is reverted with SUPPLY_CAP_REACHED
-        vm.expectRevert("LP_DTP: Supply cap exceeded");
+        vm.expectRevert("LP_DTT: Supply cap exceeded");
         pool.donateToTranche(1, amount);
     }
 
-    function testRevert_donateToPool_DonateToTranche(uint32 initialShares, uint128 assets, address donator) public {
+    function testRevert_donateToTranche_InsufficientShares(uint32 initialShares, uint128 assets, address donator) public {
         vm.assume(assets > 0);
         vm.assume(assets < type(uint128).max - pool.totalRealisedLiquidity() - initialShares);
         vm.assume(initialShares < 10 ** pool.decimals());
@@ -680,12 +680,12 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
 
         vm.startPrank(donator);
         asset.approve(address(pool), type(uint256).max);
-        vm.expectRevert("LP_DTP: Insufficient shares");
+        vm.expectRevert("LP_DTT: Insufficient shares");
         pool.donateToTranche(0, assets);
         vm.stopPrank();
     }
 
-    function testSuccess_donateToPool(uint8 index, uint128 assets, address donator, uint128 initialShares) public {
+    function testSuccess_donateToTranche(uint8 index, uint128 assets, address donator, uint128 initialShares) public {
         vm.assume(assets > 0);
         vm.assume(assets <= type(uint128).max - pool.totalRealisedLiquidity() - initialShares);
         vm.assume(index < pool.numberOfTranches());

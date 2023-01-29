@@ -285,15 +285,15 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * This is mitigated by checking that there are at least 10 ** decimals shares outstanding.
      */
     function donateToTranche(uint256 trancheIndex, uint256 assets) external whenDepositNotPaused processInterests {
-        require(trancheIndex < tranches.length, "LP_DTP: Tranche index OOB");
-        require(assets > 0, "LP_DTP: Amount is 0");
+        require(trancheIndex < tranches.length, "LP_DTT: Tranche index OOB");
+        require(assets > 0, "LP_DTT: Amount is 0");
 
-        if (supplyCap > 0) require(totalRealisedLiquidity + assets <= supplyCap, "LP_DTP: Supply cap exceeded");
+        if (supplyCap > 0) require(totalRealisedLiquidity + assets <= supplyCap, "LP_DTT: Supply cap exceeded");
 
         address tranche = tranches[trancheIndex];
         //Mitigate share manipulation, where first Liquidity Provider mints just 1 share
         //See https://github.com/OpenZeppelin/openzeppelin-contracts/issues/3706 for more information
-        require(ERC20(tranche).totalSupply() >= 10 ** decimals, "LP_DTP: Insufficient shares");
+        require(ERC20(tranche).totalSupply() >= 10 ** decimals, "LP_DTT: Insufficient shares");
 
         asset.transferFrom(msg.sender, address(this), assets);
 
