@@ -642,7 +642,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             //-> Default event, deduct badDebt from LPs, starting with most Junior Tranche.
             _processDefault(badDebt);
             totalRealisedLiquidity =
-                SafeCastLib.safeCastTo128(uint256(totalRealisedLiquidity) - badDebt + liquidationInitiatorReward);
+                SafeCastLib.safeCastTo128(uint256(totalRealisedLiquidity) + liquidationInitiatorReward - badDebt );
         } else {
             //Collateral was auctioned for more than the liabilities
             //-> Pay out the Liquidation Penalty to treasury and Tranches
