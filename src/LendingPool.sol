@@ -41,6 +41,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     uint128 public totalRealisedLiquidity;
     uint256 public supplyCap;
     uint88 public maxInitiatorFee;
+    uint96 public auctionsInProgress;
 
     address public liquidator;
     address public treasury;
@@ -611,6 +612,15 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         //Start the auction of the collateralised assets to repay debt
         ILiquidator(liquidator).startAuction(vault, openDebt, maxInitiatorFee);
 
+        //Hook to the most junior Tranche, to inform that auctions are ongoing,
+        //already done if there were are other auctions in progress (auctionsInProgress > O).
+        if (auctionsInProgress == 0) {
+            ITranche(tranches[tranches.length - 1]).setAuctionInProgress(true);
+        }
+        unchecked {
+            auctionsInProgress++;
+        }
+
         //Remove debt from Vault (burn DebtTokens)
         _withdraw(openDebt, vault, vault);
     }
@@ -625,7 +635,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param remainder Any funds remaining after the auction are returned back to the `originalOwner`.
      * @dev This function is called by the Liquidator after a liquidation is finished.
      * @dev The liquidator will transfer the auction proceeds (the underlying asset)
-     * back to the liquidity pool after liquidation.
+     * back to the liquidity pool after liquidation, before calling this function.
      */
     function settleLiquidation(
         address vault,
@@ -658,13 +668,21 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
                 realisedLiquidityOf[originalOwner] += remainder;
             }
         }
+
+        unchecked {
+            auctionsInProgress--;
+        }
+        //Hook to the most junior Tranche to inform that there are no ongoing auctions.
+        if (auctionsInProgress == 0 && tranches.length > 0) {
+            ITranche(tranches[tranches.length - 1]).setAuctionInProgress(false);
+        }
     }
 
     /**
      * @notice Handles the bookkeeping in case of bad debt (Vault became undercollateralised).
      * @param badDebt The total amount of underlying assets that need to be written off as bad debt.
      * @dev The order of the tranches is important, the most senior tranche is at index 0, the most junior at the last index.
-     * @dev The most junior tranche will loose its underlying assets first. If all liquidty of a certain Tranche is written off,
+     * @dev The most junior tranche will lose its underlying assets first. If all liquidity of a certain Tranche is written off,
      * the complete tranche is locked and removed. If there is still remaining bad debt, the next Tranche starts losing capital.
      */
     function _processDefault(uint256 badDebt) internal {
@@ -677,19 +695,24 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             tranche = tranches[i];
             maxBurnable = realisedLiquidityOf[tranche];
             if (badDebt < maxBurnable) {
-                // burn
+                //Deduct badDebt from the balance of the most junior tranche
                 unchecked {
                     realisedLiquidityOf[tranche] -= badDebt;
                 }
                 break;
             } else {
-                ITranche(tranche).lock(); //todo gas: can be removed
-                // burn
+                //Unhappy flow, should never occor in practice!
+                //badDebt is bigger than balance most junior tranche -> tranche is completely wiped out
+                //and temporaly locked (no new deposits or withdraws possible).
+                //DAO or insurance might refund (Part of) the losses, and add Tranche back.
+                ITranche(tranche).lock();
                 realisedLiquidityOf[tranche] = 0;
                 _popTranche(i, tranche);
                 unchecked {
                     badDebt -= maxBurnable;
                 }
+                //Hook to the new most junior Tranche to inform that auctions are ongoing.
+                if (i != 0) ITranche(tranches[i - 1]).setAuctionInProgress(true);
             }
         }
     }
