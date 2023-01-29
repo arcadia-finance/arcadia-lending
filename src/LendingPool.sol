@@ -40,6 +40,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
     uint128 public totalRealisedLiquidity;
     uint256 public supplyCap;
+    uint88 public maxInitiatorFee;
     uint96 public auctionsInProgress;
 
     address public liquidator;
@@ -142,6 +143,16 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         require(index < tranches.length, "TR_SLW: Inexisting Tranche");
         totalLiquidationWeight = totalLiquidationWeight - liquidationWeightTranches[index] + _weight;
         liquidationWeightTranches[index] = _weight;
+    }
+
+    /**
+     * @notice Sets the maxInitiatorFee.
+     * @param maxInitiatorFee_ The maximum fee that is paid to the initiator of a liquidation
+     * @dev The liquidator sets the % of the debt that is paid to the initiator of a liquidation.
+     * This fee is capped by the maxInitiatorFee.
+     */
+    function setMaxInitiatorFee(uint88 maxInitiatorFee_) public onlyOwner {
+        maxInitiatorFee = maxInitiatorFee_;
     }
 
     /**
@@ -599,7 +610,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         liquidationInitiator[vault] = msg.sender;
 
         //Start the auction of the collateralised assets to repay debt
-        ILiquidator(liquidator).startAuction(vault, openDebt);
+        ILiquidator(liquidator).startAuction(vault, openDebt, maxInitiatorFee);
 
         //Hook to the most junior Tranche, to inform that auctions are ongoing,
         //already done if there were are other auctions in progress (auctionsInProgress > O).
