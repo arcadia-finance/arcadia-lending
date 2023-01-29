@@ -2116,6 +2116,25 @@ contract LiquidationTest is LendingPoolTest {
         vm.stopPrank();
     }
 
+    function testRevert_setMaxInitiatorFee_Unauthorised(address unprivilegedAddress) public {
+        // Given: unprivilegedAddress is not the Owner
+        vm.assume(unprivilegedAddress != creator);
+
+        // When: unprivilegedAddress sets the Liquidator
+        // Then: setLiquidator should revert with "UNAUTHORIZED"
+        vm.startPrank(unprivilegedAddress);
+        vm.expectRevert("UNAUTHORIZED");
+        pool.setMaxInitiatorFee(100);
+        vm.stopPrank();
+    }
+
+    function testSuccess_setMaxInitiatorFee(uint88 maxFee) public {
+        vm.prank(creator);
+        pool.setMaxInitiatorFee(maxFee);
+
+        assertEq(pool.maxInitiatorFee(), maxFee);
+    }
+
     function testRevert_setLiquidator_Unauthorised(address liquidator_, address unprivilegedAddress) public {
         // Given: unprivilegedAddress is not the Owner
         vm.assume(unprivilegedAddress != creator);
