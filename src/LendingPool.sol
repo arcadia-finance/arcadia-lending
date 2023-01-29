@@ -642,7 +642,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             //-> Default event, deduct badDebt from LPs, starting with most Junior Tranche.
             _processDefault(badDebt);
             totalRealisedLiquidity =
-                SafeCastLib.safeCastTo128(uint256(totalRealisedLiquidity) + liquidationInitiatorReward - badDebt );
+                SafeCastLib.safeCastTo128(uint256(totalRealisedLiquidity) + liquidationInitiatorReward - badDebt);
         } else {
             //Collateral was auctioned for more than the liabilities
             //-> Pay out the Liquidation Penalty to treasury and Tranches
@@ -662,7 +662,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             auctionsInProgress--;
         }
         //Hook to the most junior Tranche to inform that there are no ongoing auctions.
-        if (auctionsInProgress == 0) {
+        if (auctionsInProgress == 0 && tranches.length > 0) {
             ITranche(tranches[tranches.length - 1]).setAuctionInProgress(false);
         }
     }
@@ -701,7 +701,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
                     badDebt -= maxBurnable;
                 }
                 //Hook to the new most junior Tranche to inform that auctions are ongoing.
-                if (i != 0) ITranche(tranches[i-1]).setAuctionInProgress(true);
+                if (i != 0) ITranche(tranches[i - 1]).setAuctionInProgress(true);
             }
         }
     }

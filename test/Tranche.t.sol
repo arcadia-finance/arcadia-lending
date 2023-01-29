@@ -78,6 +78,8 @@ contract DeploymentTest is TrancheTest {
                     LOCKING LOGIC
 //////////////////////////////////////////////////////////////*/
 contract LockingTest is TrancheTest {
+    using stdStorage for StdStorage;
+
     function setUp() public override {
         super.setUp();
     }
@@ -96,13 +98,17 @@ contract LockingTest is TrancheTest {
     }
 
     function testSuccess_lock() public {
-        // Given: all neccesary contracts are deployed on the setup
+        // Given: auction is ongoing
         vm.prank(address(pool));
+        tranche.setAuctionInProgress(true);
+
         // When: pool lock
+        vm.prank(address(pool));
         tranche.lock();
 
         // Then: locked should return true
         assertTrue(tranche.locked());
+        assertFalse(tranche.auctionInProgress());
     }
 
     function testRevert_unlock_Unauthorised(address unprivilegedAddress) public {
