@@ -81,7 +81,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         uint256 liquidationPenalty,
         uint256 remainder
     );
-    event VaultVersionSet(address vaultVersion, bool valid);
+    event VaultVersionSet(uint256 vaultVersion, bool valid);
     event MarginAccountOpened(address indexed vault, address indexed owner);
 
     modifier onlyLiquidator() {
@@ -457,7 +457,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         //As last step, after all assets are deposited back into the vault a final health check is done:
         //The Collateral Value of all assets in the vault is bigger than the total liabilities against the vault (including the margin taken during this function).
         IVault(vault).vaultManagementAction(actionHandler, actionData);
-        emit LeveragedAction(vault, actionHandler, amountBorrowed, actionData, referrer);
+        emit LeveragedAction(vault, actionHandler, amountBorrowed, actionData);
     }
 
     /* //////////////////////////////////////////////////////////////
@@ -764,7 +764,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      */
     function setVaultVersion(uint256 vaultVersion, bool valid) external onlyOwner {
         _setVaultVersion(vaultVersion, valid);
-        emit VaultVersionSet(address(vaultVersion), valid);
+        emit VaultVersionSet(vaultVersion, valid);
     }
 
     /**
@@ -780,7 +780,6 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             success = true;
             baseCurrency = address(asset);
             liquidator_ = liquidator;
-            emit MarginAccountOpened(msg.sender, msg.sender);
         }
     }
 
