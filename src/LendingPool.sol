@@ -40,9 +40,10 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
     uint128 public totalRealisedLiquidity;
     uint256 public supplyCap;
+    uint88 public maxInitiatorFee;
 
-    address public treasury;
     address public liquidator;
+    address public treasury;
     address public vaultFactory;
 
     uint16[] public interestWeightTranches;
@@ -141,6 +142,16 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         require(index < tranches.length, "TR_SLW: Inexisting Tranche");
         totalLiquidationWeight = totalLiquidationWeight - liquidationWeightTranches[index] + _weight;
         liquidationWeightTranches[index] = _weight;
+    }
+
+    /**
+     * @notice Sets the maxInitiatorFee.
+     * @param maxInitiatorFee_ The maximum fee that is paid to the initiator of a liquidation
+     * @dev The liquidator sets the % of the debt that is paid to the initiator of a liquidation.
+     * This fee is capped by the maxInitiatorFee.
+     */
+    function setMaxInitiatorFee(uint88 maxInitiatorFee_) public onlyOwner {
+        maxInitiatorFee = maxInitiatorFee_;
     }
 
     /**
@@ -598,7 +609,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         liquidationInitiator[vault] = msg.sender;
 
         //Start the auction of the collateralised assets to repay debt
-        ILiquidator(liquidator).startAuction(vault, openDebt);
+        ILiquidator(liquidator).startAuction(vault, openDebt, maxInitiatorFee);
 
         //Remove debt from Vault (burn DebtTokens)
         _withdraw(openDebt, vault, vault);
@@ -632,7 +643,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             //-> Default event, deduct badDebt from LPs, starting with most Junior Tranche.
             _processDefault(badDebt);
             totalRealisedLiquidity =
-                SafeCastLib.safeCastTo128(uint256(totalRealisedLiquidity) + liquidationInitiatorReward - badDebt );
+                SafeCastLib.safeCastTo128(uint256(totalRealisedLiquidity) + liquidationInitiatorReward - badDebt);
         } else {
             //Collateral was auctioned for more than the liabilities
             //-> Pay out the Liquidation Penalty to treasury and Tranches
