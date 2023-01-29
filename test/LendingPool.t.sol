@@ -57,6 +57,10 @@ contract LendingPoolExtension is LendingPool {
     function setIsValidVersion(uint256 version, bool allowed) public {
         isValidVersion[version] = allowed;
     }
+
+    function numberOfTranches() public view returns (uint256) {
+        return tranches.length;
+    }
 }
 
 abstract contract LendingPoolTest is Test {
@@ -628,6 +632,67 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         assertEq(pool.realisedLiquidityOf(address(jrTranche)), amount1);
         assertEq(pool.totalRealisedLiquidity(), totalAmount);
         assertEq(asset.balanceOf(address(pool)), totalAmount);
+    }
+
+    function testRevert_donateToPool_indexIsNoTranche(uint256 index) public {
+        vm.assume(index >= pool.numberOfTranches());
+
+        vm.expectRevert("LP_DTP: Tranche index OOB");
+        pool.donateToTranche(index, 1);
+    }
+
+    function testRevert_donateToPool_zeroAssets() public {
+        vm.expectRevert("LP_DTP: Amount is 0");
+        pool.donateToTranche(1, 0);
+    }
+
+    function testRevert_donateToPool_SupplyCap(uint256 amount, uint256 supplyCap) public {
+        // Given: amount should be greater than 1
+        vm.assume(amount > 1);
+        vm.assume(pool.totalRealisedLiquidity() + amount > supplyCap);
+        vm.assume(supplyCap > 0);
+
+        // When: supply cap is set to 1
+        vm.prank(creator);
+        pool.setSupplyCap(supplyCap);
+
+        // Then: depositInLendingPool is reverted with SUPPLY_CAP_REACHED
+        vm.expectRevert("LP_DTP: Supply cap exceeded");
+        pool.donateToTranche(1, amount);
+    }
+
+    function testSuccess_donateToPool(uint8 index, uint128 assets, address donator) public {
+        vm.assume(assets > 0);
+        vm.assume(assets <= type(uint128).max - pool.totalRealisedLiquidity());
+        vm.assume(index < pool.numberOfTranches());
+
+        vm.prank(creator);
+        pool.setSupplyCap(type(uint128).max);
+
+        vm.prank(liquidityProvider);
+        asset.transfer(donator, assets);
+
+        uint256 donatorBalancePre = asset.balanceOf(donator);
+        uint256 poolBalancePre = asset.balanceOf(address(pool));
+        uint256 realisedLiqOfPre = pool.realisedLiquidityOf(pool.tranches(index));
+        uint256 totalRealisedLiqPre = pool.totalRealisedLiquidity();
+
+        vm.startPrank(donator);
+        asset.approve(address(pool), type(uint256).max);
+
+        // When: donateToPool
+        pool.donateToTranche(index, assets);
+        vm.stopPrank();
+
+        uint256 donatorBalancePost = asset.balanceOf(donator);
+        uint256 poolBalancePost = asset.balanceOf(address(pool));
+        uint256 realisedLiqOfPost = pool.realisedLiquidityOf(pool.tranches(index));
+        uint256 totalRealisedLiqPost = pool.totalRealisedLiquidity();
+
+        assertEq(donatorBalancePost + assets, donatorBalancePre);
+        assertEq(poolBalancePost - assets, poolBalancePre);
+        assertEq(realisedLiqOfPost - assets, realisedLiqOfPre);
+        assertEq(totalRealisedLiqPost - assets, totalRealisedLiqPre);
     }
 
     function testRevert_withdrawFromLendingPool_Unauthorised(
