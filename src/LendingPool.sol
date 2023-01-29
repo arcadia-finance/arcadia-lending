@@ -263,7 +263,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param assets The amount of assets of the underlying ERC-20 tokens being deposited.
      * @dev Can be used by anyone to donate assets to the Lending Pool.
      */
-    function donateToPool(uint256 trancheIndex, uint256 assets) external whenDepositNotPaused processInterests {
+    function donateToTranche(uint256 trancheIndex, uint256 assets) external whenDepositNotPaused processInterests {
         require(trancheIndex < tranches.length, "LP_DTP: Tranche index OOB");
         require(assets > 0, "LP_DTP: Amount is 0");
 
