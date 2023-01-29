@@ -23,6 +23,10 @@ import {Guardian} from "./security/Guardian.sol";
  * @title Lending Pool
  * @author Arcadia Finance
  * @notice The Lending pool contains the main logic to provide liquidity and take or repay loans for a certain asset
+ * and does the accounting of the debtTokens (ERC4626).
+ * @dev Implementation not vulnerable to ERC4626 inflation attacks,
+ * since totalAssets() cannot be manipulated by first minter when total amount of shares are low.
+ * For more information, see https://github.com/OpenZeppelin/openzeppelin-contracts/issues/3706
  */
 contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule {
     using SafeTransferLib for ERC20;
@@ -276,6 +280,9 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev Can be used by anyone to donate assets to the Lending Pool.
      * It is supposed to serve as a way to compensate the jrTranche after an
      * auction that didn't get sold.
+     * @dev First minter of a tranche could abuse this function by mining only 1 share,
+     * frontrun next minter by calling this function and inflate the share price.
+     * This is mitigated by checking that there are at least 10 ** decimals shares outstanding.
      */
     function donateToTranche(uint256 trancheIndex, uint256 assets) external whenDepositNotPaused processInterests {
         require(trancheIndex < tranches.length, "LP_DTP: Tranche index OOB");
@@ -283,10 +290,15 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         if (supplyCap > 0) require(totalRealisedLiquidity + assets <= supplyCap, "LP_DTP: Supply cap exceeded");
 
+        address tranche = tranches[trancheIndex];
+        //Mitigate share manipulation, where first Liquidity Provider mints just 1 share
+        //See https://github.com/OpenZeppelin/openzeppelin-contracts/issues/3706 for more information
+        require(ERC20(tranche).totalSupply() >= 10 ** decimals, "LP_DTP: Insufficient shares");
+
         asset.transferFrom(msg.sender, address(this), assets);
 
         unchecked {
-            realisedLiquidityOf[tranches[trancheIndex]] += assets; //[̲̅$̲̅(̲̅ ͡° ͜ʖ ͡°̲̅)̲̅$̲̅]
+            realisedLiquidityOf[tranche] += assets; //[̲̅$̲̅(̲̅ ͡° ͜ʖ ͡°̲̅)̲̅$̲̅]
             totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
         }
     }

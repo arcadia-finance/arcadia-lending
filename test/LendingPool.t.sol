@@ -665,20 +665,44 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         pool.donateToTranche(1, amount);
     }
 
-    function testSuccess_donateToPool(uint8 index, uint128 assets, address donator) public {
+    function testRevert_donateToPool_DonateToTranche(uint32 initialShares, uint128 assets, address donator) public {
         vm.assume(assets > 0);
-        vm.assume(assets <= type(uint128).max - pool.totalRealisedLiquidity());
-        vm.assume(index < pool.numberOfTranches());
+        vm.assume(assets < type(uint128).max - pool.totalRealisedLiquidity() - initialShares);
+        vm.assume(initialShares < 10 ** pool.decimals());
 
         vm.prank(creator);
         pool.setSupplyCap(type(uint128).max);
 
-        vm.prank(liquidityProvider);
+        vm.startPrank(liquidityProvider);
+        srTranche.mint(initialShares, liquidityProvider);
         asset.transfer(donator, assets);
+        vm.stopPrank();
+
+        vm.startPrank(donator);
+        asset.approve(address(pool), type(uint256).max);
+        vm.expectRevert("LP_DTP: Insufficient shares");
+        pool.donateToTranche(0, assets);
+        vm.stopPrank();
+    }
+
+    function testSuccess_donateToPool(uint8 index, uint128 assets, address donator, uint128 initialShares) public {
+        vm.assume(assets > 0);
+        vm.assume(assets <= type(uint128).max - pool.totalRealisedLiquidity() - initialShares);
+        vm.assume(index < pool.numberOfTranches());
+        vm.assume(initialShares >= 10 ** pool.decimals());
+
+        vm.prank(creator);
+        pool.setSupplyCap(type(uint128).max);
+
+        address tranche = pool.tranches(index);
+        vm.startPrank(liquidityProvider);
+        Tranche(tranche).mint(initialShares, liquidityProvider);
+        asset.transfer(donator, assets);
+        vm.stopPrank();
 
         uint256 donatorBalancePre = asset.balanceOf(donator);
         uint256 poolBalancePre = asset.balanceOf(address(pool));
-        uint256 realisedLiqOfPre = pool.realisedLiquidityOf(pool.tranches(index));
+        uint256 realisedLiqOfPre = pool.realisedLiquidityOf(tranche);
         uint256 totalRealisedLiqPre = pool.totalRealisedLiquidity();
 
         vm.startPrank(donator);
@@ -690,7 +714,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
 
         uint256 donatorBalancePost = asset.balanceOf(donator);
         uint256 poolBalancePost = asset.balanceOf(address(pool));
-        uint256 realisedLiqOfPost = pool.realisedLiquidityOf(pool.tranches(index));
+        uint256 realisedLiqOfPost = pool.realisedLiquidityOf(tranche);
         uint256 totalRealisedLiqPost = pool.totalRealisedLiquidity();
 
         assertEq(donatorBalancePost + assets, donatorBalancePre);

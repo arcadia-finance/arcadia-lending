@@ -12,6 +12,9 @@ import {ERC20, ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
  * @author Arcadia Finance
  * @notice The Logic to do the debt accounting for a lending pool for a certain ERC20 token
  * @dev Protocol is according the ERC4626 standard, with a certain ERC20 as underlying
+ * @dev Implementation not vulnerable to ERC4626 inflation attacks,
+ * since totalAssets() cannot be manipulated by first minter when total amount of shares are low.
+ * For more information, see https://github.com/OpenZeppelin/openzeppelin-contracts/issues/3706
  */
 abstract contract DebtToken is ERC4626 {
     uint256 public realisedDebt;
