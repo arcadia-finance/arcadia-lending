@@ -262,6 +262,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param trancheIndex The index of the tranche to donate to.
      * @param assets The amount of assets of the underlying ERC-20 tokens being deposited.
      * @dev Can be used by anyone to donate assets to the Lending Pool.
+     * It is supposed to serve as a way to compensate the jrTranche after an
+     * auction that didn't get sold.
      */
     function donateToTranche(uint256 trancheIndex, uint256 assets) external whenDepositNotPaused processInterests {
         require(trancheIndex < tranches.length, "LP_DTP: Tranche index OOB");
@@ -271,10 +273,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         asset.transferFrom(msg.sender, address(this), assets);
 
-        address tranche = tranches[trancheIndex];
-
         unchecked {
-            realisedLiquidityOf[tranche] += assets; //[̲̅$̲̅(̲̅ ͡° ͜ʖ ͡°̲̅)̲̅$̲̅]
+            realisedLiquidityOf[tranches[trancheIndex]] += assets; //[̲̅$̲̅(̲̅ ͡° ͜ʖ ͡°̲̅)̲̅$̲̅]
             totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
         }
     }

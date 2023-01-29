@@ -638,12 +638,12 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         vm.assume(index >= pool.numberOfTranches());
 
         vm.expectRevert("LP_DTP: Tranche index OOB");
-        pool.donateToPool(index, 1);
+        pool.donateToTranche(index, 1);
     }
 
     function testRevert_donateToPool_zeroAssets() public {
         vm.expectRevert("LP_DTP: Amount is 0");
-        pool.donateToPool(1, 0);
+        pool.donateToTranche(1, 0);
     }
 
     function testRevert_donateToPool_SupplyCap(uint256 amount, uint256 supplyCap) public {
@@ -658,7 +658,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
 
         // Then: depositInLendingPool is reverted with SUPPLY_CAP_REACHED
         vm.expectRevert("LP_DTP: Supply cap exceeded");
-        pool.donateToPool(1, amount);
+        pool.donateToTranche(1, amount);
     }
 
     function testSuccess_donateToPool(uint8 index, uint128 assets, address donator) public {
@@ -681,7 +681,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         asset.approve(address(pool), type(uint256).max);
 
         // When: donateToPool
-        pool.donateToPool(index, assets);
+        pool.donateToTranche(index, assets);
         vm.stopPrank();
 
         uint256 donatorBalancePost = asset.balanceOf(donator);
