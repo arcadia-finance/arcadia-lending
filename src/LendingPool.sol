@@ -600,8 +600,10 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     /**
      * @notice Set's the contract address of the liquidator.
      * @param liquidator_ The contract address of the liquidator
+     * @dev Can only be set once. LPs thus know how the debt is being liquidated.
      */
     function setLiquidator(address liquidator_) public onlyOwner {
+        require(liquidator == address(0), "LP_SL: Already set");
         liquidator = liquidator_;
     }
 
