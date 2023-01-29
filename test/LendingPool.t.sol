@@ -2292,7 +2292,7 @@ contract LiquidationTest is LendingPoolTest {
         assertFalse(pool.isTranche(address(jrTranche)));
     }
 
-    function testSuccess_settleLiquidation_MaxBadDebtWithTwoTranches(uint128 liquiditySenior, uint128 liquidityJunior)
+    function testSuccess_settleLiquidation_MaxBadDebtWithTwoTranches(uint128 liquiditySenior, uint128 liquidityJunior, uint96 auctionsInProgress)
         public
     {
         // Given: srTranche deposit liquiditySenior, jrTranche deposit liquidityJunior
@@ -2309,6 +2309,10 @@ contract LiquidationTest is LendingPoolTest {
         vm.prank(creator);
         pool.setLiquidator(address(liquidator));
 
+        //And: an auction is ongoing
+        vm.assume(auctionsInProgress > 0);
+        pool.setAuctionsInProgress(auctionsInProgress);
+
         // When: Liquidator settles a liquidation
         vm.prank(address(liquidator));
         pool.settleLiquidation(address(vault), vaultOwner, badDebt, 0, 0, 0);
@@ -2323,7 +2327,7 @@ contract LiquidationTest is LendingPoolTest {
 
         // since this flow doesn't go through pool.liquidateVault(),
         // auctionsInProgress will be 0 when this liquidation is settled.
-        assertEq(pool.auctionsInProgress(), type(uint96).max);
+        assertEq(pool.auctionsInProgress(), auctionsInProgress - 1);
     }
 
     function testRevert_settleLiquidation_ExcessBadDebt(

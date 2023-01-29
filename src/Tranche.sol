@@ -26,7 +26,7 @@ contract Tranche is ERC4626, Owned {
         _;
     }
 
-    modifier notWhenAuctionInProgress() {
+    modifier notDuringAuction() {
         require(!auctionInProgress, "TRANCHE: AUCTION IN PROGRESS");
         _;
     }
@@ -60,6 +60,7 @@ contract Tranche is ERC4626, Owned {
     function lock() external {
         require(msg.sender == address(lendingPool), "T_L: UNAUTHORIZED");
         locked = true;
+        auctionInProgress = false;
     }
 
     /**
@@ -99,7 +100,7 @@ contract Tranche is ERC4626, Owned {
         public
         override
         notLocked
-        notWhenAuctionInProgress
+        notDuringAuction
         returns (uint256 shares)
     {
         //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
@@ -127,7 +128,7 @@ contract Tranche is ERC4626, Owned {
         public
         override
         notLocked
-        notWhenAuctionInProgress
+        notDuringAuction
         returns (uint256 assets)
     {
         //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
@@ -152,7 +153,7 @@ contract Tranche is ERC4626, Owned {
         public
         override
         notLocked
-        notWhenAuctionInProgress
+        notDuringAuction
         returns (uint256 shares)
     {
         //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
@@ -184,7 +185,7 @@ contract Tranche is ERC4626, Owned {
         public
         override
         notLocked
-        notWhenAuctionInProgress
+        notDuringAuction
         returns (uint256 assets)
     {
         if (msg.sender != owner_) {
