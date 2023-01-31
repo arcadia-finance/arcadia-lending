@@ -227,9 +227,7 @@ contract DepositAndWithdrawalTest is TrancheTest {
 
     function testSuccess_deposit_sync(uint128 assets, address receiver) public {
         // Given: assets bigger than 0
-        vm.assume(assets > 0);
-
-        uint256 timeNow = block.timestamp;
+        vm.assume(assets > 3);
 
         vm.prank(liquidityProvider);
         tranche.deposit(assets/3, receiver);
