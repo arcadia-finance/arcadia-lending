@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - main
+      - dev
+      - fix/fixes
 
 env:
   FOUNDRY_PROFILE: ci
@@ -25,11 +27,14 @@ jobs:
         with:
           version: nightly
 
-      - name: Run Forge build
-        run: |
-          forge --version
-          forge build --sizes
-        id: build
+      - name: Run format
+        run: forge fmt --check
+
+      # - name: Run Forge build
+      #   run: |
+      #     forge --version
+      #     forge build --sizes
+      #   id: build
 
       - name: Run Forge tests
         run: |

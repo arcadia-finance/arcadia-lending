@@ -44,7 +44,7 @@ abstract contract TrancheTest is Test {
     //Before Each
     function setUp() public virtual {
         vm.startPrank(creator);
-        pool = new LendingPool(asset, treasury, address(factory));
+        pool = new LendingPool(asset, treasury, address(factory), address(0));
 
         tranche = new Tranche(address(pool), "Senior", "SR");
         pool.addTranche(address(tranche), 50, 0);

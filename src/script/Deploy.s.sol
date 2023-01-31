@@ -36,7 +36,7 @@ contract DeployScript is DSTest, Script {
     function run() public {
         vm.startBroadcast();
         factory = new Factory();
-        pool = new LendingPool(ERC20(asset), 0x12e463251Bc79677FD980aA6c301d5Fb85101cCb, address(factory));
+        pool = new LendingPool(ERC20(asset), 0x12e463251Bc79677FD980aA6c301d5Fb85101cCb, address(factory), address(0));
         srTranche = new Tranche(address(pool), "Senior", "SR");
         jrTranche = new Tranche(address(pool), "Junior", "JR");
 
