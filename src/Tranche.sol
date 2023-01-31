@@ -241,7 +241,6 @@ contract Tranche is ERC4626, Owned {
         assets = lendingPool.liquidityOfAndSync(address(this));
     }
 
-
     function convertToSharesAndSync(uint256 assets) public returns (uint256) {
         uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
 
@@ -273,7 +272,6 @@ contract Tranche is ERC4626, Owned {
     function previewRedeemAndSync(uint256 shares) public returns (uint256) {
         return convertToAssetsAndSync(shares);
     }
-
 
     /*//////////////////////////////////////////////////////////////
                           INTERNAL HOOKS LOGIC
