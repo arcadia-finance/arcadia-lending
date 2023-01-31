@@ -489,7 +489,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev This function syncs the interests to prevent calculating UnrealisedDebt twice when depositing/withdrawing through the tranches.
      * @dev After calling this function, the interest rate will not be updated until the next processInterests() call.
      */
-    function liquidityOfAndSync(address owner_) public returns (uint256 assets) {
+    function liquidityOfAndSync(address owner_) external returns (uint256 assets) {
         // Avoid a second calculation of unrealised debt (expensive)
         // if interersts are already synced this block.
         _syncInterests();
