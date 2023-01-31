@@ -9,7 +9,6 @@ pragma solidity ^0.8.13;
 import {ERC20} from "../../lib/solmate/src/tokens/ERC20.sol";
 
 interface ILendingPool {
-    
     /**
      * @notice Deposit assets in the Lending Pool.
      * @param assets The amount of assets of the underlying ERC-20 token being deposited.
