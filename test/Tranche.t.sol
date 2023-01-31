@@ -78,6 +78,8 @@ contract DeploymentTest is TrancheTest {
                     LOCKING LOGIC
 //////////////////////////////////////////////////////////////*/
 contract LockingTest is TrancheTest {
+    using stdStorage for StdStorage;
+
     function setUp() public override {
         super.setUp();
     }
@@ -96,13 +98,17 @@ contract LockingTest is TrancheTest {
     }
 
     function testSuccess_lock() public {
-        // Given: all neccesary contracts are deployed on the setup
+        // Given: auction is ongoing
         vm.prank(address(pool));
+        tranche.setAuctionInProgress(true);
+
         // When: pool lock
+        vm.prank(address(pool));
         tranche.lock();
 
         // Then: locked should return true
         assertTrue(tranche.locked());
+        assertFalse(tranche.auctionInProgress());
     }
 
     function testRevert_unlock_Unauthorised(address unprivilegedAddress) public {
@@ -134,6 +140,26 @@ contract LockingTest is TrancheTest {
 
         // Then: locked should return false
         assertFalse(tranche.locked());
+    }
+
+    function testRevert_setAuctionInProgress_Unauthorised(address unprivilegedAddress) public {
+        // Given: unprivilegedAddress is not pool
+        vm.assume(unprivilegedAddress != address(pool));
+
+        vm.startPrank(unprivilegedAddress);
+        // When: unprivilegedAddress setAuctionInProgress
+        // Then: setAuctionInProgress reverts with "T_SAIP: UNAUTHORIZED"
+        vm.expectRevert("T_SAIP: UNAUTHORIZED");
+        tranche.setAuctionInProgress(true);
+        vm.stopPrank();
+    }
+
+    function testSuccess_setAuctionInProgress(bool set) public {
+        vm.startPrank(address(pool));
+        tranche.setAuctionInProgress(set);
+        vm.stopPrank();
+
+        assertEq(tranche.auctionInProgress(), set);
     }
 }
 
@@ -167,6 +193,20 @@ contract DepositAndWithdrawalTest is TrancheTest {
         // Then: deposit should revert with "T_D: ZERO_SHARES"
         vm.expectRevert("T_D: ZERO_SHARES");
         tranche.deposit(0, receiver);
+        vm.stopPrank();
+    }
+
+    function testRevert_deposit_AuctionInProgress(uint128 assets, address receiver) public {
+        // Given: pool lock
+        vm.prank(address(pool));
+        tranche.setAuctionInProgress(true);
+
+        vm.startPrank(liquidityProvider);
+        // When: liquidityProvider deposit
+
+        // Then: deposit should revert with "TRANCHE: LOCKED"
+        vm.expectRevert("TRANCHE: AUCTION IN PROGRESS");
+        tranche.deposit(assets, receiver);
         vm.stopPrank();
     }
 
@@ -224,6 +264,20 @@ contract DepositAndWithdrawalTest is TrancheTest {
 
         // Then: withdraw should revert with "TRANCHE: LOCKED"
         vm.expectRevert("TRANCHE: LOCKED");
+        tranche.withdraw(assets, receiver, owner);
+        vm.stopPrank();
+    }
+
+    function testRevert_withdraw_AuctionInProgress(uint128 assets, address receiver, address owner) public {
+        // Given: pool lock
+        vm.prank(address(pool));
+        tranche.setAuctionInProgress(true);
+
+        vm.startPrank(liquidityProvider);
+        // When: liquidityProvider deposit
+
+        // Then: deposit should revert with "TRANCHE: LOCKED"
+        vm.expectRevert("TRANCHE: AUCTION IN PROGRESS");
         tranche.withdraw(assets, receiver, owner);
         vm.stopPrank();
     }

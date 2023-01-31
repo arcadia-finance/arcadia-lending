@@ -23,6 +23,10 @@ import {Guardian} from "./security/Guardian.sol";
  * @title Lending Pool
  * @author Arcadia Finance
  * @notice The Lending pool contains the main logic to provide liquidity and take or repay loans for a certain asset
+ * and does the accounting of the debtTokens (ERC4626).
+ * @dev Implementation not vulnerable to ERC4626 inflation attacks,
+ * since totalAssets() cannot be manipulated by first minter when total amount of shares are low.
+ * For more information, see https://github.com/OpenZeppelin/openzeppelin-contracts/issues/3706
  */
 contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule {
     using SafeTransferLib for ERC20;
@@ -40,9 +44,11 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
     uint128 public totalRealisedLiquidity;
     uint256 public supplyCap;
+    uint88 public maxInitiatorFee;
+    uint96 public auctionsInProgress;
 
-    address public treasury;
     address public liquidator;
+    address public treasury;
     address public vaultFactory;
 
     uint16[] public interestWeightTranches;
@@ -176,6 +182,16 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     }
 
     /**
+     * @notice Sets the maxInitiatorFee.
+     * @param maxInitiatorFee_ The maximum fee that is paid to the initiator of a liquidation
+     * @dev The liquidator sets the % of the debt that is paid to the initiator of a liquidation.
+     * This fee is capped by the maxInitiatorFee.
+     */
+    function setMaxInitiatorFee(uint88 maxInitiatorFee_) public onlyOwner {
+        maxInitiatorFee = maxInitiatorFee_;
+    }
+
+    /**
      * @notice Removes the tranche at the last index (most junior)
      * @param index The index of the last Tranche
      * @param tranche The address of the last Tranche
@@ -300,6 +316,36 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
         }
         emit Deposit(from, assets);
+    }
+
+    /**
+     * @notice Donate assets to the Lending Pool.
+     * @param trancheIndex The index of the tranche to donate to.
+     * @param assets The amount of assets of the underlying ERC-20 tokens being deposited.
+     * @dev Can be used by anyone to donate assets to the Lending Pool.
+     * It is supposed to serve as a way to compensate the jrTranche after an
+     * auction that didn't get sold.
+     * @dev First minter of a tranche could abuse this function by mining only 1 share,
+     * frontrun next minter by calling this function and inflate the share price.
+     * This is mitigated by checking that there are at least 10 ** decimals shares outstanding.
+     */
+    function donateToTranche(uint256 trancheIndex, uint256 assets) external whenDepositNotPaused processInterests {
+        require(trancheIndex < tranches.length, "LP_DTT: Tranche index OOB");
+        require(assets > 0, "LP_DTT: Amount is 0");
+
+        if (supplyCap > 0) require(totalRealisedLiquidity + assets <= supplyCap, "LP_DTT: Supply cap exceeded");
+
+        address tranche = tranches[trancheIndex];
+        //Mitigate share manipulation, where first Liquidity Provider mints just 1 share
+        //See https://github.com/OpenZeppelin/openzeppelin-contracts/issues/3706 for more information
+        require(ERC20(tranche).totalSupply() >= 10 ** decimals, "LP_DTT: Insufficient shares");
+
+        asset.transferFrom(msg.sender, address(this), assets);
+
+        unchecked {
+            realisedLiquidityOf[tranche] += assets; //[̲̅$̲̅(̲̅ ͡° ͜ʖ ͡°̲̅)̲̅$̲̅]
+            totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
+        }
     }
 
     /**
@@ -604,10 +650,12 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     /**
      * @notice Set's the contract address of the liquidator.
      * @param liquidator_ The contract address of the liquidator
+     * @dev Can only be set once. LPs thus know how the debt is being liquidated.
      */
     event LiquidatorSet(address liquidator_);
 
     function setLiquidator(address liquidator_) public onlyOwner {
+        require(liquidator == address(0), "LP_SL: Already set");
         liquidator = liquidator_;
         emit LiquidatorSet(liquidator_);
     }
@@ -630,7 +678,16 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         liquidationInitiator[vault] = msg.sender;
 
         //Start the auction of the collateralised assets to repay debt
-        ILiquidator(liquidator).startAuction(vault, openDebt);
+        ILiquidator(liquidator).startAuction(vault, openDebt, maxInitiatorFee);
+
+        //Hook to the most junior Tranche, to inform that auctions are ongoing,
+        //already done if there were are other auctions in progress (auctionsInProgress > O).
+        if (auctionsInProgress == 0) {
+            ITranche(tranches[tranches.length - 1]).setAuctionInProgress(true);
+        }
+        unchecked {
+            auctionsInProgress++;
+        }
 
         //Remove debt from Vault (burn DebtTokens)
         _withdraw(openDebt, vault, vault);
@@ -647,7 +704,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param remainder Any funds remaining after the auction are returned back to the `originalOwner`.
      * @dev This function is called by the Liquidator after a liquidation is finished.
      * @dev The liquidator will transfer the auction proceeds (the underlying asset)
-     * back to the liquidity pool after liquidation.
+     * back to the liquidity pool after liquidation, before calling this function.
      */
 
     function settleLiquidation(
@@ -666,7 +723,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             //-> Default event, deduct badDebt from LPs, starting with most Junior Tranche.
             _processDefault(badDebt);
             totalRealisedLiquidity =
-                SafeCastLib.safeCastTo128(uint256(totalRealisedLiquidity) - badDebt + liquidationInitiatorReward);
+                SafeCastLib.safeCastTo128(uint256(totalRealisedLiquidity) + liquidationInitiatorReward - badDebt);
         } else {
             //Collateral was auctioned for more than the liabilities
             //-> Pay out the Liquidation Penalty to treasury and Tranches
@@ -681,6 +738,14 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
                 realisedLiquidityOf[originalOwner] += remainder;
             }
         }
+
+        unchecked {
+            auctionsInProgress--;
+        }
+        //Hook to the most junior Tranche to inform that there are no ongoing auctions.
+        if (auctionsInProgress == 0 && tranches.length > 0) {
+            ITranche(tranches[tranches.length - 1]).setAuctionInProgress(false);
+        }
         emit LiquidationSettled(
             vault, originalOwner, badDebt, liquidationInitiatorReward, liquidationPenalty, remainder
             );
@@ -690,7 +755,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @notice Handles the bookkeeping in case of bad debt (Vault became undercollateralised).
      * @param badDebt The total amount of underlying assets that need to be written off as bad debt.
      * @dev The order of the tranches is important, the most senior tranche is at index 0, the most junior at the last index.
-     * @dev The most junior tranche will loose its underlying assets first. If all liquidty of a certain Tranche is written off,
+     * @dev The most junior tranche will lose its underlying assets first. If all liquidity of a certain Tranche is written off,
      * the complete tranche is locked and removed. If there is still remaining bad debt, the next Tranche starts losing capital.
      */
     function _processDefault(uint256 badDebt) internal {
@@ -703,19 +768,24 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             tranche = tranches[i];
             maxBurnable = realisedLiquidityOf[tranche];
             if (badDebt < maxBurnable) {
-                // burn
+                //Deduct badDebt from the balance of the most junior tranche
                 unchecked {
                     realisedLiquidityOf[tranche] -= badDebt;
                 }
                 break;
             } else {
-                ITranche(tranche).lock(); //todo gas: can be removed
-                // burn
+                //Unhappy flow, should never occor in practice!
+                //badDebt is bigger than balance most junior tranche -> tranche is completely wiped out
+                //and temporaly locked (no new deposits or withdraws possible).
+                //DAO or insurance might refund (Part of) the losses, and add Tranche back.
+                ITranche(tranche).lock();
                 realisedLiquidityOf[tranche] = 0;
                 _popTranche(i, tranche);
                 unchecked {
                     badDebt -= maxBurnable;
                 }
+                //Hook to the new most junior Tranche to inform that auctions are ongoing.
+                if (i != 0) ITranche(tranches[i - 1]).setAuctionInProgress(true);
             }
         }
     }
