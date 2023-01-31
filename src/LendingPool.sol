@@ -15,7 +15,7 @@ import {IFactory} from "./interfaces/IFactory.sol";
 import {IVault} from "./interfaces/IVault.sol";
 import {ILiquidator} from "./interfaces/ILiquidator.sol";
 import {TrustedCreditor} from "./TrustedCreditor.sol";
-import {ERC20, DebtToken} from "./DebtToken.sol";
+import {ERC20, ERC4626, DebtToken} from "./DebtToken.sol";
 import {InterestRateModule, DataTypes} from "./InterestRateModule.sol";
 import {Guardian} from "./security/Guardian.sol";
 
@@ -44,7 +44,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     uint16 public liquidationWeightTreasury; //fraction of the liquidation fees that goes to the tresury
 
     uint128 public totalRealisedLiquidity; //total amount of `asset` that is claimable by the LPs
-    uint256 public supplyCap; //max amount of `asset` that can be supplied to the pool
+    uint128 public supplyCap; //max amount of `asset` that can be supplied to the pool
     uint80 public maxInitiatorFee; //max fee that is paid to the initiator of a liquidation, in àsset` decimals
     uint16 public auctionsInProgress; //number of auctions that are currently in progress
 
@@ -233,7 +233,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev The borrowCap is the maximum amount of borrowed assets that can be outstanding at any given time.
      * @dev If it is set to 0, there is no borrow cap.
      */
-    function setBorrowCap(uint256 borrowCap_) external onlyOwner {
+    function setBorrowCap(uint128 borrowCap_) external onlyOwner {
         borrowCap = borrowCap_;
     }
     /**
@@ -243,7 +243,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev If it is set to 0, there is no supply cap.
      */
 
-    function setSupplyCap(uint256 supplyCap_) external onlyOwner {
+    function setSupplyCap(uint128 supplyCap_) external onlyOwner {
         supplyCap = supplyCap_;
     }
 
@@ -270,7 +270,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         unchecked {
             realisedLiquidityOf[msg.sender] += assets;
-            totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
+            totalRealisedLiquidity += uint128(assets); //we know that the sum is <MAXUINT128 from l266
         }
     }
 
@@ -286,7 +286,6 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * This is mitigated by checking that there are at least 10 ** decimals shares outstanding.
      */
     function donateToTranche(uint256 trancheIndex, uint256 assets) external whenDepositNotPaused processInterests {
-        require(trancheIndex < tranches.length, "LP_DTT: Tranche index OOB");
         require(assets > 0, "LP_DTT: Amount is 0");
 
         if (supplyCap > 0) require(totalRealisedLiquidity + assets <= supplyCap, "LP_DTT: Supply cap exceeded");
@@ -294,13 +293,13 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         address tranche = tranches[trancheIndex];
         //Mitigate share manipulation, where first Liquidity Provider mints just 1 share
         //See https://github.com/OpenZeppelin/openzeppelin-contracts/issues/3706 for more information
-        require(ERC20(tranche).totalSupply() >= 10 ** decimals, "LP_DTT: Insufficient shares");
+        require(ERC4626(tranche).totalSupply() >= 10 ** decimals, "LP_DTT: Insufficient shares");
 
         asset.transferFrom(msg.sender, address(this), assets);
 
         unchecked {
             realisedLiquidityOf[tranche] += assets; //[̲̅$̲̅(̲̅ ͡° ͜ʖ ͡°̲̅)̲̅$̲̅]
-            totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
+            totalRealisedLiquidity += uint128(assets);//we know that the sum is <MAXUINT128 from l292
         }
     }
 
@@ -309,12 +308,12 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param assets The amount of assets of the underlying ERC-20 tokens being withdrawn.
      * @param receiver The address of the receiver of the underlying ERC-20 tokens.
      * @dev This function can be called by anyone with an open balance (realisedLiquidityOf[address] bigger than 0),
-     * which can be both Tranches as other other address (treasury, Liquidation Initiators, Liquidated Vault Owner...).
+     * which can be both Tranches as other address (treasury, Liquidation Initiators, Liquidated Vault Owner...).
      */
-    function withdrawFromLendingPool(uint256 assets, address receiver) public whenWithdrawNotPaused processInterests {
+    function withdrawFromLendingPool(uint256 assets, address receiver) external whenWithdrawNotPaused processInterests {
         require(realisedLiquidityOf[msg.sender] >= assets, "LP_WFLP: Amount exceeds balance");
 
-        realisedLiquidityOf[msg.sender] -= assets;
+        unchecked {realisedLiquidityOf[msg.sender] -= assets;}
         totalRealisedLiquidity -= SafeCastLib.safeCastTo128(assets);
 
         asset.safeTransfer(receiver, assets);
@@ -347,7 +346,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param amount The amount of underlying ERC-20 tokens to be lent out
      * @param vault The address of the Arcadia Vault backing the loan
      * @param to The address who receives the lended out underlying tokens
-     * @dev The sender might be different as the owner if they have the proper allowances
+     * @dev The sender might be different than the owner if they have the proper allowances
      */
     function borrow(uint256 amount, address vault, address to, bytes3 referrer)
         public
@@ -390,6 +389,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param vault The address of the Arcadia Vault backing the loan
      * @dev if vault is not an actual address of a vault, maxWithdraw(vault) will always return 0.
      * Function will not revert, but transferAmount is always 0.
+     * @dev Anyone (EOAs and contracts) can repay debt in the name of a vault.
      */
     function repay(uint256 amount, address vault) public whenRepayNotPaused processInterests {
         uint256 vaultDebt = maxWithdraw(vault);
@@ -412,7 +412,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param vault The address of the Arcadia Vault backing the loan
      * @param actionHandler the address of the action handler to call
      * @param actionData a bytes object containing two actionAssetData structs, an address array and a bytes array
-     * @dev The sender might be different as the owner if they have the proper allowances.
+     * @dev The sender might be different than the owner if they have the proper allowances.
      * @dev vaultManagementAction() works similar to flash loans, this function optimistically calls external logic and checks for the vault state at the very end.
      */
     function doActionWithLeverage(

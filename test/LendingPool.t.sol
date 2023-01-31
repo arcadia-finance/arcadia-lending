@@ -450,7 +450,7 @@ contract ProtocolCapTest is LendingPoolTest {
         super.setUp();
     }
 
-    function testRevert_setBorrowCap_InvalidOwner(address unprivilegedAddress, uint256 borrowCap) public {
+    function testRevert_setBorrowCap_InvalidOwner(address unprivilegedAddress, uint128 borrowCap) public {
         // Given: all neccesary contracts are deployed on the setup
         // And: unprivilegedAddress is not the owner
         vm.assume(unprivilegedAddress != creator);
@@ -463,7 +463,7 @@ contract ProtocolCapTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_setBorrowCap(uint256 borrowCap) public {
+    function testSuccess_setBorrowCap(uint128 borrowCap) public {
         // Given: all neccesary contracts are deployed on the setup
 
         // When: Owner calls setBorrowCap
@@ -474,7 +474,7 @@ contract ProtocolCapTest is LendingPoolTest {
         assertEq(pool.borrowCap(), borrowCap);
     }
 
-    function testRevert_setSupplyCap_InvalidOwner(address unprivilegedAddress, uint256 supplyCap) public {
+    function testRevert_setSupplyCap_InvalidOwner(address unprivilegedAddress, uint128 supplyCap) public {
         // Given: all neccesary contracts are deployed on the setup
         // And: unprivilegedAddress is not the owner
         vm.assume(unprivilegedAddress != creator);
@@ -487,7 +487,7 @@ contract ProtocolCapTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_setSupplyCap(uint256 supplyCap) public {
+    function testSuccess_setSupplyCap(uint128 supplyCap) public {
         // Given: all neccesary contracts are deployed on the setup
 
         // When: Owner calls setSupplyCap
@@ -564,7 +564,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         pool.depositInLendingPool(amount1, liquidityProvider);
     }
 
-    function testRevert_depositInLendingPool_SupplyCap(uint256 amount, uint256 supplyCap) public {
+    function testRevert_depositInLendingPool_SupplyCap(uint256 amount, uint128 supplyCap) public {
         // Given: amount should be greater than 1
         vm.assume(amount > 1);
         vm.assume(pool.totalRealisedLiquidity() + amount > supplyCap);
@@ -641,7 +641,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
     function testRevert_donateToTranche_indexIsNoTranche(uint256 index) public {
         vm.assume(index >= pool.numberOfTranches());
 
-        vm.expectRevert("LP_DTT: Tranche index OOB");
+        vm.expectRevert(stdError.indexOOBError);
         pool.donateToTranche(index, 1);
     }
 
@@ -650,7 +650,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         pool.donateToTranche(1, 0);
     }
 
-    function testRevert_donateToTranche_SupplyCap(uint256 amount, uint256 supplyCap) public {
+    function testRevert_donateToTranche_SupplyCap(uint256 amount, uint128 supplyCap) public {
         // Given: amount should be greater than 1
         vm.assume(amount > 1);
         vm.assume(pool.totalRealisedLiquidity() + amount > supplyCap);
@@ -993,7 +993,7 @@ contract LendingLogicTest is LendingPoolTest {
         uint256 collateralValue,
         uint128 liquidity,
         address to,
-        uint256 borrowCap
+        uint128 borrowCap
     ) public {
         // Given: collateralValue bigger than equal to amountLoaned, liquidity is bigger than 0 and amountLoaned,
         // to is not address 0, creator setDebtToken to debt, liquidityProvider approve pool to max value,

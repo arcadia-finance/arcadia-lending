@@ -18,7 +18,7 @@ import {ERC20, ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
  */
 abstract contract DebtToken is ERC4626 {
     uint256 public realisedDebt;
-    uint256 public borrowCap;
+    uint128 public borrowCap;
 
     /**
      * @notice The constructor for the debt token
