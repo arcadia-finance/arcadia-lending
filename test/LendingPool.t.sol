@@ -16,7 +16,9 @@ import "../src/DebtToken.sol";
 
 contract LendingPoolExtension is LendingPool {
     //Extensions to test internal functions
-    constructor(ERC20 _asset, address _treasury, address _vaultFactory, address _liquidator) LendingPool(_asset, _treasury, _vaultFactory, _liquidator) {}
+    constructor(ERC20 _asset, address _treasury, address _vaultFactory, address _liquidator)
+        LendingPool(_asset, _treasury, _vaultFactory, _liquidator)
+    {}
 
     function popTranche(uint256 index, address tranche) public {
         _popTranche(index, tranche);
