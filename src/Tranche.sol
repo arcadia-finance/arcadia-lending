@@ -9,6 +9,7 @@ pragma solidity ^0.8.13;
 import {Owned} from "../lib/solmate/src/auth/Owned.sol";
 import {ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
 import {ILendingPool} from "./interfaces/ILendingPool.sol";
+import {FixedPointMathLib} from "../lib/solmate/src/utils/FixedPointMathLib.sol";
 
 /**
  * @title Tranche
@@ -20,6 +21,8 @@ import {ILendingPool} from "./interfaces/ILendingPool.sol";
  * For more information, see https://github.com/OpenZeppelin/openzeppelin-contracts/issues/3706
  */
 contract Tranche is ERC4626, Owned {
+    using FixedPointMathLib for uint256;
+
     bool public locked;
     bool public auctionInProgress;
     ILendingPool public lendingPool;
