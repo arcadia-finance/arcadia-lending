@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - main
+      - dev
+      - fix/fixes
 
 env:
   FOUNDRY_PROFILE: ci
@@ -24,6 +26,9 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1
         with:
           version: nightly
+
+      - name: Run format
+        run: forge fmt --check
 
       - name: Run Forge build
         run: |
