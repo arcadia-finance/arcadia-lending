@@ -35,4 +35,11 @@ interface ILendingPool {
      * @return assets The redeemable amount of liquidity in the underlying asset.
      */
     function liquidityOf(address owner) external view returns (uint256);
+
+    /**
+     * @notice liquidityOf, but syncs the unrealised interest first.
+     * @param owner The address of the liquidity provider.
+     * @return assets The redeemable amount of liquidity in the underlying asset.
+     */
+    function liquidityOfAndSync(address owner) external returns (uint256);
 }
