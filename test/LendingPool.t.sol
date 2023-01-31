@@ -1375,6 +1375,7 @@ contract LendingLogicTest is LendingPoolTest {
         // Given: nonVault is not vault
         vm.assume(nonVault != address(vault));
         vm.assume(availablefunds > amountRepaid);
+        vm.assume(liquidityProvider != sender);
         vm.prank(liquidityProvider);
         asset.transfer(sender, availablefunds);
 
@@ -1804,7 +1805,7 @@ contract AccountingTest is LendingPoolTest {
 
     function testSuccess_totalAssets(uint120 realisedDebt, uint256 interestRate, uint24 deltaTimestamp) public {
         // Given: all neccesary contracts are deployed on the setup
-        vm.assume(interestRate <= 10e3 * 10e18);
+        vm.assume(interestRate <= 1e3 * 1e18);
         //1000%
         vm.assume(interestRate > 0);
         vm.assume(deltaTimestamp <= 5 * 365 * 24 * 60 * 60);
@@ -1840,7 +1841,7 @@ contract AccountingTest is LendingPoolTest {
         // Given: all necessary contracts are deployed on the setup
         vm.assume(deltaTimestamp <= 5 * 365 * 24 * 60 * 60);
         //5 year
-        vm.assume(interestRate <= 10e3 * 10 ** 18);
+        vm.assume(interestRate <= 1e3 * 10 ** 18);
         //1000%
         vm.assume(interestRate > 0);
         vm.assume(initialLiquidity >= realisedDebt);
