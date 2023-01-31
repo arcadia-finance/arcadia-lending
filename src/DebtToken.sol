@@ -143,7 +143,7 @@ abstract contract DebtToken is ERC4626 {
      * @dev No public transferFrom allowed
      */
     function transferFrom(address, address, uint256) public pure override returns (bool) {
-        revert("DT_TF: TRANSFERFROM_NOT_SUPPORTED");
+        revert("DT_TF: TRANSFER_NOT_SUPPORTED");
     }
 
     /**
