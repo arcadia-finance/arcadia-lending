@@ -258,7 +258,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev This function can only be called by Tranches.
      */
     function depositInLendingPool(uint256 assets, address from)
-        public
+        external
         whenDepositNotPaused
         onlyTranche
         processInterests
