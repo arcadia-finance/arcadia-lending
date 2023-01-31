@@ -10,12 +10,6 @@ import {ERC20} from "../../lib/solmate/src/tokens/ERC20.sol";
 
 interface ILendingPool {
     /**
-     * @notice Returns the underlying ERC-20 token of the Lending Pool
-     * @return ERC20 The underlying ERC-20 token
-     */
-    function asset() external returns (ERC20);
-
-    /**
      * @notice Deposit assets in the Lending Pool.
      * @param assets The amount of assets of the underlying ERC-20 token being deposited.
      * @param from The address of the Liquidity Provider who deposits the underlying ERC-20 token via a Tranche.
