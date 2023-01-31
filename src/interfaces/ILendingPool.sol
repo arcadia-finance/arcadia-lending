@@ -9,12 +9,7 @@ pragma solidity ^0.8.13;
 import {ERC20} from "../../lib/solmate/src/tokens/ERC20.sol";
 
 interface ILendingPool {
-    /**
-     * @notice Returns the underlying ERC-20 token of the Lending Pool
-     * @return ERC20 The underlying ERC-20 token
-     */
-    function asset() external returns (ERC20);
-
+    
     /**
      * @notice Deposit assets in the Lending Pool.
      * @param assets The amount of assets of the underlying ERC-20 token being deposited.

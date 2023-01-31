@@ -49,9 +49,9 @@ contract Tranche is ERC4626, Owned {
      */
     constructor(address _lendingPool, string memory _prefix, string memory _prefixSymbol)
         ERC4626(
-            ILendingPool(address(_lendingPool)).asset(),
-            string(abi.encodePacked(_prefix, " Arcadia ", ILendingPool(_lendingPool).asset().name())),
-            string(abi.encodePacked(_prefixSymbol, "arc", ILendingPool(_lendingPool).asset().symbol()))
+            ERC4626(address(_lendingPool)).asset(),
+            string(abi.encodePacked(_prefix, " Arcadia ", ERC4626(_lendingPool).asset().name())),
+            string(abi.encodePacked(_prefixSymbol, "arc", ERC4626(_lendingPool).asset().symbol()))
         )
         Owned(msg.sender)
     {
