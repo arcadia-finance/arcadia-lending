@@ -31,16 +31,18 @@ contract InterestRateModule {
         unchecked {
             if (utilisation >= interestRateConfig.utilisationThreshold) {
                 // 1e23 = (uT * 1e5) * (ls * 1e18)
-                uint256 lowSlopeInterest = uint256(interestRateConfig.utilisationThreshold) * interestRateConfig.lowSlopePerYear;
+                uint256 lowSlopeInterest =
+                    uint256(interestRateConfig.utilisationThreshold) * interestRateConfig.lowSlopePerYear;
                 // 1e23 = ((uT - u) * 1e5) * (hs * 1e18)
-                uint256 highSlopeInterest =
-                    uint256((utilisation - interestRateConfig.utilisationThreshold)) * interestRateConfig.highSlopePerYear;
+                uint256 highSlopeInterest = uint256((utilisation - interestRateConfig.utilisationThreshold))
+                    * interestRateConfig.highSlopePerYear;
                 // 1e18 = (bs * 1e18) + ((lsIR * 1e23) + (hsIR * 1e23) / 1e5)
                 return uint256(interestRateConfig.baseRatePerYear) + ((lowSlopeInterest + highSlopeInterest) / 100_000);
             } else {
                 // 1e18 = br * 1e18 + (ls * 1e18) * (u * 1e5) / 1e5
                 return uint256(
-                    uint256(interestRateConfig.baseRatePerYear) + ((uint256(interestRateConfig.lowSlopePerYear) * utilisation) / 100_000)
+                    uint256(interestRateConfig.baseRatePerYear)
+                        + ((uint256(interestRateConfig.lowSlopePerYear) * utilisation) / 100_000)
                 );
             }
         }
