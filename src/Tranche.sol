@@ -13,7 +13,7 @@ import {ILendingPool} from "./interfaces/ILendingPool.sol";
 /**
  * @title Tranche
  * @author Arcadia Finance
- * @notice The Logic to provide Lending for a lending pool for a certain ERC20 token
+ * @notice The Tranche contract allows for lending of a specified ERC20 token, managed by a lending pool.
  * @dev Protocol is according the ERC4626 standard, with a certain ERC20 as underlying
  * @dev Implementation not vulnerable to ERC4626 inflation attacks,
  * since totalAssets() cannot be manipulated by first minter when total amount of shares are low.
