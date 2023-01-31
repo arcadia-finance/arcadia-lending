@@ -225,6 +225,23 @@ contract DepositAndWithdrawalTest is TrancheTest {
         assertEq(asset.balanceOf(address(pool)), assets);
     }
 
+    function testSuccess_deposit_sync(uint128 assets, address receiver) public {
+        // Given: assets bigger than 0
+        vm.assume(assets > 3);
+
+        vm.prank(liquidityProvider);
+        tranche.deposit(assets / 3, receiver);
+
+        vm.prank(liquidityProvider);
+        tranche.deposit(assets / 3, receiver);
+
+        vm.warp(500);
+
+        vm.prank(liquidityProvider);
+        vm.expectCall(address(pool), abi.encodeWithSignature("liquidityOfAndSync(address)", address(tranche)));
+        tranche.deposit(assets / 3, receiver);
+    }
+
     function testRevert_mint_Locked(uint128 shares, address receiver) public {
         // Given: pool lock
         vm.prank(address(pool));

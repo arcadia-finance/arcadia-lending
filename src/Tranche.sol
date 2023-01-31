@@ -9,18 +9,21 @@ pragma solidity ^0.8.13;
 import {Owned} from "../lib/solmate/src/auth/Owned.sol";
 import {ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
 import {ILendingPool} from "./interfaces/ILendingPool.sol";
+import {FixedPointMathLib} from "../lib/solmate/src/utils/FixedPointMathLib.sol";
 import {ITranche} from "./interfaces/ITranche.sol";
 
 /**
  * @title Tranche
  * @author Arcadia Finance
- * @notice The Logic to provide Lending for a lending pool for a certain ERC20 token
+ * @notice The Tranche contract allows for lending of a specified ERC20 token, managed by a lending pool.
  * @dev Protocol is according the ERC4626 standard, with a certain ERC20 as underlying
  * @dev Implementation not vulnerable to ERC4626 inflation attacks,
  * since totalAssets() cannot be manipulated by first minter when total amount of shares are low.
  * For more information, see https://github.com/OpenZeppelin/openzeppelin-contracts/issues/3706
  */
 contract Tranche is ITranche, ERC4626, Owned {
+    using FixedPointMathLib for uint256;
+
     bool public locked;
     bool public auctionInProgress;
     ILendingPool public lendingPool;
@@ -64,7 +67,7 @@ contract Tranche is ITranche, ERC4626, Owned {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Locks the tranche in case all liquidity of the tranche is written of due to bad debt
+     * @notice Locks the tranche in case all liquidity of the tranche is written off due to bad debt
      * @dev Only the Lending Pool can call this function, only trigger is a severe default event.
      */
     function lock() external {
@@ -102,7 +105,7 @@ contract Tranche is ITranche, ERC4626, Owned {
      * @param assets The amount of assets of the underlying ERC-20 token being deposited
      * @param receiver The address that receives the minted shares.
      * @return shares The amount of shares minted
-     * @dev This contract does not directly transfers the underlying assets from the sender to the receiver.
+     * @dev This contract does not directly transfer the underlying assets from the sender to the receiver.
      * Instead it calls the deposit of the Lending Pool which calls the transferFrom of the underlying assets.
      * Hence the sender should not give this contract an allowance to transfer the underlying asset but the Lending Pool.
      */
@@ -115,7 +118,7 @@ contract Tranche is ITranche, ERC4626, Owned {
     {
         //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
         // Check for rounding error since we round down in previewDeposit.
-        require((shares = previewDeposit(assets)) != 0, "T_D: ZERO_SHARES");
+        require((shares = previewDepositAndSync(assets)) != 0, "T_D: ZERO_SHARES");
 
         // Need to transfer (via lendingPool.depositInLendingPool()) before minting or ERC777s could reenter.
         lendingPool.depositInLendingPool(assets, msg.sender);
@@ -142,7 +145,7 @@ contract Tranche is ITranche, ERC4626, Owned {
         returns (uint256 assets)
     {
         //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
-        assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
+        assets = previewMintAndSync(shares); // No need to check for rounding error, previewMint rounds up.
 
         // Need to transfer (via lendingPool.depositInLendingPool()) before minting or ERC777s could reenter.
         lendingPool.depositInLendingPool(assets, msg.sender);
@@ -167,7 +170,7 @@ contract Tranche is ITranche, ERC4626, Owned {
         returns (uint256 shares)
     {
         //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
-        shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
+        shares = previewWithdrawAndSync(assets); // No need to check for rounding error, previewWithdraw rounds up.
 
         if (msg.sender != owner_) {
             uint256 allowed = allowance[owner_][msg.sender]; // Saves gas for limited approvals.
@@ -208,7 +211,7 @@ contract Tranche is ITranche, ERC4626, Owned {
 
         //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
         // Check for rounding error since we round down in previewRedeem.
-        require((assets = previewRedeem(shares)) != 0, "T_R: ZERO_ASSETS");
+        require((assets = previewRedeemAndSync(shares)) != 0, "T_R: ZERO_ASSETS");
 
         _burn(owner_, shares);
 
@@ -228,6 +231,47 @@ contract Tranche is ITranche, ERC4626, Owned {
      */
     function totalAssets() public view override returns (uint256 assets) {
         assets = lendingPool.liquidityOf(address(this));
+    }
+
+    /**
+     * @notice Returns the total amount of underlying assets, to which liquidity providers have a claim
+     * @return assets The total amount of underlying assets, to which liquidity providers have a claim
+     * @dev The Liquidity Pool does the accounting of the outstanding claim on liquidity per tranche.
+     */
+    function totalAssetsAndSync() public returns (uint256 assets) {
+        assets = lendingPool.liquidityOfAndSync(address(this));
+    }
+
+    function convertToSharesAndSync(uint256 assets) public returns (uint256) {
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? assets : assets.mulDivDown(supply, totalAssetsAndSync());
+    }
+
+    function convertToAssetsAndSync(uint256 shares) public returns (uint256) {
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? shares : shares.mulDivDown(totalAssetsAndSync(), supply);
+    }
+
+    function previewDepositAndSync(uint256 assets) public returns (uint256) {
+        return convertToSharesAndSync(assets);
+    }
+
+    function previewMintAndSync(uint256 shares) public returns (uint256) {
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? shares : shares.mulDivUp(totalAssetsAndSync(), supply);
+    }
+
+    function previewWithdrawAndSync(uint256 assets) public returns (uint256) {
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? assets : assets.mulDivUp(supply, totalAssetsAndSync());
+    }
+
+    function previewRedeemAndSync(uint256 shares) public returns (uint256) {
+        return convertToAssetsAndSync(shares);
     }
 
     /*//////////////////////////////////////////////////////////////
