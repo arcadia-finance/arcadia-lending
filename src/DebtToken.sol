@@ -39,6 +39,9 @@ abstract contract DebtToken is ERC4626 {
     /**
      * @notice Returns the total amount of outstanding debt in the underlying asset
      * @return totalDebt The total debt in underlying assets
+     * @dev Implementation overwritten in LendingPool.sol which inherits DebtToken.sol
+     * Implementation not vulnerable to ERC4626 inflation attacks,
+     * totaLAssets() does not rely on balanceOf call.
      */
     function totalAssets() public view virtual override returns (uint256) {}
 
