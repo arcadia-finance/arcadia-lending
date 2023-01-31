@@ -26,8 +26,8 @@ contract LendingPoolExtension is LendingPool {
         _syncInterestsToLiquidityProviders(assets);
     }
 
-    function syncLiquidationPenaltyToLiquidityProviders(uint128 assets) public {
-        _syncLiquidationPenaltyToLiquidityProviders(assets);
+    function syncLiquidationFeeToLiquidityProviders(uint128 assets) public {
+        _syncLiquidationFeeToLiquidityProviders(assets);
     }
 
     function processDefault(uint256 assets) public {
@@ -62,7 +62,7 @@ contract LendingPoolExtension is LendingPool {
         return tranches.length;
     }
 
-    function setAuctionsInProgress(uint96 amount) public {
+    function setAuctionsInProgress(uint16 amount) public {
         auctionsInProgress = amount;
     }
 }
@@ -526,7 +526,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         vm.startPrank(unprivilegedAddress);
         // When: unprivilegedAddress deposit
         // Then: deposit should revert with UNAUTHORIZED
-        vm.expectRevert("UNAUTHORIZED");
+        vm.expectRevert("LP: Only tranche");
         pool.depositInLendingPool(assets, from);
         vm.stopPrank();
     }
@@ -1375,6 +1375,7 @@ contract LendingLogicTest is LendingPoolTest {
         // Given: nonVault is not vault
         vm.assume(nonVault != address(vault));
         vm.assume(availablefunds > amountRepaid);
+        vm.assume(sender != liquidityProvider);
         vm.prank(liquidityProvider);
         asset.transfer(sender, availablefunds);
 
@@ -2152,7 +2153,7 @@ contract LiquidationTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_setMaxInitiatorFee(uint88 maxFee) public {
+    function testSuccess_setMaxInitiatorFee(uint80 maxFee) public {
         vm.prank(creator);
         pool.setMaxInitiatorFee(maxFee);
 
@@ -2263,7 +2264,7 @@ contract LiquidationTest is LendingPoolTest {
     function testSuccess_liquidateVault_WithOngoingAuctions(
         address liquidationInitiator,
         uint128 amountLoaned,
-        uint96 auctionsInProgress
+        uint16 auctionsInProgress
     ) public {
         // Given: all necessary contracts are deployed on the setup
         // And: The vault has debt
@@ -2281,7 +2282,7 @@ contract LiquidationTest is LendingPoolTest {
 
         //And: an auction is ongoing
         vm.assume(auctionsInProgress > 0);
-        vm.assume(auctionsInProgress < type(uint96).max);
+        vm.assume(auctionsInProgress < type(uint16).max);
         pool.setAuctionsInProgress(auctionsInProgress);
         vm.prank(address(pool));
         jrTranche.setAuctionInProgress(true);
@@ -2320,7 +2321,7 @@ contract LiquidationTest is LendingPoolTest {
         // When: unprivilegedAddress settles a liquidation
         // Then: settleLiquidation should revert with "UNAUTHORIZED"
         vm.startPrank(unprivilegedAddress_);
-        vm.expectRevert("UNAUTHORIZED");
+        vm.expectRevert("LP: Only liquidator");
         pool.settleLiquidation(
             address(vault), vaultOwner, badDebt, liquidationInitiatorReward, liquidationPenalty, remainder
         );
@@ -2440,7 +2441,7 @@ contract LiquidationTest is LendingPoolTest {
         assertEq(pool.totalRealisedLiquidity(), uint256(liquidity) + liquidationInitiatorReward - badDebt);
     }
 
-    function testSuccess_settleLiquidation_MultipleAuctionsOngoing(uint128 liquidity, uint96 auctionsInProgress)
+    function testSuccess_settleLiquidation_MultipleAuctionsOngoing(uint128 liquidity, uint16 auctionsInProgress)
         public
     {
         // Given: Liquidity is deposited in Lending Pool
@@ -2501,7 +2502,7 @@ contract LiquidationTest is LendingPoolTest {
         uint128 liquiditySenior,
         uint128 liquidityJunior,
         uint128 badDebt,
-        uint96 auctionsInProgress
+        uint16 auctionsInProgress
     ) public {
         vm.assume(badDebt > 0);
         // Given: srTranche deposit liquiditySenior, jrTranche deposit liquidityJunior
@@ -2545,7 +2546,7 @@ contract LiquidationTest is LendingPoolTest {
     function testSuccess_settleLiquidation_ProcessDefaultAllTranchesWiped(
         uint128 liquiditySenior,
         uint128 liquidityJunior,
-        uint96 auctionsInProgress
+        uint16 auctionsInProgress
     ) public {
         // Given: srTranche deposit liquiditySenior, jrTranche deposit liquidityJunior
         vm.assume(liquiditySenior <= type(uint128).max - liquidityJunior);
@@ -2612,7 +2613,7 @@ contract LiquidationTest is LendingPoolTest {
         pool.settleLiquidation(address(vault), vaultOwner, badDebt, 0, 0, 0);
     }
 
-    function testSuccess_syncLiquidationPenaltyToLiquidityProviders(
+    function testSuccess_syncLiquidationFeeToLiquidityProviders(
         uint128 penalty,
         uint8 weightSr,
         uint8 weightJr,
@@ -2627,8 +2628,8 @@ contract LiquidationTest is LendingPoolTest {
         pool.setTreasuryLiquidationWeight(weightTreasury);
         vm.stopPrank();
 
-        // When: creator syncLiquidationPenaltyToLiquidityProviders with penalty
-        pool.syncLiquidationPenaltyToLiquidityProviders(penalty);
+        // When: creator syncLiquidationFeeToLiquidityProviders with penalty
+        pool.syncLiquidationFeeToLiquidityProviders(penalty);
 
         // Then: supplyBalances srTranche, jrTranche and treasury should be correct
         // TotalSupply should be equal to penalty
