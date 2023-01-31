@@ -250,7 +250,7 @@ contract TransferTest is DebtTokenTest {
         vm.startPrank(sender);
         // When: sender transferFrom
         // Then: transferFrom should revert with DT_TF: TRANSFERFROM_NOT_SUPPORTED
-        vm.expectRevert("DT_TF: TRANSFERFROM_NOT_SUPPORTED");
+        vm.expectRevert("DT_TF: TRANSFROM_NOT_SUPPORTED");
         debt.transferFrom(from, to, amount);
         vm.stopPrank();
     }
