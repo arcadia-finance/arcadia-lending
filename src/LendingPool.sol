@@ -14,6 +14,7 @@ import {ITranche} from "./interfaces/ITranche.sol";
 import {IFactory} from "./interfaces/IFactory.sol";
 import {IVault} from "./interfaces/IVault.sol";
 import {ILiquidator} from "./interfaces/ILiquidator.sol";
+import {ILendingPool} from "./interfaces/ILendingPool.sol";
 import {TrustedCreditor} from "./TrustedCreditor.sol";
 import {ERC20, ERC4626, DebtToken} from "./DebtToken.sol";
 import {InterestRateModule, DataTypes} from "./InterestRateModule.sol";
@@ -28,7 +29,7 @@ import {Guardian} from "./security/Guardian.sol";
  * since totalAssets() cannot be manipulated by first minter when total amount of shares are low.
  * For more information, see https://github.com/OpenZeppelin/openzeppelin-contracts/issues/3706
  */
-contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule {
+contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule, ILendingPool {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 

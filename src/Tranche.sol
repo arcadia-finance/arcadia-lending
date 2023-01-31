@@ -9,6 +9,7 @@ pragma solidity ^0.8.13;
 import {Owned} from "../lib/solmate/src/auth/Owned.sol";
 import {ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
 import {ILendingPool} from "./interfaces/ILendingPool.sol";
+import {ITranche} from "./interfaces/ITranche.sol";
 
 /**
  * @title Tranche
@@ -19,7 +20,7 @@ import {ILendingPool} from "./interfaces/ILendingPool.sol";
  * since totalAssets() cannot be manipulated by first minter when total amount of shares are low.
  * For more information, see https://github.com/OpenZeppelin/openzeppelin-contracts/issues/3706
  */
-contract Tranche is ERC4626, Owned {
+contract Tranche is ITranche, ERC4626, Owned {
     bool public locked;
     bool public auctionInProgress;
     ILendingPool public lendingPool;
@@ -49,9 +50,9 @@ contract Tranche is ERC4626, Owned {
      */
     constructor(address _lendingPool, string memory _prefix, string memory _prefixSymbol)
         ERC4626(
-            ILendingPool(address(_lendingPool)).asset(),
-            string(abi.encodePacked(_prefix, " Arcadia ", ILendingPool(_lendingPool).asset().name())),
-            string(abi.encodePacked(_prefixSymbol, "arc", ILendingPool(_lendingPool).asset().symbol()))
+            ERC4626(address(_lendingPool)).asset(),
+            string(abi.encodePacked(_prefix, " Arcadia ", ERC4626(_lendingPool).asset().name())),
+            string(abi.encodePacked(_prefixSymbol, "arc", ERC4626(_lendingPool).asset().symbol()))
         )
         Owned(msg.sender)
     {
