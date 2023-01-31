@@ -63,7 +63,7 @@ contract Tranche is ERC4626, Owned {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Locks the tranche in case all liquidity of the tranche is written of due to bad debt
+     * @notice Locks the tranche in case all liquidity of the tranche is written off due to bad debt
      * @dev Only the Lending Pool can call this function, only trigger is a severe default event.
      */
     function lock() external {
@@ -101,7 +101,7 @@ contract Tranche is ERC4626, Owned {
      * @param assets The amount of assets of the underlying ERC-20 token being deposited
      * @param receiver The address that receives the minted shares.
      * @return shares The amount of shares minted
-     * @dev This contract does not directly transfers the underlying assets from the sender to the receiver.
+     * @dev This contract does not directly transfer the underlying assets from the sender to the receiver.
      * Instead it calls the deposit of the Lending Pool which calls the transferFrom of the underlying assets.
      * Hence the sender should not give this contract an allowance to transfer the underlying asset but the Lending Pool.
      */
