@@ -67,7 +67,7 @@ abstract contract DebtToken is ERC4626 {
     function _deposit(uint256 assets, address receiver) internal returns (uint256 shares) {
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDeposit(assets)) != 0, "DT_D: ZERO_SHARES");
-        if (borrowCap > 0) require(balanceOf[receiver] + assets <= borrowCap, "DT_D: BORROW_CAP_EXCEEDED");
+        if (borrowCap > 0) require(maxWithdraw(receiver); + assets <= borrowCap, "DT_D: BORROW_CAP_EXCEEDED");
 
         _mint(receiver, shares);
 
