@@ -665,7 +665,9 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         pool.donateToTranche(1, amount);
     }
 
-    function testRevert_donateToTranche_InsufficientShares(uint32 initialShares, uint128 assets, address donator) public {
+    function testRevert_donateToTranche_InsufficientShares(uint32 initialShares, uint128 assets, address donator)
+        public
+    {
         vm.assume(assets > 0);
         vm.assume(assets < type(uint128).max - pool.totalRealisedLiquidity() - initialShares);
         vm.assume(initialShares < 10 ** pool.decimals());
