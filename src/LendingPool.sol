@@ -72,8 +72,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     event OriginationFeeChanged(uint8 originationFee_);
     event BorrowCapChanged(uint256 borrowCap_);
     event SupplyCapChanged(uint256 supplyCap_);
-    event Deposit(address indexed from, uint256 assets);
-    event Withdraw(address indexed receiver, uint256 assets);
+    event DepositLiquidity(address indexed from, uint256 assets);
+    event WithdrawLiquidity(address indexed receiver, uint256 assets);
     event Repay(address indexed from, uint256 amount, address indexed vault);
     event LeveragedAction(
         address indexed vault, address indexed actionHandler, uint256 amountBorrowed, bytes actionData
@@ -315,7 +315,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             realisedLiquidityOf[msg.sender] += assets;
             totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
         }
-        emit Deposit(from, assets);
+        emit DepositLiquidity(from, assets);
     }
 
     /**
@@ -363,7 +363,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         totalRealisedLiquidity -= SafeCastLib.safeCastTo128(assets);
 
         asset.safeTransfer(receiver, assets);
-        emit Withdraw(receiver, assets);
+        emit WithdrawLiquidity(receiver, assets);
     }
 
     /* //////////////////////////////////////////////////////////////
