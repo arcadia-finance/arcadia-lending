@@ -268,7 +268,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         if (supplyCap > 0) require(totalRealisedLiquidity + assets <= supplyCap, "LP_DFLP: Supply cap exceeded");
         // Need to transfer before minting or ERC777s could reenter.
         // Address(this) is trusted -> no risk on re-entrancy attack after transfer
-        asset.transferFrom(from, address(this), assets);
+        asset.safeTransferFrom(from, address(this), assets);
 
         unchecked {
             realisedLiquidityOf[msg.sender] += assets;
@@ -297,7 +297,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         //See https://github.com/OpenZeppelin/openzeppelin-contracts/issues/3706 for more information
         require(ERC4626(tranche).totalSupply() >= 10 ** decimals, "LP_DTT: Insufficient shares");
 
-        asset.transferFrom(msg.sender, address(this), assets);
+        asset.safeTransferFrom(msg.sender, address(this), assets);
 
         unchecked {
             realisedLiquidityOf[tranche] += assets; //[̲̅$̲̅(̲̅ ͡° ͜ʖ ͡°̲̅)̲̅$̲̅]
@@ -402,7 +402,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         // Need to transfer before burning debt or ERC777s could reenter.
         // Address(this) is trusted -> no risk on re-entrancy attack after transfer
-        asset.transferFrom(msg.sender, address(this), transferAmount);
+        asset.safeTransferFrom(msg.sender, address(this), transferAmount);
 
         _withdraw(transferAmount, vault, vault);
     }
@@ -675,9 +675,9 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         if (badDebt != 0) {
             //Collateral was auctioned for less than the liabilities (openDebt + Liquidation Initiator Reward)
             //-> Default event, deduct badDebt from LPs, starting with most Junior Tranche.
-            _processDefault(badDebt);
             totalRealisedLiquidity =
                 SafeCastLib.safeCastTo128(uint256(totalRealisedLiquidity) + liquidationInitiatorReward - badDebt);
+            _processDefault(badDebt);
         } else {
             //Collateral was auctioned for more than the liabilities
             //-> Pay out the Liquidation Fee to treasury and Tranches
@@ -729,12 +729,12 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
                 //badDebt is bigger than balance most junior tranche -> tranche is completely wiped out
                 //and temporaly locked (no new deposits or withdraws possible).
                 //DAO or insurance might refund (Part of) the losses, and add Tranche back.
-                ITranche(tranche).lock();
                 realisedLiquidityOf[tranche] = 0;
                 _popTranche(i, tranche);
                 unchecked {
                     badDebt -= maxBurnable;
                 }
+                ITranche(tranche).lock();
                 //Hook to the new most junior Tranche to inform that auctions are ongoing.
                 if (i != 0) ITranche(tranches[i - 1]).setAuctionInProgress(true);
             }

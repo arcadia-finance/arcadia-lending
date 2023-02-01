@@ -24,9 +24,10 @@ import { ITranche } from "./interfaces/ITranche.sol";
 contract Tranche is ITranche, ERC4626, Owned {
     using FixedPointMathLib for uint256;
 
+    ILendingPool public immutable lendingPool;
+
     bool public locked;
     bool public auctionInProgress;
-    ILendingPool public lendingPool;
 
     modifier notLocked() {
         require(!locked, "TRANCHE: LOCKED");
@@ -46,20 +47,20 @@ contract Tranche is ITranche, ERC4626, Owned {
 
     /**
      * @notice The constructor for a tranche
-     * @param _lendingPool the Lending Pool of the underlying ERC-20 token, with the lending logic.
-     * @param _prefix The prefix of the contract name (eg. Senior -> Mezzanine -> Junior)
-     * @param _prefixSymbol The prefix of the contract symbol (eg. SR  -> MZ -> JR)
+     * @param lendingPool_ the Lending Pool of the underlying ERC-20 token, with the lending logic.
+     * @param prefix_ The prefix of the contract name (eg. Senior -> Mezzanine -> Junior)
+     * @param prefixSymbol_ The prefix of the contract symbol (eg. SR  -> MZ -> JR)
      * @dev The name and symbol of the tranche are automatically generated, based on the name and symbol of the underlying token
      */
-    constructor(address _lendingPool, string memory _prefix, string memory _prefixSymbol)
+    constructor(address lendingPool_, string memory prefix_, string memory prefixSymbol_)
         ERC4626(
-            ERC4626(address(_lendingPool)).asset(),
-            string(abi.encodePacked(_prefix, " Arcadia ", ERC4626(_lendingPool).asset().name())),
-            string(abi.encodePacked(_prefixSymbol, "arc", ERC4626(_lendingPool).asset().symbol()))
+            ERC4626(address(lendingPool_)).asset(),
+            string(abi.encodePacked(prefix_, " Arcadia ", ERC4626(lendingPool_).asset().name())),
+            string(abi.encodePacked(prefixSymbol_, "arc", ERC4626(lendingPool_).asset().symbol()))
         )
         Owned(msg.sender)
     {
-        lendingPool = ILendingPool(_lendingPool);
+        lendingPool = ILendingPool(lendingPool_);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -91,9 +92,9 @@ contract Tranche is ITranche, ERC4626, Owned {
      * This function is to make sure no JIT liquidity is provided during a positive auction,
      * and that no liquidity can be withdrawn during a negative auction.
      */
-    function setAuctionInProgress(bool _auctionInProgress) external {
+    function setAuctionInProgress(bool auctionInProgress_) external {
         require(msg.sender == address(lendingPool), "T_SAIP: UNAUTHORIZED");
-        auctionInProgress = _auctionInProgress;
+        auctionInProgress = auctionInProgress_;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -116,7 +117,6 @@ contract Tranche is ITranche, ERC4626, Owned {
         notDuringAuction
         returns (uint256 shares)
     {
-        //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
         // Check for rounding error since we round down in previewDeposit.
         require((shares = previewDepositAndSync(assets)) != 0, "T_D: ZERO_SHARES");
 
@@ -144,7 +144,6 @@ contract Tranche is ITranche, ERC4626, Owned {
         notDuringAuction
         returns (uint256 assets)
     {
-        //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
         assets = previewMintAndSync(shares); // No need to check for rounding error, previewMint rounds up.
 
         // Need to transfer (via lendingPool.depositInLendingPool()) before minting or ERC777s could reenter.
@@ -169,7 +168,6 @@ contract Tranche is ITranche, ERC4626, Owned {
         notDuringAuction
         returns (uint256 shares)
     {
-        //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
         shares = previewWithdrawAndSync(assets); // No need to check for rounding error, previewWithdraw rounds up.
 
         if (msg.sender != owner_) {
@@ -209,7 +207,6 @@ contract Tranche is ITranche, ERC4626, Owned {
             }
         }
 
-        //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
         // Check for rounding error since we round down in previewRedeem.
         require((assets = previewRedeemAndSync(shares)) != 0, "T_R: ZERO_ASSETS");
 
@@ -273,12 +270,4 @@ contract Tranche is ITranche, ERC4626, Owned {
     function previewRedeemAndSync(uint256 shares) public returns (uint256) {
         return convertToAssetsAndSync(shares);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                          INTERNAL HOOKS LOGIC
-    //////////////////////////////////////////////////////////////*/
-
-    function beforeWithdraw(uint256 assets, uint256 shares) internal override { }
-
-    function afterDeposit(uint256 assets, uint256 shares) internal override { }
 }

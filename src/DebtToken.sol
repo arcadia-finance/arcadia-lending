@@ -153,12 +153,4 @@ abstract contract DebtToken is ERC4626 {
     function permit(address, address, uint256, uint256, uint8, bytes32, bytes32) public pure override {
         revert("DT_TP: PERMIT_NOT_SUPPORTED");
     }
-
-    /* //////////////////////////////////////////////////////////////
-                          INTERNAL HOOKS LOGIC
-    ////////////////////////////////////////////////////////////// */
-
-    function beforeWithdraw(uint256 assets, uint256 shares) internal override { }
-
-    function afterDeposit(uint256 assets, uint256 shares) internal override { }
 }
