@@ -18,7 +18,7 @@ contract LendingPoolExtension is LendingPool {
     //Extensions to test internal functions
     constructor(ERC20 _asset, address _treasury, address _vaultFactory, address _liquidator)
         LendingPool(_asset, _treasury, _vaultFactory, _liquidator)
-    {}
+    { }
 
     function popTranche(uint256 index, address tranche) public {
         _popTranche(index, tranche);
@@ -1241,8 +1241,8 @@ contract LendingLogicTest is LendingPoolTest {
         bytes3 ref
     ) public {
         vm.assume(amountLoaned <= type(uint256).max / (uint256(originationFee) + 1));
-        vm.assume(amountLoaned <= type(uint256).max - (amountLoaned * originationFee / 10000));
-        vm.assume(collateralValue >= amountLoaned + (amountLoaned * originationFee / 10000));
+        vm.assume(amountLoaned <= type(uint256).max - (amountLoaned * originationFee / 10_000));
+        vm.assume(collateralValue >= amountLoaned + (amountLoaned * originationFee / 10_000));
         vm.assume(liquidity >= amountLoaned);
         vm.assume(amountLoaned > 0);
         vm.assume(to != address(0));
@@ -1271,8 +1271,8 @@ contract LendingLogicTest is LendingPoolTest {
         assertEq(asset.balanceOf(address(pool)), liquidity - amountLoaned);
         assertEq(asset.balanceOf(to), amountLoaned);
 
-        assertEq(debt.balanceOf(address(vault)), amountLoaned + (amountLoaned * originationFee / 10000));
-        assertEq(treasuryBalancePre + (amountLoaned * originationFee / 10000), treasuryBalancePost);
+        assertEq(debt.balanceOf(address(vault)), amountLoaned + (amountLoaned * originationFee / 10_000));
+        assertEq(treasuryBalancePre + (amountLoaned * originationFee / 10_000), treasuryBalancePost);
     }
 
     function testSuccess_borrow_EmitReferralEvent(
@@ -1287,15 +1287,15 @@ contract LendingLogicTest is LendingPoolTest {
         // to is not address 0 and not liquidityProvider, creator setDebtToken to debt, setTotalValue to colletralValue,
         // liquidityProvider approve pool to max value, srTranche deposit liquidity
         vm.assume(amountLoaned <= type(uint256).max / (uint256(originationFee) + 1));
-        vm.assume(amountLoaned <= type(uint256).max - (amountLoaned * originationFee / 10000));
-        vm.assume(collateralValue >= amountLoaned + (amountLoaned * originationFee / 10000));
+        vm.assume(amountLoaned <= type(uint256).max - (amountLoaned * originationFee / 10_000));
+        vm.assume(collateralValue >= amountLoaned + (amountLoaned * originationFee / 10_000));
         vm.assume(liquidity >= amountLoaned);
         vm.assume(amountLoaned > 0);
         vm.assume(to != address(0));
         vm.assume(to != liquidityProvider);
         vm.assume(to != address(pool));
 
-        uint256 amountLoanedWithFee = amountLoaned + (amountLoaned * originationFee / 10000);
+        uint256 amountLoanedWithFee = amountLoaned + (amountLoaned * originationFee / 10_000);
 
         vm.prank(creator);
         pool.setOriginationFee(originationFee);
@@ -1745,8 +1745,8 @@ contract LeveragedActions is LendingPoolTest {
         // balanceOf vault should be equal to amountLoaned + fee
         assertEq(asset.balanceOf(address(pool)), liquidity - amountLoaned);
         assertEq(asset.balanceOf(actionHandler), amountLoaned);
-        assertEq(debt.balanceOf(address(vault)), amountLoaned + (amountLoaned * originationFee / 10000));
-        assertEq(treasuryBalancePre + (amountLoaned * originationFee / 10000), treasuryBalancePost);
+        assertEq(debt.balanceOf(address(vault)), amountLoaned + (amountLoaned * originationFee / 10_000));
+        assertEq(treasuryBalancePre + (amountLoaned * originationFee / 10_000), treasuryBalancePost);
     }
 
     function testSuccess_doActionWithLeverage_EmitReferralEvent(
@@ -1759,14 +1759,14 @@ contract LeveragedActions is LendingPoolTest {
         bytes3 ref
     ) public {
         vm.assume(amountLoaned <= type(uint256).max / (uint256(originationFee) + 1));
-        vm.assume(amountLoaned <= type(uint256).max - (amountLoaned * originationFee / 10000));
-        vm.assume(collateralValue >= amountLoaned + (amountLoaned * originationFee / 10000));
+        vm.assume(amountLoaned <= type(uint256).max - (amountLoaned * originationFee / 10_000));
+        vm.assume(collateralValue >= amountLoaned + (amountLoaned * originationFee / 10_000));
         vm.assume(liquidity >= amountLoaned);
         vm.assume(amountLoaned > 0);
         vm.assume(actionHandler != address(0));
         vm.assume(actionHandler != liquidityProvider);
 
-        uint256 amountLoanedWithFee = amountLoaned + (amountLoaned * originationFee / 10000);
+        uint256 amountLoanedWithFee = amountLoaned + (amountLoaned * originationFee / 10_000);
 
         vm.prank(creator);
         pool.setOriginationFee(originationFee);

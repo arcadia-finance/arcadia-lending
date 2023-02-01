@@ -6,19 +6,19 @@
  */
 pragma solidity ^0.8.13;
 
-import {SafeTransferLib} from "../lib/solmate/src/utils/SafeTransferLib.sol";
-import {SafeCastLib} from "../lib/solmate/src/utils/SafeCastLib.sol";
-import {FixedPointMathLib} from "../lib/solmate/src/utils/FixedPointMathLib.sol";
-import {LogExpMath} from "./utils/LogExpMath.sol";
-import {ITranche} from "./interfaces/ITranche.sol";
-import {IFactory} from "./interfaces/IFactory.sol";
-import {IVault} from "./interfaces/IVault.sol";
-import {ILiquidator} from "./interfaces/ILiquidator.sol";
-import {ILendingPool} from "./interfaces/ILendingPool.sol";
-import {TrustedCreditor} from "./TrustedCreditor.sol";
-import {ERC20, ERC4626, DebtToken} from "./DebtToken.sol";
-import {InterestRateModule, DataTypes} from "./InterestRateModule.sol";
-import {Guardian} from "./security/Guardian.sol";
+import { SafeTransferLib } from "../lib/solmate/src/utils/SafeTransferLib.sol";
+import { SafeCastLib } from "../lib/solmate/src/utils/SafeCastLib.sol";
+import { FixedPointMathLib } from "../lib/solmate/src/utils/FixedPointMathLib.sol";
+import { LogExpMath } from "./utils/LogExpMath.sol";
+import { ITranche } from "./interfaces/ITranche.sol";
+import { IFactory } from "./interfaces/IFactory.sol";
+import { IVault } from "./interfaces/IVault.sol";
+import { ILiquidator } from "./interfaces/ILiquidator.sol";
+import { ILendingPool } from "./interfaces/ILendingPool.sol";
+import { TrustedCreditor } from "./TrustedCreditor.sol";
+import { ERC20, ERC4626, DebtToken } from "./DebtToken.sol";
+import { InterestRateModule, DataTypes } from "./InterestRateModule.sol";
+import { Guardian } from "./security/Guardian.sol";
 
 /**
  * @title The Arcadia Lending Pool contract provides liquidity against positions backed by Arcadia Vaults as collateral.
@@ -611,7 +611,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @notice Updates the interest rate
      * @dev Any address can call this, it will sync unrealised interests and update the interest rate.
      */
-    function updateInterestRate() external processInterests {}
+    function updateInterestRate() external processInterests { }
 
     /* //////////////////////////////////////////////////////////////
                         LIQUIDATION LOGIC

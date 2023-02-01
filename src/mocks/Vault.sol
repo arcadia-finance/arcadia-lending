@@ -30,5 +30,5 @@ contract Vault {
         }
     }
 
-    function vaultManagementAction(address actionHandler, bytes calldata actionData) external {}
+    function vaultManagementAction(address actionHandler, bytes calldata actionData) external { }
 }

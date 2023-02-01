@@ -14,7 +14,7 @@ import "../src/Tranche.sol";
 import "../src/DebtToken.sol";
 
 contract DebtTokenExtension is DebtToken {
-    constructor(ERC20 asset_) DebtToken(asset_) {}
+    constructor(ERC20 asset_) DebtToken(asset_) { }
 
     function deposit_(uint256 assets, address receiver) public returns (uint256 shares) {
         shares = _deposit(assets, receiver);

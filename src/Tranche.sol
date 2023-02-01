@@ -6,11 +6,11 @@
  */
 pragma solidity ^0.8.13;
 
-import {Owned} from "../lib/solmate/src/auth/Owned.sol";
-import {ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
-import {ILendingPool} from "./interfaces/ILendingPool.sol";
-import {FixedPointMathLib} from "../lib/solmate/src/utils/FixedPointMathLib.sol";
-import {ITranche} from "./interfaces/ITranche.sol";
+import { Owned } from "../lib/solmate/src/auth/Owned.sol";
+import { ERC4626 } from "../lib/solmate/src/mixins/ERC4626.sol";
+import { ILendingPool } from "./interfaces/ILendingPool.sol";
+import { FixedPointMathLib } from "../lib/solmate/src/utils/FixedPointMathLib.sol";
+import { ITranche } from "./interfaces/ITranche.sol";
 
 /**
  * @title Tranche
@@ -278,7 +278,7 @@ contract Tranche is ITranche, ERC4626, Owned {
                           INTERNAL HOOKS LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function beforeWithdraw(uint256 assets, uint256 shares) internal override {}
+    function beforeWithdraw(uint256 assets, uint256 shares) internal override { }
 
-    function afterDeposit(uint256 assets, uint256 shares) internal override {}
+    function afterDeposit(uint256 assets, uint256 shares) internal override { }
 }

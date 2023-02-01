@@ -5,7 +5,7 @@
  */
 pragma solidity ^0.8.13;
 
-import {ERC20, ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
+import { ERC20, ERC4626 } from "../lib/solmate/src/mixins/ERC4626.sol";
 
 /**
  * @title Debt Token
@@ -30,7 +30,7 @@ abstract contract DebtToken is ERC4626 {
             string(abi.encodePacked("Arcadia ", asset_.name(), " Debt")),
             string(abi.encodePacked("darc", asset_.symbol()))
         )
-    {}
+    { }
 
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
@@ -43,7 +43,7 @@ abstract contract DebtToken is ERC4626 {
      * Implementation not vulnerable to ERC4626 inflation attacks,
      * totaLAssets() does not rely on balanceOf call.
      */
-    function totalAssets() public view virtual override returns (uint256) {}
+    function totalAssets() public view virtual override returns (uint256) { }
 
     /*//////////////////////////////////////////////////////////////
                         DEPOSIT/WITHDRAWAL LOGIC
@@ -158,7 +158,7 @@ abstract contract DebtToken is ERC4626 {
                           INTERNAL HOOKS LOGIC
     ////////////////////////////////////////////////////////////// */
 
-    function beforeWithdraw(uint256 assets, uint256 shares) internal override {}
+    function beforeWithdraw(uint256 assets, uint256 shares) internal override { }
 
-    function afterDeposit(uint256 assets, uint256 shares) internal override {}
+    function afterDeposit(uint256 assets, uint256 shares) internal override { }
 }

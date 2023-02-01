@@ -6,7 +6,7 @@
  */
 pragma solidity ^0.8.13;
 
-import {ArcadiaAddresses, ArcadiaContractAddresses} from "./Constants/TransferOwnershipConstants.sol";
+import { ArcadiaAddresses, ArcadiaContractAddresses } from "./Constants/TransferOwnershipConstants.sol";
 import "../lib/forge-std/src/Script.sol";
 import "../src/LendingPool.sol";
 
