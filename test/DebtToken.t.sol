@@ -14,7 +14,7 @@ import "../src/Tranche.sol";
 import "../src/DebtToken.sol";
 
 contract DebtTokenExtension is DebtToken {
-    constructor(ERC20 asset_) DebtToken(asset_) {}
+    constructor(ERC20 asset_) DebtToken(asset_) { }
 
     function deposit_(uint256 assets, address receiver) public returns (uint256 shares) {
         shares = _deposit(assets, receiver);
@@ -250,7 +250,7 @@ contract TransferTest is DebtTokenTest {
         vm.startPrank(sender);
         // When: sender transferFrom
         // Then: transferFrom should revert with DT_TF: TRANSFERFROM_NOT_SUPPORTED
-        vm.expectRevert("DT_TF: TRANSFERFROM_NOT_SUPPORTED");
+        vm.expectRevert("DT_TF: TRANSFROM_NOT_SUPPORTED");
         debt.transferFrom(from, to, amount);
         vm.stopPrank();
     }

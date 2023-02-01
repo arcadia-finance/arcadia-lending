@@ -13,5 +13,5 @@ interface ILiquidator {
      * @param openDebt The open debt taken by `originalOwner`.
      * @param maxInitiatorFee The maximum fee that is paid to the initiator of a liquidation.
      */
-    function startAuction(address vault, uint256 openDebt, uint88 maxInitiatorFee) external;
+    function startAuction(address vault, uint256 openDebt, uint80 maxInitiatorFee) external;
 }

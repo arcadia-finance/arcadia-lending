@@ -44,7 +44,7 @@ abstract contract TrancheTest is Test {
     //Before Each
     function setUp() public virtual {
         vm.startPrank(creator);
-        pool = new LendingPool(asset, treasury, address(factory));
+        pool = new LendingPool(asset, treasury, address(factory), address(0));
 
         tranche = new Tranche(address(pool), "Senior", "SR");
         pool.addTranche(address(tranche), 50, 0);
@@ -223,6 +223,23 @@ contract DepositAndWithdrawalTest is TrancheTest {
         assertEq(tranche.maxRedeem(receiver), assets);
         assertEq(tranche.totalAssets(), assets);
         assertEq(asset.balanceOf(address(pool)), assets);
+    }
+
+    function testSuccess_deposit_sync(uint128 assets, address receiver) public {
+        // Given: assets bigger than 0
+        vm.assume(assets > 3);
+
+        vm.prank(liquidityProvider);
+        tranche.deposit(assets / 3, receiver);
+
+        vm.prank(liquidityProvider);
+        tranche.deposit(assets / 3, receiver);
+
+        vm.warp(500);
+
+        vm.prank(liquidityProvider);
+        vm.expectCall(address(pool), abi.encodeWithSignature("liquidityOfAndSync(address)", address(tranche)));
+        tranche.deposit(assets / 3, receiver);
     }
 
     function testRevert_mint_Locked(uint128 shares, address receiver) public {

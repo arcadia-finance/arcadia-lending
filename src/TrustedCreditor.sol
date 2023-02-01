@@ -15,7 +15,7 @@ pragma solidity ^0.8.13;
 abstract contract TrustedCreditor {
     mapping(uint256 => bool) public isValidVersion;
 
-    constructor() {}
+    constructor() { }
 
     /* //////////////////////////////////////////////////////////////
                             VAULT LOGIC

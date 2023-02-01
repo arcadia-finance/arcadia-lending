@@ -3,10 +3,10 @@ pragma solidity ^0.8.13;
 
 import "../lib/forge-std/src/Script.sol";
 
-import {LendingPool} from "src/LendingPool.sol";
+import { LendingPool } from "src/LendingPool.sol";
 
 contract LendingPoolScript is Script {
-    function setUp() public {}
+    function setUp() public { }
 
     function run() public {
         vm.broadcast();

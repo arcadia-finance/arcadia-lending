@@ -20,14 +20,15 @@ contract Vault {
         totalValue = _totalValue;
     }
 
-    function increaseMarginPosition(address, uint256 amount) external returns (bool) {
-        if (totalValue - lockedValue >= amount) {
-            lockedValue += amount;
-            return true;
+    function isVaultHealthy(uint256 amount, uint256 totalOpenDebt) external view returns (bool success) {
+        if (amount != 0) {
+            //Check if vault is still healthy after an increase of used margin.
+            success = totalValue >= lockedValue + amount;
         } else {
-            return false;
+            //Check if vault is healthy for a given amount of openDebt.
+            success = totalValue >= totalOpenDebt;
         }
     }
 
-    function vaultManagementAction(address actionHandler, bytes calldata actionData) external {}
+    function vaultManagementAction(address actionHandler, bytes calldata actionData) external { }
 }
