@@ -542,7 +542,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         // When: srTranche deposits
         // Then: deposit should revert with stdError.arithmeticError
         vm.startPrank(address(srTranche));
-        vm.expectRevert(stdError.arithmeticError);
+        vm.expectRevert("TRANSFER_FROM_FAILED");
         pool.depositInLendingPool(amount, liquidityProvider);
         vm.stopPrank();
     }
@@ -1336,7 +1336,7 @@ contract LendingLogicTest is LendingPoolTest {
         asset.approve(address(pool), type(uint256).max);
         // When: sender repays amountLoaned which is more than his available funds
         // Then: repay should revert with an ovcerflow
-        vm.expectRevert(stdError.arithmeticError);
+        vm.expectRevert("TRANSFER_FROM_FAILED");
         pool.repay(amountLoaned, address(vault));
         vm.stopPrank();
     }
