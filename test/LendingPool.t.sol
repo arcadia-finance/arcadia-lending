@@ -921,7 +921,7 @@ contract LendingLogicTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testRevert_borrow_InsufficientCollateral(uint256 amountLoaned, uint256 collateralValue, address to)
+    function testRevert_borrow_InsufficientCollateral(uint128 amountLoaned, uint256 collateralValue, address to)
         public
     {
         // Given: collateralValue is less than amountLoaned, vault setTotalValue to colletrallValue
