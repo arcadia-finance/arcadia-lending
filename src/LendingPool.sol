@@ -642,7 +642,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             ITranche(tranches[tranches.length - 1]).setAuctionInProgress(true);
         }
         unchecked {
-            auctionsInProgress++;
+            ++auctionsInProgress;
         }
 
         //Remove debt from Vault (burn DebtTokens)
@@ -694,7 +694,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         }
 
         unchecked {
-            auctionsInProgress--;
+            --auctionsInProgress;
         }
         //Hook to the most junior Tranche to inform that there are no ongoing auctions.
         if (auctionsInProgress == 0 && tranches.length > 0) {
