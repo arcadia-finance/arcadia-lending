@@ -832,6 +832,7 @@ contract LendingLogicTest is LendingPoolTest {
 
         vm.startPrank(vaultOwner);
         vault = Vault(factory.createVault(1));
+        vault.setTrustedCreditor(address(pool));
         vm.stopPrank();
 
         vm.prank(liquidityProvider);
@@ -1505,6 +1506,7 @@ contract LeveragedActions is LendingPoolTest {
 
         vm.prank(vaultOwner);
         vault = Vault(factory.createVault(1));
+        vault.setTrustedCreditor(address(pool));
 
         vm.prank(liquidityProvider);
         asset.approve(address(pool), type(uint256).max);
@@ -1802,6 +1804,7 @@ contract AccountingTest is LendingPoolTest {
 
         vm.prank(vaultOwner);
         vault = Vault(factory.createVault(1));
+        vault.setTrustedCreditor(address(pool));
 
         vm.prank(liquidityProvider);
         asset.approve(address(pool), type(uint256).max);
@@ -1894,6 +1897,7 @@ contract InterestsTest is LendingPoolTest {
 
         vm.startPrank(vaultOwner);
         vault = Vault(factory.createVault(1));
+        vault.setTrustedCreditor(address(pool));
         vm.stopPrank();
     }
 
@@ -2142,6 +2146,7 @@ contract LiquidationTest is LendingPoolTest {
 
         vm.startPrank(vaultOwner);
         vault = Vault(factory.createVault(1));
+        vault.setTrustedCreditor(address(pool));
         vm.stopPrank();
     }
 
@@ -2596,6 +2601,7 @@ contract VaultTest is LendingPoolTest {
 
         vm.startPrank(vaultOwner);
         vault = Vault(factory.createVault(1));
+        vault.setTrustedCreditor(address(pool));
         vm.stopPrank();
     }
 

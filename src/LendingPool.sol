@@ -377,7 +377,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             _deposit(amountWithFee, vault);
 
             //Call vault to check if it is still healthy after the debt is increased with amountWithFee.
-            require(IVault(vault).isVaultHealthy(0, maxWithdraw(vault)), "LP_B: Reverted");
+            (bool isHealthy, address trustedCreditor) = IVault(vault).isVaultHealthy(0, maxWithdraw(vault));
+            require(isHealthy && trustedCreditor == address(this), "LP_B: Reverted");
 
             //Transfer fails if there is insufficient liquidity in the pool
             asset.safeTransfer(to, amount);
@@ -459,7 +460,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         //resulting from the actions back into the vault.
         //As last step, after all assets are deposited back into the vault a final health check is done:
         //The Collateral Value of all assets in the vault is bigger than the total liabilities against the vault (including the margin taken during this function).
-        IVault(vault).vaultManagementAction(actionHandler, actionData);
+        address trustedCreditor = IVault(vault).vaultManagementAction(actionHandler, actionData);
+        require(trustedCreditor == address(this), "LP_DAWL: Not trusted");
     }
 
     /* //////////////////////////////////////////////////////////////
