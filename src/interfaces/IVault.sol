@@ -19,12 +19,12 @@ interface IVault {
      * @return success Boolean indicating if there is sufficient margin to back a certain amount of Debt.
      * @dev Only one of the vaules can be non-zero, or we check on a certain increase of debt, or we check on a total amount of debt.
      */
-    function isVaultHealthy(uint256 amount, uint256 totalOpenDebt) external view returns (bool);
+    function isVaultHealthy(uint256 amount, uint256 totalOpenDebt) external view returns (bool, address);
 
     /**
      * @notice Calls external action handler to execute and interact with external logic.
      * @param actionHandler The address of the action handler.
      * @param actionData A bytes object containing two actionAssetData structs, an address array and a bytes array.
      */
-    function vaultManagementAction(address actionHandler, bytes calldata actionData) external;
+    function vaultManagementAction(address actionHandler, bytes calldata actionData) external returns (address);
 }
