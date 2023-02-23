@@ -629,7 +629,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         //Only Vaults can have debt, and debtTokens are non-transferrable.
         //Hence by checking that the balance of the address passed as vault is not 0, we know the address
         //passed as vault is indeed a vault and has debt.
-        uint256 openDebt = balanceOf[vault];
+        uint256 openDebt = maxWithdraw(vault);
         require(openDebt != 0, "LP_LV: Not a Vault with debt");
 
         //Store liquidation initiator to pay out initiator reward when auction is finished.
