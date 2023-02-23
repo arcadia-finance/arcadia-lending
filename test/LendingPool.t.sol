@@ -1564,17 +1564,16 @@ contract LeveragedActions is LendingPoolTest {
         // Given: beneficiary is not vaultOwner, amount is bigger than 0
         vm.assume(beneficiary != vaultOwner);
 
-        vm.assume(amount > 0);
         vm.startPrank(beneficiary);
         // When: doActionWithLeverage as beneficiary
 
         // Then: doActionWithLeverage should revert with stdError.arithmeticError
-        vm.expectRevert(stdError.arithmeticError);
+        vm.expectRevert("LP_DAWL: UNAUTHORIZED");
         pool.doActionWithLeverage(amount, address(vault), actionHandler, actionData, emptyBytes3);
         vm.stopPrank();
     }
 
-    function testRevert_doActionWithLeverage_InsufficientApproval(
+    function testRevert_doActionWithLeverage_ByLimitedAuthorisedAddress(
         uint256 amountAllowed,
         uint256 amountLoaned,
         address beneficiary,
@@ -1583,7 +1582,7 @@ contract LeveragedActions is LendingPoolTest {
     ) public {
         // Given: beneficiary is not vaultOwner, amountAllowed is less than amountLoaned, vaultOwner approveBeneficiary
         vm.assume(beneficiary != vaultOwner);
-        vm.assume(amountAllowed < amountLoaned);
+        vm.assume(amountAllowed < type(uint256).max);
 
         vm.prank(vaultOwner);
         pool.approveBeneficiary(beneficiary, amountAllowed, address(vault));
@@ -1592,7 +1591,7 @@ contract LeveragedActions is LendingPoolTest {
         // When: doActionWithLeverage as beneficiary
 
         // Then: doActionWithLeverage should revert with stdError.arithmeticError
-        vm.expectRevert(stdError.arithmeticError);
+        vm.expectRevert("LP_DAWL: UNAUTHORIZED");
         pool.doActionWithLeverage(amountLoaned, address(vault), actionHandler, actionData, emptyBytes3);
         vm.stopPrank();
     }
@@ -1657,47 +1656,6 @@ contract LeveragedActions is LendingPoolTest {
         assertEq(asset.balanceOf(address(pool)), liquidity - amountLoaned);
         assertEq(asset.balanceOf(actionHandler), amountLoaned);
         assertEq(debt.balanceOf(address(vault)), amountLoaned);
-    }
-
-    function testSuccess_doActionWithLeverage_ByLimitedAuthorisedAddress(
-        uint256 amountAllowed,
-        uint256 amountLoaned,
-        uint256 collateralValue,
-        uint128 liquidity,
-        address beneficiary,
-        address actionHandler,
-        bytes calldata actionData
-    ) public {
-        // Given: amountAllowed, collateralValue and liquidity bigger than equal to amountLoaned, amountLoaned is bigger than 0,
-        // amountAllowed is less than max value, beneficiary is not vaultOwner, actionHandler is not address 0 and not liquidityProvider,
-        // creator setDebtToken to debt, liquidityProvider approve pool to max value, srTranche deposit liquidity,
-        // vaultOwner approveBeneficiary
-        vm.assume(amountAllowed >= amountLoaned);
-        vm.assume(collateralValue >= amountLoaned);
-        vm.assume(liquidity >= amountLoaned);
-        vm.assume(amountLoaned > 0);
-        vm.assume(amountAllowed < type(uint256).max);
-        vm.assume(beneficiary != vaultOwner);
-        vm.assume(actionHandler != address(0));
-        vm.assume(actionHandler != liquidityProvider);
-
-        vault.setTotalValue(collateralValue);
-        vm.prank(address(srTranche));
-        pool.depositInLendingPool(liquidity, liquidityProvider);
-        vm.prank(vaultOwner);
-        pool.approveBeneficiary(beneficiary, amountAllowed, address(vault));
-
-        vm.startPrank(beneficiary);
-        // When: beneficiary does action with leverage of amountLoaned
-        pool.doActionWithLeverage(amountLoaned, address(vault), actionHandler, actionData, emptyBytes3);
-        vm.stopPrank();
-
-        // Then: balanceOf pool should be equal to liquidity minus amountLoaned, balanceOf "actionHandler" should be equal to amountLoaned,
-        // balanceOf vault should be equal to amountLoaned, creditAllowance should be equal to amountAllowed minus amountLoaned
-        assertEq(asset.balanceOf(address(pool)), liquidity - amountLoaned);
-        assertEq(asset.balanceOf(actionHandler), amountLoaned);
-        assertEq(debt.balanceOf(address(vault)), amountLoaned);
-        assertEq(pool.creditAllowance(address(vault), vaultOwner, beneficiary), amountAllowed - amountLoaned);
     }
 
     function testSuccess_doActionWithLeverage_ByMaxAuthorisedAddress(
