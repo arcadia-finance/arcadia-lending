@@ -1269,6 +1269,7 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(amountLoaned <= type(uint256).max - (amountLoaned * originationFee / 10_000));
         vm.assume(collateralValue >= amountLoaned + (amountLoaned * originationFee / 10_000));
         vm.assume(liquidity >= amountLoaned);
+        vm.assume(liquidity <= type(uint128).max - (amountLoaned * originationFee / 10_000));
         vm.assume(to != address(0));
         vm.assume(to != liquidityProvider);
         vm.assume(to != address(pool));
@@ -1283,12 +1284,14 @@ contract LendingLogicTest is LendingPoolTest {
         pool.depositInLendingPool(liquidity, liquidityProvider);
 
         uint256 treasuryBalancePre = pool.realisedLiquidityOf(treasury);
+        uint256 totalRealisedLiquidityPre = pool.totalRealisedLiquidity();
 
         vm.startPrank(vaultOwner);
         pool.borrow(amountLoaned, address(vault), to, ref);
         vm.stopPrank();
 
         uint256 treasuryBalancePost = pool.realisedLiquidityOf(treasury);
+        uint256 totalRealisedLiquidityPost = pool.totalRealisedLiquidity();
 
         // Then: balanceOf pool should be equal to liquidity minus amountLoaned, balanceOf "actionHandler" should be equal to amountLoaned,
         // balanceOf vault should be equal to amountLoaned + fee
@@ -1297,6 +1300,7 @@ contract LendingLogicTest is LendingPoolTest {
 
         assertEq(debt.balanceOf(address(vault)), amountLoaned + (amountLoaned * originationFee / 10_000));
         assertEq(treasuryBalancePre + (amountLoaned * originationFee / 10_000), treasuryBalancePost);
+        assertEq(totalRealisedLiquidityPre + (amountLoaned * originationFee / 10_000), totalRealisedLiquidityPost);
     }
 
     function testSuccess_borrow_EmitReferralEvent(
@@ -1701,6 +1705,7 @@ contract LeveragedActions is LendingPoolTest {
     ) public {
         vm.assume(collateralValue >= amountLoaned);
         vm.assume(liquidity >= amountLoaned);
+        vm.assume(liquidity <= type(uint128).max - (amountLoaned * originationFee / 10_000));
         vm.assume(amountLoaned > 0);
         vm.assume(actionHandler != address(0));
         vm.assume(actionHandler != liquidityProvider);
@@ -1715,6 +1720,7 @@ contract LeveragedActions is LendingPoolTest {
         pool.depositInLendingPool(liquidity, liquidityProvider);
 
         uint256 treasuryBalancePre = pool.realisedLiquidityOf(treasury);
+        uint256 totalRealisedLiquidityPre = pool.totalRealisedLiquidity();
 
         vm.startPrank(vaultOwner);
         // When: vaultOwner does action with leverage of amountLoaned
@@ -1722,6 +1728,7 @@ contract LeveragedActions is LendingPoolTest {
         vm.stopPrank();
 
         uint256 treasuryBalancePost = pool.realisedLiquidityOf(treasury);
+        uint256 totalRealisedLiquidityPost = pool.totalRealisedLiquidity();
 
         // Then: balanceOf pool should be equal to liquidity minus amountLoaned, balanceOf "actionHandler" should be equal to amountLoaned,
         // balanceOf vault should be equal to amountLoaned + fee
@@ -1729,6 +1736,7 @@ contract LeveragedActions is LendingPoolTest {
         assertEq(asset.balanceOf(actionHandler), amountLoaned);
         assertEq(debt.balanceOf(address(vault)), amountLoaned + (amountLoaned * originationFee / 10_000));
         assertEq(treasuryBalancePre + (amountLoaned * originationFee / 10_000), treasuryBalancePost);
+        assertEq(totalRealisedLiquidityPre + (amountLoaned * originationFee / 10_000), totalRealisedLiquidityPost);
     }
 
     function testSuccess_doActionWithLeverage_EmitReferralEvent(
