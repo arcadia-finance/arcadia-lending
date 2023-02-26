@@ -436,10 +436,9 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         //Check allowances to take debt
         if (vaultOwner != msg.sender) {
-            uint256 allowed = creditAllowance[vault][vaultOwner][msg.sender];
-            if (allowed != type(uint256).max) {
-                creditAllowance[vault][vaultOwner][msg.sender] = allowed - amountBorrowedWithFee;
-            }
+            //Since calling vaultManagementAction() gives the sender full control over all assets in the vault,
+            //Only Beneficiaries with maximum allowance can call the doActionWithLeverage function.
+            require(creditAllowance[vault][vaultOwner][msg.sender] == type(uint256).max, "LP_DAWL: UNAUTHORIZED");
         }
 
         if (amountBorrowedWithFee != 0) {
