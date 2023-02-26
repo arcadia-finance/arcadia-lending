@@ -60,9 +60,9 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     mapping(address => uint256) public interestWeight;
     mapping(address => uint256) public realisedLiquidityOf;
     mapping(address => address) public liquidationInitiator;
-    mapping(address => mapping(address => uint256)) public creditAllowance;
+    mapping(address => mapping(address => mapping(address => uint256))) public creditAllowance; //mapping of vault => owner => beneficiary => amount
 
-    event CreditApproval(address indexed vault, address indexed beneficiary, uint256 amount);
+    event CreditApproval(address indexed vault, address indexed owner, address indexed beneficiary, uint256 amount);
     event Borrow(address indexed vault, bytes3 indexed referrer, uint256 amount);
 
     modifier onlyLiquidator() {
@@ -341,9 +341,9 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         //If vault is not an actual address of a vault, ownerOfVault(address) will return the zero address
         require(IFactory(vaultFactory).ownerOfVault(vault) == msg.sender, "LP_AB: UNAUTHORIZED");
 
-        creditAllowance[vault][beneficiary] = amount;
+        creditAllowance[vault][msg.sender][beneficiary] = amount;
 
-        emit CreditApproval(vault, beneficiary, amount);
+        emit CreditApproval(vault, msg.sender, beneficiary, amount);
     }
 
     /**
@@ -366,9 +366,9 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         //Check allowances to take debt
         if (vaultOwner != msg.sender) {
-            uint256 allowed = creditAllowance[vault][msg.sender];
+            uint256 allowed = creditAllowance[vault][vaultOwner][msg.sender];
             if (allowed != type(uint256).max) {
-                creditAllowance[vault][msg.sender] = allowed - amountWithFee;
+                creditAllowance[vault][vaultOwner][msg.sender] = allowed - amountWithFee;
             }
         }
 
@@ -436,9 +436,9 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         //Check allowances to take debt
         if (vaultOwner != msg.sender) {
-            uint256 allowed = creditAllowance[vault][msg.sender];
+            uint256 allowed = creditAllowance[vault][vaultOwner][msg.sender];
             if (allowed != type(uint256).max) {
-                creditAllowance[vault][msg.sender] = allowed - amountBorrowedWithFee;
+                creditAllowance[vault][vaultOwner][msg.sender] = allowed - amountBorrowedWithFee;
             }
         }
 

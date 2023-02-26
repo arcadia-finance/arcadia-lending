@@ -821,6 +821,8 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
                         LENDING LOGIC
 ////////////////////////////////////////////////////////////// */
 contract LendingLogicTest is LendingPoolTest {
+    using stdStorage for StdStorage;
+
     function setUp() public override {
         super.setUp();
 
@@ -873,7 +875,7 @@ contract LendingLogicTest is LendingPoolTest {
         pool.approveBeneficiary(beneficiary, amount, address(vault));
 
         // Then: creditAllowance should be equal to amount
-        assertEq(pool.creditAllowance(address(vault), beneficiary), amount);
+        assertEq(pool.creditAllowance(address(vault), vaultOwner, beneficiary), amount);
     }
 
     function testRevert_borrow_NonVault(uint256 amount, address nonVault, address to) public {
@@ -912,6 +914,32 @@ contract LendingLogicTest is LendingPoolTest {
 
         vm.prank(vaultOwner);
         pool.approveBeneficiary(beneficiary, amountAllowed, address(vault));
+
+        vm.startPrank(beneficiary);
+        // When: borrow as beneficiary
+
+        // Then: borrow should revert with stdError.arithmeticError
+        vm.expectRevert(stdError.arithmeticError);
+        pool.borrow(amountLoaned, address(vault), to, emptyBytes3);
+        vm.stopPrank();
+    }
+
+    function testRevert_borrow_InsufficientApprovalAfterTransfer(
+        uint256 amountLoaned,
+        address beneficiary,
+        address to,
+        address newOwner
+    ) public {
+        // Given: beneficiary is not vaultOwner, vaultOwner approveBeneficiary
+        vm.assume(beneficiary != vaultOwner);
+        vm.assume(newOwner != vaultOwner);
+        vm.assume(newOwner != address(0));
+        vm.assume(amountLoaned > 0);
+
+        vm.prank(vaultOwner);
+        pool.approveBeneficiary(beneficiary, type(uint256).max, address(vault));
+        uint256 vaultIndex = factory.vaultIndex(address(vault));
+        stdstore.target(address(factory)).sig(factory.ownerOf.selector).with_key(vaultIndex).checked_write(newOwner);
 
         vm.startPrank(beneficiary);
         // When: borrow as beneficiary
@@ -1192,7 +1220,7 @@ contract LendingLogicTest is LendingPoolTest {
         assertEq(asset.balanceOf(address(pool)), liquidity - amountLoaned);
         assertEq(asset.balanceOf(to), amountLoaned);
         assertEq(debt.balanceOf(address(vault)), amountLoaned);
-        assertEq(pool.creditAllowance(address(vault), beneficiary), amountAllowed - amountLoaned);
+        assertEq(pool.creditAllowance(address(vault), vaultOwner, beneficiary), amountAllowed - amountLoaned);
     }
 
     function testSuccess_borrow_ByMaxAuthorisedAddress(
@@ -1230,7 +1258,7 @@ contract LendingLogicTest is LendingPoolTest {
         assertEq(asset.balanceOf(address(pool)), liquidity - amountLoaned);
         assertEq(asset.balanceOf(to), amountLoaned);
         assertEq(debt.balanceOf(address(vault)), amountLoaned);
-        assertEq(pool.creditAllowance(address(vault), beneficiary), type(uint256).max);
+        assertEq(pool.creditAllowance(address(vault), vaultOwner, beneficiary), type(uint256).max);
     }
 
     function testSuccess_borrow_originationFeeAvailable(
@@ -1669,7 +1697,7 @@ contract LeveragedActions is LendingPoolTest {
         assertEq(asset.balanceOf(address(pool)), liquidity - amountLoaned);
         assertEq(asset.balanceOf(actionHandler), amountLoaned);
         assertEq(debt.balanceOf(address(vault)), amountLoaned);
-        assertEq(pool.creditAllowance(address(vault), beneficiary), amountAllowed - amountLoaned);
+        assertEq(pool.creditAllowance(address(vault), vaultOwner, beneficiary), amountAllowed - amountLoaned);
     }
 
     function testSuccess_doActionWithLeverage_ByMaxAuthorisedAddress(
@@ -1708,7 +1736,7 @@ contract LeveragedActions is LendingPoolTest {
         assertEq(asset.balanceOf(address(pool)), liquidity - amountLoaned);
         assertEq(asset.balanceOf(actionHandler), amountLoaned);
         assertEq(debt.balanceOf(address(vault)), amountLoaned);
-        assertEq(pool.creditAllowance(address(vault), beneficiary), type(uint256).max);
+        assertEq(pool.creditAllowance(address(vault), vaultOwner, beneficiary), type(uint256).max);
     }
 
     function testSuccss_doActionWithLeverage_originationFeeAvailable(
