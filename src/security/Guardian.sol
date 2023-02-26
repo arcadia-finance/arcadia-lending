@@ -7,7 +7,8 @@
 
 pragma solidity ^0.8.13;
 
-import "../../lib/solmate/src/auth/Owned.sol";
+import { Owned } from "../../lib/solmate/src/auth/Owned.sol";
+import { IGuardian } from "../interfaces/IGuardian.sol";
 
 /**
  * @dev This module provides a mechanism that allows authorized accounts to trigger an emergency stop

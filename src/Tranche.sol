@@ -11,6 +11,7 @@ import { ERC4626 } from "../lib/solmate/src/mixins/ERC4626.sol";
 import { ILendingPool } from "./interfaces/ILendingPool.sol";
 import { FixedPointMathLib } from "../lib/solmate/src/utils/FixedPointMathLib.sol";
 import { ITranche } from "./interfaces/ITranche.sol";
+import { IGuardian } from "./interfaces/IGuardian.sol";
 
 /**
  * @title Tranche
@@ -231,43 +232,124 @@ contract Tranche is ITranche, ERC4626, Owned {
     }
 
     /**
-     * @notice Returns the total amount of underlying assets, to which liquidity providers have a claim
-     * @return assets The total amount of underlying assets, to which liquidity providers have a claim
-     * @dev The Liquidity Pool does the accounting of the outstanding claim on liquidity per tranche.
+     * @dev Modification of totalAssets() where interests are realised (state modification).
      */
     function totalAssetsAndSync() public returns (uint256 assets) {
         assets = lendingPool.liquidityOfAndSync(address(this));
     }
 
+    /**
+     * @dev Modification of convertToShares() where interests are realised (state modification).
+     */
     function convertToSharesAndSync(uint256 assets) public returns (uint256) {
         uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
 
         return supply == 0 ? assets : assets.mulDivDown(supply, totalAssetsAndSync());
     }
 
+    /**
+     * @dev Modification of convertToAssets() where interests are realised (state modification).
+     */
     function convertToAssetsAndSync(uint256 shares) public returns (uint256) {
         uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
 
         return supply == 0 ? shares : shares.mulDivDown(totalAssetsAndSync(), supply);
     }
 
+    /**
+     * @dev Modification of previewDeposit() where interests are realised (state modification).
+     */
     function previewDepositAndSync(uint256 assets) public returns (uint256) {
         return convertToSharesAndSync(assets);
     }
 
+    /**
+     * @dev Modification of previewMint() where interests are realised (state modification).
+     */
     function previewMintAndSync(uint256 shares) public returns (uint256) {
         uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
 
         return supply == 0 ? shares : shares.mulDivUp(totalAssetsAndSync(), supply);
     }
 
+    /**
+     * @dev Modification of previewWithdraw() where interests are realised (state modification).
+     */
     function previewWithdrawAndSync(uint256 assets) public returns (uint256) {
         uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
 
         return supply == 0 ? assets : assets.mulDivUp(supply, totalAssetsAndSync());
     }
 
+    /**
+     * @dev Modification of previewRedeem() where interests are realised (state modification).
+     */
     function previewRedeemAndSync(uint256 shares) public returns (uint256) {
         return convertToAssetsAndSync(shares);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                     DEPOSIT/WITHDRAWAL LIMIT LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    /**
+     * @dev maxDeposit() according the EIP-4626 specification.
+     */
+    function maxDeposit(address) public view override returns (uint256 maxAssets) {
+        if (locked || auctionInProgress || IGuardian(address(lendingPool)).depositPaused()) return 0;
+
+        uint256 supplyCap = lendingPool.supplyCap();
+        uint256 realisedLiquidity = lendingPool.totalRealisedLiquidity();
+        uint256 interests = lendingPool.calcUnrealisedDebt();
+
+        if (supplyCap > 0) {
+            if (realisedLiquidity + interests > supplyCap) return 0;
+            maxAssets = supplyCap - realisedLiquidity - interests;
+        } else {
+            maxAssets = type(uint128).max - realisedLiquidity - interests;
+        }
+    }
+
+    /**
+     * @dev maxMint() according the EIP-4626 specification.
+     */
+    function maxMint(address) public view override returns (uint256 maxShares) {
+        if (locked || auctionInProgress || IGuardian(address(lendingPool)).depositPaused()) return 0;
+
+        uint256 supplyCap = lendingPool.supplyCap();
+        uint256 realisedLiquidity = lendingPool.totalRealisedLiquidity();
+        uint256 interests = lendingPool.calcUnrealisedDebt();
+
+        if (supplyCap > 0) {
+            if (realisedLiquidity + interests > supplyCap) return 0;
+            maxShares = convertToShares(supplyCap - realisedLiquidity - interests);
+        } else {
+            maxShares = convertToShares(type(uint128).max - realisedLiquidity - interests);
+        }
+    }
+
+    /**
+     * @dev maxWithdraw() according the EIP-4626 specification.
+     */
+    function maxWithdraw(address owner_) public view override returns (uint256 maxAssets) {
+        if (locked || auctionInProgress || IGuardian(address(lendingPool)).withdrawPaused()) return 0;
+
+        uint256 availableAssets = asset.balanceOf(address(lendingPool));
+        uint256 claimableAssets = convertToAssets(balanceOf[owner_]);
+
+        maxAssets = availableAssets < claimableAssets ? availableAssets : claimableAssets;
+    }
+
+    /**
+     * @dev maxRedeem() according the EIP-4626 specification.
+     */
+    function maxRedeem(address owner_) public view override returns (uint256 maxShares) {
+        if (locked || auctionInProgress || IGuardian(address(lendingPool)).withdrawPaused()) return 0;
+
+        uint256 claimableShares = balanceOf[owner_];
+        if (claimableShares == 0) return 0;
+        uint256 availableShares = convertToShares(asset.balanceOf(address(lendingPool)));
+
+        maxShares = availableShares < claimableShares ? availableShares : claimableShares;
     }
 }

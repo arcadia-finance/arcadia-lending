@@ -567,7 +567,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     }
 
     /**
-     * @notice Calculates the unrealised debt.
+     * @notice Calculates the unrealised debt (interests).
+     * @return unrealisedDebt The unrealised debt.
      * @dev To Find the unrealised debt over an amount of time, you need to calculate D[(1+r)^x-1].
      * The base of the exponential: 1 + r, is a 18 decimals fixed point number
      * with r the yearly interest rate.
