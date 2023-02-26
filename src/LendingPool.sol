@@ -272,7 +272,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         unchecked {
             realisedLiquidityOf[msg.sender] += assets;
-            totalRealisedLiquidity += uint128(assets); //we know that the sum is <MAXUINT128 from l266
+            totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
         }
     }
 
@@ -301,7 +301,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         unchecked {
             realisedLiquidityOf[tranche] += assets; //[̲̅$̲̅(̲̅ ͡° ͜ʖ ͡°̲̅)̲̅$̲̅]
-            totalRealisedLiquidity += uint128(assets); //we know that the sum is <MAXUINT128 from l292
+            totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
         }
     }
 
