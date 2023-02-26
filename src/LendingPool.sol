@@ -62,7 +62,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     mapping(address => address) public liquidationInitiator;
     mapping(address => mapping(address => mapping(address => uint256))) public creditAllowance; //mapping of vault => owner => beneficiary => amount
 
-    event CreditApproval(address indexed vault, address owner, address indexed beneficiary, uint256 amount);
+    event CreditApproval(address indexed vault, address indexed owner, address indexed beneficiary, uint256 amount);
     event Borrow(address indexed vault, bytes3 indexed referrer, uint256 amount);
 
     modifier onlyLiquidator() {
@@ -339,12 +339,11 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      */
     function approveBeneficiary(address beneficiary, uint256 amount, address vault) external {
         //If vault is not an actual address of a vault, ownerOfVault(address) will return the zero address
-        address owner_ = IFactory(vaultFactory).ownerOfVault(vault);
-        require(owner_ == msg.sender, "LP_AB: UNAUTHORIZED");
+        require(IFactory(vaultFactory).ownerOfVault(vault) == msg.sender, "LP_AB: UNAUTHORIZED");
 
-        creditAllowance[vault][owner_][beneficiary] = amount;
+        creditAllowance[vault][msg.sender][beneficiary] = amount;
 
-        emit CreditApproval(vault, owner_, beneficiary, amount);
+        emit CreditApproval(vault, msg.sender, beneficiary, amount);
     }
 
     /**
