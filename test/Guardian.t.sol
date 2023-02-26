@@ -46,6 +46,8 @@ contract GuardianUnitTest is Test {
     address guardian = address(1);
     address owner = address(2);
 
+    event GuardianChanged(address indexed oldGuardian, address indexed newGuardian);
+
     constructor() {
         vm.startPrank(owner);
         lendingPool = new LendingPoolMockup();
@@ -84,7 +86,10 @@ contract GuardianUnitTest is Test {
         vm.assume(newGuardian_ != owner);
         // Given: the lending pool owner is owner
         vm.startPrank(owner);
+
         // When: the owner changes the guardian
+        vm.expectEmit(true, true, false, false);
+        emit GuardianChanged(guardian, newGuardian_);
         lendingPool.changeGuardian(newGuardian_);
         vm.stopPrank();
         // Then: the guardian is changed
