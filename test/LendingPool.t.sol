@@ -930,7 +930,7 @@ contract LendingLogicTest is LendingPoolTest {
         address newOwner
     ) public {
         // Given: beneficiary is not vaultOwner, vaultOwner approveBeneficiary
-        vm.assume(beneficiary != vaultOwner);
+        vm.assume(beneficiary != newOwner);
         vm.assume(newOwner != vaultOwner);
         vm.assume(newOwner != address(0));
         vm.assume(amountLoaned > 0);
