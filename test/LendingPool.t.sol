@@ -568,7 +568,6 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
 
     function testRevert_depositInLendingPool_SupplyCap(uint256 amount, uint128 supplyCap) public {
         // Given: amount should be greater than 1
-        vm.assume(amount > 1);
         vm.assume(pool.totalRealisedLiquidity() + amount > supplyCap);
         vm.assume(supplyCap > 0);
 
@@ -1159,7 +1158,6 @@ contract LendingLogicTest is LendingPoolTest {
         // liquidityProvider approve pool to max value, srTranche deposit liquidity
         vm.assume(collateralValue >= amountLoaned);
         vm.assume(liquidity >= amountLoaned);
-        vm.assume(amountLoaned > 0);
         vm.assume(to != address(0));
         vm.assume(to != liquidityProvider);
         vm.assume(to != address(pool));
@@ -1197,7 +1195,6 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(amountAllowed >= amountLoaned);
         vm.assume(collateralValue >= amountLoaned);
         vm.assume(liquidity >= amountLoaned);
-        vm.assume(amountLoaned > 0);
         vm.assume(amountAllowed < type(uint256).max);
         vm.assume(beneficiary != vaultOwner);
         vm.assume(to != address(0));
@@ -1236,7 +1233,6 @@ contract LendingLogicTest is LendingPoolTest {
         // srTranche deposit liquidity, vaultOwner approveBeneficiary
         vm.assume(collateralValue >= amountLoaned);
         vm.assume(liquidity >= amountLoaned);
-        vm.assume(amountLoaned > 0);
         vm.assume(beneficiary != vaultOwner);
         vm.assume(to != address(0));
         vm.assume(to != liquidityProvider);
@@ -1273,7 +1269,6 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(amountLoaned <= type(uint256).max - (amountLoaned * originationFee / 10_000));
         vm.assume(collateralValue >= amountLoaned + (amountLoaned * originationFee / 10_000));
         vm.assume(liquidity >= amountLoaned);
-        vm.assume(amountLoaned > 0);
         vm.assume(to != address(0));
         vm.assume(to != liquidityProvider);
         vm.assume(to != address(pool));
@@ -1402,7 +1397,7 @@ contract LendingLogicTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_repay_NonVault(uint128 availablefunds, uint256 amountRepaid, address sender, address nonVault)
+    function testRevert_repay_NonVault(uint128 availablefunds, uint256 amountRepaid, address sender, address nonVault)
         public
     {
         // Given: nonVault is not vault
@@ -1413,12 +1408,11 @@ contract LendingLogicTest is LendingPoolTest {
         asset.transfer(sender, availablefunds);
 
         // When: repay amount to nonVault
-        vm.prank(sender);
+        // Then: repay should revert
+        vm.startPrank(sender);
+        vm.expectRevert("DT_W: ZERO_SHARES");
         pool.repay(amountRepaid, nonVault);
-
-        // Then: no funds are actually transferred
-        assertEq(asset.balanceOf(address(pool)), 0);
-        assertEq(asset.balanceOf(sender), availablefunds);
+        vm.stopPrank();
     }
 
     function testSuccess_repay_AmountInferiorLoan(uint128 amountLoaned, uint256 amountRepaid, address sender) public {
