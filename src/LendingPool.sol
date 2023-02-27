@@ -517,6 +517,31 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         }
     }
 
+    /**
+     * @notice Skims any surplus funds in the LendingPool to the treasury
+     * @dev In normal conditions (when there are no ongoing auctions), the total Claimable Liquidity should be equal
+     * to the sum of the available funds (the balanceOf() the underlying asset) in the pool and the total open debt.
+     * In practice the actual sum of available funds and total open debt will always be bigger than the total Claimable Liquidity.
+     * This because of the rounding errors of the ERC4626 calculations (conversions between assets and shares),
+     * or because someone accidently sent funds directly to the pool instead of depositing via a Tranche.
+     * This functions makes the surplus available to the Treasury (otherwise they would be lost forever).
+     * @dev In case you aaccidentally sent funds to the pool, contact the current treasury manager.
+     */
+    function skim() external processInterests {
+        //During auctions, debt tokens are burned at start of auction, while auctions proceeds are only returned
+        //at the end of the auction -> skim function must be blocked.
+        require(auctionsInProgress == 0, "LP_S: Auctions Ongoing");
+
+        //Pending interests are synced via processInterests modifier
+        uint256 delta = asset.balanceOf(address(this)) + realisedDebt - totalRealisedLiquidity;
+
+        //Add difference to the treasury
+        unchecked {
+            totalRealisedLiquidity += SafeCastLib.safeCastTo128(delta);
+            realisedLiquidityOf[treasury] += delta;
+        }
+    }
+
     /* //////////////////////////////////////////////////////////////
                             INTERESTS LOGIC
     ////////////////////////////////////////////////////////////// */

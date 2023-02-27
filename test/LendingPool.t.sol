@@ -1865,6 +1865,32 @@ contract AccountingTest is LendingPoolTest {
         // Then: actualValue should be equal to expectedValue
         assertEq(actualValue, expectedValue);
     }
+
+    function testRevert_skim_OngoingAuctions(uint16 auctionsInProgress_, address sender) public {
+        vm.assume(auctionsInProgress_ > 0);
+        pool.setAuctionsInProgress(auctionsInProgress_);
+
+        vm.startPrank(sender);
+        vm.expectRevert("LP_S: Auctions Ongoing");
+        pool.skim();
+        vm.stopPrank();
+    }
+
+    function testSuccess_skim(uint128 balanceOf, uint128 totalDebt, uint128 totalLiquidity, address sender) public {
+        vm.assume(uint256(balanceOf) + totalDebt <= type(uint128).max);
+        vm.assume(totalLiquidity <= balanceOf + totalDebt);
+
+        pool.setTotalRealisedLiquidity(totalLiquidity);
+        pool.setRealisedDebt(totalDebt);
+        vm.prank(liquidityProvider);
+        asset.transfer(address(pool), balanceOf);
+
+        vm.prank(sender);
+        pool.skim();
+
+        assertEq(pool.totalRealisedLiquidity(), balanceOf + totalDebt);
+        assertEq(pool.realisedLiquidityOf(treasury), balanceOf + totalDebt - totalLiquidity);
+    }
 }
 
 /* //////////////////////////////////////////////////////////////
