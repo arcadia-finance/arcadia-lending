@@ -5,7 +5,8 @@
  */
 pragma solidity ^0.8.13;
 
-import {ERC20, ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
+import { ERC20, ERC4626 } from "../lib/solmate/src/mixins/ERC4626.sol";
+import { FixedPointMathLib } from "../lib/solmate/src/utils/FixedPointMathLib.sol";
 
 /**
  * @title Debt Token
@@ -17,8 +18,10 @@ import {ERC20, ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
  * For more information, see https://github.com/OpenZeppelin/openzeppelin-contracts/issues/3706
  */
 abstract contract DebtToken is ERC4626 {
+    using FixedPointMathLib for uint256;
+
     uint256 public realisedDebt;
-    uint256 public borrowCap;
+    uint128 public borrowCap;
 
     /**
      * @notice The constructor for the debt token
@@ -30,7 +33,7 @@ abstract contract DebtToken is ERC4626 {
             string(abi.encodePacked("Arcadia ", asset_.name(), " Debt")),
             string(abi.encodePacked("darc", asset_.symbol()))
         )
-    {}
+    { }
 
     /*//////////////////////////////////////////////////////////////
                             ACCOUNTING LOGIC
@@ -39,8 +42,11 @@ abstract contract DebtToken is ERC4626 {
     /**
      * @notice Returns the total amount of outstanding debt in the underlying asset
      * @return totalDebt The total debt in underlying assets
+     * @dev Implementation overwritten in LendingPool.sol which inherits DebtToken.sol
+     * Implementation not vulnerable to ERC4626 inflation attacks,
+     * totaLAssets() does not rely on balanceOf call.
      */
-    function totalAssets() public view virtual override returns (uint256) {}
+    function totalAssets() public view virtual override returns (uint256) { }
 
     /*//////////////////////////////////////////////////////////////
                         DEPOSIT/WITHDRAWAL LOGIC
@@ -62,9 +68,8 @@ abstract contract DebtToken is ERC4626 {
      * @dev Only the Lending Pool (which inherits this contract) can issue debt
      */
     function _deposit(uint256 assets, address receiver) internal returns (uint256 shares) {
-        // Check for rounding error since we round down in previewDeposit.
-        require((shares = previewDeposit(assets)) != 0, "DT_D: ZERO_SHARES");
-        if (borrowCap > 0) require(balanceOf[receiver] + assets <= borrowCap, "DT_D: BORROW_CAP_EXCEEDED");
+        shares = previewDeposit(assets); // No need to check for rounding error, previewDeposit rounds up.
+        if (borrowCap > 0) require(maxWithdraw(receiver) + assets <= borrowCap, "DT_D: BORROW_CAP_EXCEEDED");
 
         _mint(receiver, shares);
 
@@ -98,7 +103,8 @@ abstract contract DebtToken is ERC4626 {
      * @dev Only the Lending Pool (which inherits this contract) can issue debt
      */
     function _withdraw(uint256 assets, address receiver, address owner_) internal returns (uint256 shares) {
-        shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
+        // Check for rounding error since we round down in previewWithdraw.
+        require((shares = previewWithdraw(assets)) != 0, "DT_W: ZERO_SHARES");
 
         _burn(owner_, shares);
 
@@ -113,6 +119,34 @@ abstract contract DebtToken is ERC4626 {
      */
     function redeem(uint256, address, address) public pure override returns (uint256) {
         revert("DT_R: REDEEM_NOT_SUPPORTED");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                            ACCOUNTING LOGIC
+    //////////////////////////////////////////////////////////////*/
+
+    function convertToShares(uint256 assets) public view override returns (uint256) {
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? assets : assets.mulDivUp(supply, totalAssets());
+    }
+
+    function convertToAssets(uint256 shares) public view override returns (uint256) {
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? shares : shares.mulDivUp(totalAssets(), supply);
+    }
+
+    function previewMint(uint256 shares) public view override returns (uint256) {
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? shares : shares.mulDivDown(totalAssets(), supply);
+    }
+
+    function previewWithdraw(uint256 assets) public view override returns (uint256) {
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? assets : assets.mulDivDown(supply, totalAssets());
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -140,7 +174,7 @@ abstract contract DebtToken is ERC4626 {
      * @dev No public transferFrom allowed
      */
     function transferFrom(address, address, uint256) public pure override returns (bool) {
-        revert("DT_TF: TRANSFERFROM_NOT_SUPPORTED");
+        revert("DT_TF: TRANSFROM_NOT_SUPPORTED");
     }
 
     /**
@@ -150,12 +184,4 @@ abstract contract DebtToken is ERC4626 {
     function permit(address, address, uint256, uint256, uint8, bytes32, bytes32) public pure override {
         revert("DT_TP: PERMIT_NOT_SUPPORTED");
     }
-
-    /* //////////////////////////////////////////////////////////////
-                          INTERNAL HOOKS LOGIC
-    ////////////////////////////////////////////////////////////// */
-
-    function beforeWithdraw(uint256 assets, uint256 shares) internal override {}
-
-    function afterDeposit(uint256 assets, uint256 shares) internal override {}
 }

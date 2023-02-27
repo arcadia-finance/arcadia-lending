@@ -14,7 +14,7 @@ contract Factory {
 
     address[] public allVaults;
 
-    constructor() {}
+    constructor() { }
 
     function createVault(uint256 salt) external returns (address vault) {
         vault = address(

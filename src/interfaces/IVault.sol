@@ -13,17 +13,18 @@ interface IVault {
     function owner() external view returns (address);
 
     /**
-     * @notice Called by trusted applications, checks if the Vault has sufficient free margin.
-     * @param baseCurrency The Base-currency in which the vault is denominated.
-     * @param amount The amount the position is increased.
-     * @return success Boolean indicating if there is sufficient free margin to increase the margin position.
+     * @notice Checks if the Vault is healthy and still has free margin.
+     * @param amount The amount with which the position is increased.
+     * @param totalOpenDebt The total open Debt against the Vault.
+     * @return success Boolean indicating if there is sufficient margin to back a certain amount of Debt.
+     * @dev Only one of the vaules can be non-zero, or we check on a certain increase of debt, or we check on a total amount of debt.
      */
-    function increaseMarginPosition(address baseCurrency, uint256 amount) external returns (bool);
+    function isVaultHealthy(uint256 amount, uint256 totalOpenDebt) external view returns (bool, address);
 
     /**
      * @notice Calls external action handler to execute and interact with external logic.
      * @param actionHandler The address of the action handler.
      * @param actionData A bytes object containing two actionAssetData structs, an address array and a bytes array.
      */
-    function vaultManagementAction(address actionHandler, bytes calldata actionData) external;
+    function vaultManagementAction(address actionHandler, bytes calldata actionData) external returns (address);
 }

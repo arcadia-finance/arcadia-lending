@@ -5,9 +5,10 @@
  * SPDX-License-Identifier: BUSL-1.1
  */
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.13;
 
-import "../../lib/solmate/src/auth/Owned.sol";
+import { Owned } from "../../lib/solmate/src/auth/Owned.sol";
+import { IGuardian } from "../interfaces/IGuardian.sol";
 
 /**
  * @dev This module provides a mechanism that allows authorized accounts to trigger an emergency stop
@@ -44,7 +45,7 @@ abstract contract Guardian is Owned {
     bool public liquidationPaused;
     uint256 public pauseTimestamp;
 
-    constructor() Owned(msg.sender) {}
+    constructor() Owned(msg.sender) { }
 
     /*
     //////////////////////////////////////////////////////////////
@@ -111,8 +112,8 @@ abstract contract Guardian is Owned {
      * @dev Allows onlyOwner to change the guardian address.
      */
     function changeGuardian(address guardian_) external onlyOwner {
-        guardian = guardian_;
         emit GuardianChanged(guardian, guardian_);
+        guardian = guardian_;
     }
 
     /**

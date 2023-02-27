@@ -14,7 +14,7 @@ import "../src/Tranche.sol";
 import "../src/DebtToken.sol";
 
 contract DebtTokenExtension is DebtToken {
-    constructor(ERC20 asset_) DebtToken(asset_) {}
+    constructor(ERC20 asset_) DebtToken(asset_) { }
 
     function deposit_(uint256 assets, address receiver) public returns (uint256 shares) {
         shares = _deposit(assets, receiver);
@@ -93,23 +93,6 @@ contract DepositWithdrawalTest is DebtTokenTest {
         vm.stopPrank();
     }
 
-    function testRevert_deposit_ZeroShares(uint256 assets, address receiver, uint256 totalSupply, uint256 totalDebt)
-        public
-    {
-        vm.assume(assets <= totalDebt);
-        vm.assume(totalSupply > 0); //First mint new shares are issued equal to amount of assets -> error will not throw
-        vm.assume(assets <= type(uint256).max / totalSupply); //Avoid overflow in next assumption
-
-        //Will result in zero shares being created
-        vm.assume(totalDebt > assets * totalSupply);
-
-        stdstore.target(address(debt)).sig(debt.totalSupply.selector).checked_write(totalSupply);
-        stdstore.target(address(debt)).sig(debt.realisedDebt.selector).checked_write(totalDebt);
-
-        vm.expectRevert("DT_D: ZERO_SHARES");
-        debt.deposit_(assets, receiver);
-    }
-
     function testsuccess_deposit_FirstDeposit(uint256 assets, address receiver) public {
         vm.assume(assets > 0);
 
@@ -132,13 +115,14 @@ contract DepositWithdrawalTest is DebtTokenTest {
         vm.assume(totalSupply > 0); //Not first deposit
         vm.assume(assets <= type(uint256).max / totalSupply); //Avoid overflow in next assumption
 
-        //One or more shares are created
-        vm.assume(totalDebt <= assets * totalSupply);
-
         stdstore.target(address(debt)).sig(debt.totalSupply.selector).checked_write(totalSupply);
         stdstore.target(address(debt)).sig(debt.realisedDebt.selector).checked_write(totalDebt);
 
         uint256 shares = assets * totalSupply / totalDebt;
+        if (shares * totalDebt < assets * totalSupply) {
+            //Must round up
+            shares += 1;
+        }
         vm.assume(shares <= type(uint256).max - totalSupply);
 
         debt.deposit_(assets, receiver);
@@ -170,6 +154,23 @@ contract DepositWithdrawalTest is DebtTokenTest {
         vm.stopPrank();
     }
 
+    function testRevert_withdraw_ZeroShares(uint256 assets, address owner, uint256 totalSupply, uint256 totalDebt)
+        public
+    {
+        vm.assume(assets <= totalDebt);
+        vm.assume(totalSupply > 0); //First mint new shares are issued equal to amount of assets -> error will not throw
+        vm.assume(assets <= type(uint256).max / totalSupply); //Avoid overflow in next assumption
+
+        //Will result in zero shares being created
+        vm.assume(totalDebt > assets * totalSupply);
+
+        stdstore.target(address(debt)).sig(debt.totalSupply.selector).checked_write(totalSupply);
+        stdstore.target(address(debt)).sig(debt.realisedDebt.selector).checked_write(totalDebt);
+
+        vm.expectRevert("DT_W: ZERO_SHARES");
+        debt.withdraw_(assets, owner, owner);
+    }
+
     function testSuccess_withdraw(
         uint256 assetsWithdrawn,
         address owner,
@@ -182,12 +183,9 @@ contract DepositWithdrawalTest is DebtTokenTest {
         vm.assume(initialShares <= totalSupply);
         vm.assume(totalSupply > 0);
         vm.assume(assetsWithdrawn <= type(uint256).max / totalSupply); //Avoid overflow in next assumption
+        vm.assume(totalDebt <= assetsWithdrawn * totalSupply);
 
         uint256 sharesRedeemed = assetsWithdrawn * totalSupply / totalDebt;
-        if (sharesRedeemed * totalDebt < assetsWithdrawn * totalSupply) {
-            //Must round up
-            sharesRedeemed += 1;
-        }
         vm.assume(sharesRedeemed <= initialShares);
 
         stdstore.target(address(debt)).sig(debt.balanceOf.selector).with_key(owner).checked_write(initialShares);
@@ -250,7 +248,7 @@ contract TransferTest is DebtTokenTest {
         vm.startPrank(sender);
         // When: sender transferFrom
         // Then: transferFrom should revert with DT_TF: TRANSFERFROM_NOT_SUPPORTED
-        vm.expectRevert("DT_TF: TRANSFERFROM_NOT_SUPPORTED");
+        vm.expectRevert("DT_TF: TRANSFROM_NOT_SUPPORTED");
         debt.transferFrom(from, to, amount);
         vm.stopPrank();
     }

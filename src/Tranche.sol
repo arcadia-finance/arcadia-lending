@@ -6,23 +6,29 @@
  */
 pragma solidity ^0.8.13;
 
-import {Owned} from "../lib/solmate/src/auth/Owned.sol";
-import {ERC4626} from "../lib/solmate/src/mixins/ERC4626.sol";
-import {ILendingPool} from "./interfaces/ILendingPool.sol";
+import { Owned } from "../lib/solmate/src/auth/Owned.sol";
+import { ERC4626 } from "../lib/solmate/src/mixins/ERC4626.sol";
+import { ILendingPool } from "./interfaces/ILendingPool.sol";
+import { FixedPointMathLib } from "../lib/solmate/src/utils/FixedPointMathLib.sol";
+import { ITranche } from "./interfaces/ITranche.sol";
+import { IGuardian } from "./interfaces/IGuardian.sol";
 
 /**
  * @title Tranche
  * @author Arcadia Finance
- * @notice The Logic to provide Lending for a lending pool for a certain ERC20 token
+ * @notice The Tranche contract allows for lending of a specified ERC20 token, managed by a lending pool.
  * @dev Protocol is according the ERC4626 standard, with a certain ERC20 as underlying
  * @dev Implementation not vulnerable to ERC4626 inflation attacks,
  * since totalAssets() cannot be manipulated by first minter when total amount of shares are low.
  * For more information, see https://github.com/OpenZeppelin/openzeppelin-contracts/issues/3706
  */
-contract Tranche is ERC4626, Owned {
+contract Tranche is ITranche, ERC4626, Owned {
+    using FixedPointMathLib for uint256;
+
+    ILendingPool public immutable lendingPool;
+
     bool public locked;
     bool public auctionInProgress;
-    ILendingPool public lendingPool;
 
     modifier notLocked() {
         require(!locked, "TRANCHE: LOCKED");
@@ -42,20 +48,20 @@ contract Tranche is ERC4626, Owned {
 
     /**
      * @notice The constructor for a tranche
-     * @param _lendingPool the Lending Pool of the underlying ERC-20 token, with the lending logic.
-     * @param _prefix The prefix of the contract name (eg. Senior -> Mezzanine -> Junior)
-     * @param _prefixSymbol The prefix of the contract symbol (eg. SR  -> MZ -> JR)
+     * @param lendingPool_ the Lending Pool of the underlying ERC-20 token, with the lending logic.
+     * @param prefix_ The prefix of the contract name (eg. Senior -> Mezzanine -> Junior)
+     * @param prefixSymbol_ The prefix of the contract symbol (eg. SR  -> MZ -> JR)
      * @dev The name and symbol of the tranche are automatically generated, based on the name and symbol of the underlying token
      */
-    constructor(address _lendingPool, string memory _prefix, string memory _prefixSymbol)
+    constructor(address lendingPool_, string memory prefix_, string memory prefixSymbol_)
         ERC4626(
-            ILendingPool(address(_lendingPool)).asset(),
-            string(abi.encodePacked(_prefix, " Arcadia ", ILendingPool(_lendingPool).asset().name())),
-            string(abi.encodePacked(_prefixSymbol, "arc", ILendingPool(_lendingPool).asset().symbol()))
+            ERC4626(address(lendingPool_)).asset(),
+            string(abi.encodePacked(prefix_, " Arcadia ", ERC4626(lendingPool_).asset().name())),
+            string(abi.encodePacked(prefixSymbol_, "arc", ERC4626(lendingPool_).asset().symbol()))
         )
         Owned(msg.sender)
     {
-        lendingPool = ILendingPool(_lendingPool);
+        lendingPool = ILendingPool(lendingPool_);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -63,7 +69,7 @@ contract Tranche is ERC4626, Owned {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Locks the tranche in case all liquidity of the tranche is written of due to bad debt
+     * @notice Locks the tranche in case all liquidity of the tranche is written off due to bad debt
      * @dev Only the Lending Pool can call this function, only trigger is a severe default event.
      */
     function lock() external {
@@ -87,9 +93,9 @@ contract Tranche is ERC4626, Owned {
      * This function is to make sure no JIT liquidity is provided during a positive auction,
      * and that no liquidity can be withdrawn during a negative auction.
      */
-    function setAuctionInProgress(bool _auctionInProgress) external {
+    function setAuctionInProgress(bool auctionInProgress_) external {
         require(msg.sender == address(lendingPool), "T_SAIP: UNAUTHORIZED");
-        auctionInProgress = _auctionInProgress;
+        auctionInProgress = auctionInProgress_;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -101,7 +107,7 @@ contract Tranche is ERC4626, Owned {
      * @param assets The amount of assets of the underlying ERC-20 token being deposited
      * @param receiver The address that receives the minted shares.
      * @return shares The amount of shares minted
-     * @dev This contract does not directly transfers the underlying assets from the sender to the receiver.
+     * @dev This contract does not directly transfer the underlying assets from the sender to the receiver.
      * Instead it calls the deposit of the Lending Pool which calls the transferFrom of the underlying assets.
      * Hence the sender should not give this contract an allowance to transfer the underlying asset but the Lending Pool.
      */
@@ -112,9 +118,8 @@ contract Tranche is ERC4626, Owned {
         notDuringAuction
         returns (uint256 shares)
     {
-        //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
         // Check for rounding error since we round down in previewDeposit.
-        require((shares = previewDeposit(assets)) != 0, "T_D: ZERO_SHARES");
+        require((shares = previewDepositAndSync(assets)) != 0, "T_D: ZERO_SHARES");
 
         // Need to transfer (via lendingPool.depositInLendingPool()) before minting or ERC777s could reenter.
         lendingPool.depositInLendingPool(assets, msg.sender);
@@ -140,8 +145,7 @@ contract Tranche is ERC4626, Owned {
         notDuringAuction
         returns (uint256 assets)
     {
-        //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
-        assets = previewMint(shares); // No need to check for rounding error, previewMint rounds up.
+        assets = previewMintAndSync(shares); // No need to check for rounding error, previewMint rounds up.
 
         // Need to transfer (via lendingPool.depositInLendingPool()) before minting or ERC777s could reenter.
         lendingPool.depositInLendingPool(assets, msg.sender);
@@ -165,8 +169,7 @@ contract Tranche is ERC4626, Owned {
         notDuringAuction
         returns (uint256 shares)
     {
-        //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
-        shares = previewWithdraw(assets); // No need to check for rounding error, previewWithdraw rounds up.
+        shares = previewWithdrawAndSync(assets); // No need to check for rounding error, previewWithdraw rounds up.
 
         if (msg.sender != owner_) {
             uint256 allowed = allowance[owner_][msg.sender]; // Saves gas for limited approvals.
@@ -205,9 +208,8 @@ contract Tranche is ERC4626, Owned {
             }
         }
 
-        //ToDo: Interest should be synced here, now interests are calculated two times (previewWithdraw() and withdrawFromLendingPool())
         // Check for rounding error since we round down in previewRedeem.
-        require((assets = previewRedeem(shares)) != 0, "T_R: ZERO_ASSETS");
+        require((assets = previewRedeemAndSync(shares)) != 0, "T_R: ZERO_ASSETS");
 
         _burn(owner_, shares);
 
@@ -229,11 +231,125 @@ contract Tranche is ERC4626, Owned {
         assets = lendingPool.liquidityOf(address(this));
     }
 
+    /**
+     * @dev Modification of totalAssets() where interests are realised (state modification).
+     */
+    function totalAssetsAndSync() public returns (uint256 assets) {
+        assets = lendingPool.liquidityOfAndSync(address(this));
+    }
+
+    /**
+     * @dev Modification of convertToShares() where interests are realised (state modification).
+     */
+    function convertToSharesAndSync(uint256 assets) public returns (uint256) {
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? assets : assets.mulDivDown(supply, totalAssetsAndSync());
+    }
+
+    /**
+     * @dev Modification of convertToAssets() where interests are realised (state modification).
+     */
+    function convertToAssetsAndSync(uint256 shares) public returns (uint256) {
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? shares : shares.mulDivDown(totalAssetsAndSync(), supply);
+    }
+
+    /**
+     * @dev Modification of previewDeposit() where interests are realised (state modification).
+     */
+    function previewDepositAndSync(uint256 assets) public returns (uint256) {
+        return convertToSharesAndSync(assets);
+    }
+
+    /**
+     * @dev Modification of previewMint() where interests are realised (state modification).
+     */
+    function previewMintAndSync(uint256 shares) public returns (uint256) {
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? shares : shares.mulDivUp(totalAssetsAndSync(), supply);
+    }
+
+    /**
+     * @dev Modification of previewWithdraw() where interests are realised (state modification).
+     */
+    function previewWithdrawAndSync(uint256 assets) public returns (uint256) {
+        uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
+
+        return supply == 0 ? assets : assets.mulDivUp(supply, totalAssetsAndSync());
+    }
+
+    /**
+     * @dev Modification of previewRedeem() where interests are realised (state modification).
+     */
+    function previewRedeemAndSync(uint256 shares) public returns (uint256) {
+        return convertToAssetsAndSync(shares);
+    }
+
     /*//////////////////////////////////////////////////////////////
-                          INTERNAL HOOKS LOGIC
+                     DEPOSIT/WITHDRAWAL LIMIT LOGIC
     //////////////////////////////////////////////////////////////*/
 
-    function beforeWithdraw(uint256 assets, uint256 shares) internal override {}
+    /**
+     * @dev maxDeposit() according the EIP-4626 specification.
+     */
+    function maxDeposit(address) public view override returns (uint256 maxAssets) {
+        if (locked || auctionInProgress || IGuardian(address(lendingPool)).depositPaused()) return 0;
 
-    function afterDeposit(uint256 assets, uint256 shares) internal override {}
+        uint256 supplyCap = lendingPool.supplyCap();
+        uint256 realisedLiquidity = lendingPool.totalRealisedLiquidity();
+        uint256 interests = lendingPool.calcUnrealisedDebt();
+
+        if (supplyCap > 0) {
+            if (realisedLiquidity + interests > supplyCap) return 0;
+            maxAssets = supplyCap - realisedLiquidity - interests;
+        } else {
+            maxAssets = type(uint128).max - realisedLiquidity - interests;
+        }
+    }
+
+    /**
+     * @dev maxMint() according the EIP-4626 specification.
+     */
+    function maxMint(address) public view override returns (uint256 maxShares) {
+        if (locked || auctionInProgress || IGuardian(address(lendingPool)).depositPaused()) return 0;
+
+        uint256 supplyCap = lendingPool.supplyCap();
+        uint256 realisedLiquidity = lendingPool.totalRealisedLiquidity();
+        uint256 interests = lendingPool.calcUnrealisedDebt();
+
+        if (supplyCap > 0) {
+            if (realisedLiquidity + interests > supplyCap) return 0;
+            maxShares = convertToShares(supplyCap - realisedLiquidity - interests);
+        } else {
+            maxShares = convertToShares(type(uint128).max - realisedLiquidity - interests);
+        }
+    }
+
+    /**
+     * @dev maxWithdraw() according the EIP-4626 specification.
+     */
+    function maxWithdraw(address owner_) public view override returns (uint256 maxAssets) {
+        if (locked || auctionInProgress || IGuardian(address(lendingPool)).withdrawPaused()) return 0;
+
+        uint256 availableAssets = asset.balanceOf(address(lendingPool));
+        uint256 claimableAssets = convertToAssets(balanceOf[owner_]);
+
+        maxAssets = availableAssets < claimableAssets ? availableAssets : claimableAssets;
+    }
+
+    /**
+     * @dev maxRedeem() according the EIP-4626 specification.
+     */
+    function maxRedeem(address owner_) public view override returns (uint256 maxShares) {
+        if (locked || auctionInProgress || IGuardian(address(lendingPool)).withdrawPaused()) return 0;
+
+        uint256 claimableShares = balanceOf[owner_];
+        if (claimableShares == 0) return 0;
+        uint256 availableShares = convertToShares(asset.balanceOf(address(lendingPool)));
+
+        maxShares = availableShares < claimableShares ? availableShares : claimableShares;
+    }
 }

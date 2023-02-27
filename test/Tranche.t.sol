@@ -13,10 +13,21 @@ import "../src/mocks/Factory.sol";
 import "../src/Tranche.sol";
 import "../src/DebtToken.sol";
 
+contract LendingPoolExtension is LendingPool {
+    //Extensions to test internal functions of set packed state variables
+    constructor(ERC20 _asset, address _treasury, address _vaultFactory, address _liquidator)
+        LendingPool(_asset, _treasury, _vaultFactory, _liquidator)
+    { }
+
+    function setTotalRealisedLiquidity(uint128 totalRealisedLiquidity_) public {
+        totalRealisedLiquidity = totalRealisedLiquidity_;
+    }
+}
+
 abstract contract TrancheTest is Test {
     Asset asset;
     Factory factory;
-    LendingPool pool;
+    LendingPoolExtension pool;
     Tranche tranche;
     Tranche jrTranche;
     DebtToken debt;
@@ -44,7 +55,7 @@ abstract contract TrancheTest is Test {
     //Before Each
     function setUp() public virtual {
         vm.startPrank(creator);
-        pool = new LendingPool(asset, treasury, address(factory));
+        pool = new LendingPoolExtension(asset, treasury, address(factory), address(0));
 
         tranche = new Tranche(address(pool), "Senior", "SR");
         pool.addTranche(address(tranche), 50, 0);
@@ -223,6 +234,23 @@ contract DepositAndWithdrawalTest is TrancheTest {
         assertEq(tranche.maxRedeem(receiver), assets);
         assertEq(tranche.totalAssets(), assets);
         assertEq(asset.balanceOf(address(pool)), assets);
+    }
+
+    function testSuccess_deposit_sync(uint128 assets, address receiver) public {
+        // Given: assets bigger than 0
+        vm.assume(assets > 3);
+
+        vm.prank(liquidityProvider);
+        tranche.deposit(assets / 3, receiver);
+
+        vm.prank(liquidityProvider);
+        tranche.deposit(assets / 3, receiver);
+
+        vm.warp(500);
+
+        vm.prank(liquidityProvider);
+        vm.expectCall(address(pool), abi.encodeWithSignature("liquidityOfAndSync(address)", address(tranche)));
+        tranche.deposit(assets / 3, receiver);
     }
 
     function testRevert_mint_Locked(uint128 shares, address receiver) public {
@@ -659,5 +687,386 @@ contract AccountingTest is TrancheTest {
         );
 
         assertEq(tranche.totalAssets(), assets);
+    }
+}
+
+/*//////////////////////////////////////////////////////////////
+                     DEPOSIT/WITHDRAWAL LIMIT LOGIC
+    //////////////////////////////////////////////////////////////*/
+contract DepositAndWithdrawalLimitTest is TrancheTest {
+    using stdStorage for StdStorage;
+
+    function setUp() public override {
+        super.setUp();
+    }
+
+    function testSuccess_maxDeposit_Locked(address receiver) public {
+        vm.prank(address(pool));
+        tranche.lock();
+
+        assertEq(tranche.maxDeposit(receiver), 0);
+    }
+
+    function testSuccess_maxDeposit_AuctionInProgress(address receiver) public {
+        vm.prank(address(pool));
+        tranche.setAuctionInProgress(true);
+
+        assertEq(tranche.maxDeposit(receiver), 0);
+    }
+
+    function testSuccess_maxDeposit_Paused(address receiver) public {
+        vm.warp(35 days);
+        vm.startPrank(creator);
+        pool.changeGuardian(creator);
+        pool.pause();
+        vm.stopPrank();
+
+        assertEq(tranche.maxDeposit(receiver), 0);
+    }
+
+    function testSuccess_maxDeposit_SupplyCapExceeded(address receiver, uint128 supplyCap, uint128 totalLiquidity)
+        public
+    {
+        vm.assume(supplyCap > 0);
+        vm.assume(supplyCap < totalLiquidity);
+
+        vm.prank(creator);
+        pool.setSupplyCap(supplyCap);
+        pool.setTotalRealisedLiquidity(totalLiquidity);
+
+        assertEq(tranche.maxDeposit(receiver), 0);
+    }
+
+    function testSuccess_maxDeposit_WithSupplyCap(address receiver, uint128 supplyCap, uint128 totalLiquidity) public {
+        vm.assume(supplyCap > 0);
+        vm.assume(supplyCap >= totalLiquidity);
+
+        vm.prank(creator);
+        pool.setSupplyCap(supplyCap);
+        pool.setTotalRealisedLiquidity(totalLiquidity);
+
+        assertEq(tranche.maxDeposit(receiver), supplyCap - totalLiquidity);
+    }
+
+    function testSuccess_maxDeposit_WithoutSupplyCap(address receiver, uint128 totalLiquidity) public {
+        pool.setTotalRealisedLiquidity(totalLiquidity);
+
+        vm.prank(creator);
+        pool.setSupplyCap(0);
+
+        assertEq(tranche.maxDeposit(receiver), type(uint128).max - totalLiquidity);
+    }
+
+    function testSuccess_maxMint_Locked(address receiver) public {
+        vm.prank(address(pool));
+        tranche.lock();
+
+        assertEq(tranche.maxMint(receiver), 0);
+    }
+
+    function testSuccess_maxMint_AuctionInProgress(address receiver) public {
+        vm.prank(address(pool));
+        tranche.setAuctionInProgress(true);
+
+        assertEq(tranche.maxMint(receiver), 0);
+    }
+
+    function testSuccess_maxMint_Paused(address receiver) public {
+        vm.warp(35 days);
+        vm.startPrank(creator);
+        pool.changeGuardian(creator);
+        pool.pause();
+        vm.stopPrank();
+
+        assertEq(tranche.maxMint(receiver), 0);
+    }
+
+    function testSuccess_maxMint_SupplyCapExceeded(address receiver, uint128 supplyCap, uint128 totalLiquidity)
+        public
+    {
+        vm.assume(supplyCap > 0);
+        vm.assume(supplyCap < totalLiquidity);
+
+        vm.prank(creator);
+        pool.setSupplyCap(supplyCap);
+        pool.setTotalRealisedLiquidity(totalLiquidity);
+
+        assertEq(tranche.maxMint(receiver), 0);
+    }
+
+    function testSuccess_maxMint_WithSupplyCapZeroSupply(
+        address receiver,
+        uint128 supplyCap,
+        uint128 totalLiquidity,
+        uint128 liquidityOf
+    ) public {
+        vm.assume(supplyCap > 0);
+        vm.assume(liquidityOf > 0);
+        vm.assume(supplyCap >= totalLiquidity);
+        vm.assume(liquidityOf <= totalLiquidity);
+
+        vm.prank(creator);
+        pool.setSupplyCap(supplyCap);
+        pool.setTotalRealisedLiquidity(totalLiquidity);
+        stdstore.target(address(pool)).sig(pool.realisedLiquidityOf.selector).with_key(address(tranche)).checked_write(
+            liquidityOf
+        );
+
+        uint256 maxAssets = supplyCap - totalLiquidity;
+        uint256 maxShares = maxAssets;
+
+        assertEq(tranche.maxMint(receiver), maxShares);
+    }
+
+    function testSuccess_maxMint_WithSupplyCapNonZeroShares(
+        address receiver,
+        uint128 supplyCap,
+        uint128 totalLiquidity,
+        uint128 liquidityOf,
+        uint128 totalShares
+    ) public {
+        vm.assume(supplyCap > 0);
+        vm.assume(liquidityOf > 0);
+        vm.assume(totalShares > 0);
+        vm.assume(supplyCap >= totalLiquidity);
+        vm.assume(liquidityOf <= totalLiquidity);
+
+        vm.prank(creator);
+        pool.setSupplyCap(supplyCap);
+        pool.setTotalRealisedLiquidity(totalLiquidity);
+        stdstore.target(address(pool)).sig(pool.realisedLiquidityOf.selector).with_key(address(tranche)).checked_write(
+            liquidityOf
+        );
+        stdstore.target(address(tranche)).sig(pool.totalSupply.selector).checked_write(totalShares);
+
+        uint256 maxAssets = supplyCap - totalLiquidity;
+        uint256 maxShares = maxAssets * totalShares / liquidityOf;
+
+        assertEq(tranche.maxMint(receiver), maxShares);
+    }
+
+    function testSuccess_maxMint_WithoutSupplyCapZeroSupply(
+        address receiver,
+        uint128 totalLiquidity,
+        uint128 liquidityOf
+    ) public {
+        vm.assume(liquidityOf > 0);
+        vm.assume(liquidityOf <= totalLiquidity);
+
+        vm.prank(creator);
+        pool.setTotalRealisedLiquidity(totalLiquidity);
+        stdstore.target(address(pool)).sig(pool.realisedLiquidityOf.selector).with_key(address(tranche)).checked_write(
+            liquidityOf
+        );
+
+        uint256 maxAssets = type(uint128).max - totalLiquidity;
+        uint256 maxShares = maxAssets;
+
+        assertEq(tranche.maxMint(receiver), maxShares);
+    }
+
+    function testSuccess_maxMint_WithoutSupplyCapNonZeroShares(
+        address receiver,
+        uint128 totalLiquidity,
+        uint128 liquidityOf,
+        uint128 totalShares
+    ) public {
+        vm.assume(liquidityOf > 0);
+        vm.assume(totalShares > 0);
+        vm.assume(liquidityOf <= totalLiquidity);
+
+        vm.prank(creator);
+        pool.setTotalRealisedLiquidity(totalLiquidity);
+        stdstore.target(address(pool)).sig(pool.realisedLiquidityOf.selector).with_key(address(tranche)).checked_write(
+            liquidityOf
+        );
+        stdstore.target(address(tranche)).sig(pool.totalSupply.selector).checked_write(totalShares);
+
+        uint256 maxAssets = type(uint128).max - totalLiquidity;
+        uint256 maxShares = maxAssets * totalShares / liquidityOf;
+
+        assertEq(tranche.maxMint(receiver), maxShares);
+    }
+
+    function testSuccess_maxWithdraw_Locked(address owner) public {
+        vm.prank(address(pool));
+        tranche.lock();
+
+        assertEq(tranche.maxWithdraw(owner), 0);
+    }
+
+    function testSuccess_maxWithdraw_AuctionInProgress(address owner) public {
+        vm.prank(address(pool));
+        tranche.setAuctionInProgress(true);
+
+        assertEq(tranche.maxWithdraw(owner), 0);
+    }
+
+    function testSuccess_maxWithdraw_Paused(address owner) public {
+        vm.warp(35 days);
+        vm.startPrank(creator);
+        pool.changeGuardian(creator);
+        pool.pause();
+        vm.stopPrank();
+
+        assertEq(tranche.maxWithdraw(owner), 0);
+    }
+
+    function testSuccess_maxWithdraw_LimitedByShares(
+        address owner,
+        uint128 shares,
+        uint128 totalShares,
+        uint128 totalLiquidity,
+        uint128 claimableLiquidityOfTranche,
+        uint128 availableLiquidityOfTranche
+    ) public {
+        vm.assume(shares <= totalShares);
+        vm.assume(claimableLiquidityOfTranche <= totalLiquidity);
+        vm.assume(availableLiquidityOfTranche <= totalLiquidity);
+
+        stdstore.target(address(tranche)).sig(pool.balanceOf.selector).with_key(owner).checked_write(shares);
+        stdstore.target(address(tranche)).sig(pool.totalSupply.selector).checked_write(totalShares);
+        pool.setTotalRealisedLiquidity(totalLiquidity);
+        stdstore.target(address(pool)).sig(pool.realisedLiquidityOf.selector).with_key(address(tranche)).checked_write(
+            claimableLiquidityOfTranche
+        );
+        stdstore.target(address(asset)).sig(pool.balanceOf.selector).with_key(address(pool)).checked_write(
+            availableLiquidityOfTranche
+        );
+
+        uint256 claimableAssets;
+        if (shares == 0) {
+            claimableAssets = 0;
+        } else {
+            claimableAssets = uint256(shares) * claimableLiquidityOfTranche / totalShares;
+        }
+        vm.assume(availableLiquidityOfTranche >= claimableAssets);
+
+        assertEq(tranche.maxWithdraw(owner), claimableAssets);
+    }
+
+    function testSuccess_maxWithdraw_LimitedByUnderlyingAssets(
+        address owner,
+        uint128 shares,
+        uint128 totalShares,
+        uint128 totalLiquidity,
+        uint128 claimableLiquidityOfTranche,
+        uint128 availableLiquidityOfTranche
+    ) public {
+        vm.assume(shares <= totalShares);
+        vm.assume(claimableLiquidityOfTranche <= totalLiquidity);
+        vm.assume(availableLiquidityOfTranche <= totalLiquidity);
+
+        stdstore.target(address(tranche)).sig(pool.balanceOf.selector).with_key(owner).checked_write(shares);
+        stdstore.target(address(tranche)).sig(pool.totalSupply.selector).checked_write(totalShares);
+        pool.setTotalRealisedLiquidity(totalLiquidity);
+        stdstore.target(address(pool)).sig(pool.realisedLiquidityOf.selector).with_key(address(tranche)).checked_write(
+            claimableLiquidityOfTranche
+        );
+        stdstore.target(address(asset)).sig(pool.balanceOf.selector).with_key(address(pool)).checked_write(
+            availableLiquidityOfTranche
+        );
+
+        uint256 claimableAssets;
+        if (shares == 0) {
+            claimableAssets = 0;
+        } else {
+            claimableAssets = uint256(shares) * claimableLiquidityOfTranche / totalShares;
+        }
+        vm.assume(availableLiquidityOfTranche <= claimableAssets);
+
+        assertEq(tranche.maxWithdraw(owner), availableLiquidityOfTranche);
+    }
+
+    function testSuccess_maxRedeem_Locked(address owner) public {
+        vm.prank(address(pool));
+        tranche.lock();
+
+        assertEq(tranche.maxRedeem(owner), 0);
+    }
+
+    function testSuccess_maxRedeem_AuctionInProgress(address owner) public {
+        vm.prank(address(pool));
+        tranche.setAuctionInProgress(true);
+
+        assertEq(tranche.maxRedeem(owner), 0);
+    }
+
+    function testSuccess_maxRedeem_Paused(address owner) public {
+        vm.warp(35 days);
+        vm.startPrank(creator);
+        pool.changeGuardian(creator);
+        pool.pause();
+        vm.stopPrank();
+
+        assertEq(tranche.maxRedeem(owner), 0);
+    }
+
+    function testSuccess_maxRedeem_LimitedByShares(
+        address owner,
+        uint128 shares,
+        uint128 totalShares,
+        uint128 totalLiquidity,
+        uint128 claimableLiquidityOfTranche,
+        uint128 availableLiquidityOfTranche
+    ) public {
+        vm.assume(shares <= totalShares);
+        vm.assume(claimableLiquidityOfTranche <= totalLiquidity);
+        vm.assume(availableLiquidityOfTranche <= totalLiquidity);
+        if (totalShares > 0) vm.assume(claimableLiquidityOfTranche > 0);
+
+        stdstore.target(address(tranche)).sig(pool.balanceOf.selector).with_key(owner).checked_write(shares);
+        stdstore.target(address(tranche)).sig(pool.totalSupply.selector).checked_write(totalShares);
+        pool.setTotalRealisedLiquidity(totalLiquidity);
+        stdstore.target(address(pool)).sig(pool.realisedLiquidityOf.selector).with_key(address(tranche)).checked_write(
+            claimableLiquidityOfTranche
+        );
+        stdstore.target(address(asset)).sig(pool.balanceOf.selector).with_key(address(pool)).checked_write(
+            availableLiquidityOfTranche
+        );
+
+        uint256 availableShares;
+        if (claimableLiquidityOfTranche == 0) {
+            availableShares = 0;
+        } else {
+            availableShares = uint256(availableLiquidityOfTranche) * totalShares / claimableLiquidityOfTranche;
+        }
+        vm.assume(availableShares >= shares);
+
+        assertEq(tranche.maxRedeem(owner), shares);
+    }
+
+    function testSuccess_maxRedeem_LimitedByUnderlyingAssets(
+        address owner,
+        uint128 shares,
+        uint128 totalShares,
+        uint128 totalLiquidity,
+        uint128 claimableLiquidityOfTranche,
+        uint128 availableLiquidityOfTranche
+    ) public {
+        vm.assume(shares <= totalShares);
+        vm.assume(claimableLiquidityOfTranche <= totalLiquidity);
+        vm.assume(availableLiquidityOfTranche <= totalLiquidity);
+        if (totalShares > 0) vm.assume(claimableLiquidityOfTranche > 0);
+
+        stdstore.target(address(tranche)).sig(pool.balanceOf.selector).with_key(owner).checked_write(shares);
+        stdstore.target(address(tranche)).sig(pool.totalSupply.selector).checked_write(totalShares);
+        pool.setTotalRealisedLiquidity(totalLiquidity);
+        stdstore.target(address(pool)).sig(pool.realisedLiquidityOf.selector).with_key(address(tranche)).checked_write(
+            claimableLiquidityOfTranche
+        );
+        stdstore.target(address(asset)).sig(pool.balanceOf.selector).with_key(address(pool)).checked_write(
+            availableLiquidityOfTranche
+        );
+
+        uint256 availableShares;
+        if (claimableLiquidityOfTranche == 0) {
+            availableShares = 0;
+        } else {
+            availableShares = uint256(availableLiquidityOfTranche) * totalShares / claimableLiquidityOfTranche;
+        }
+        vm.assume(availableShares <= shares);
+
+        assertEq(tranche.maxRedeem(owner), availableShares);
     }
 }
