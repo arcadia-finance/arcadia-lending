@@ -272,7 +272,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         unchecked {
             realisedLiquidityOf[msg.sender] += assets;
-            totalRealisedLiquidity += uint128(assets); //we know that the sum is <MAXUINT128 from l266
+            totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
         }
     }
 
@@ -301,7 +301,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         unchecked {
             realisedLiquidityOf[tranche] += assets; //[̲̅$̲̅(̲̅ ͡° ͜ʖ ͡°̲̅)̲̅$̲̅]
-            totalRealisedLiquidity += uint128(assets); //we know that the sum is <MAXUINT128 from l292
+            totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
         }
     }
 
@@ -373,20 +373,22 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         }
 
         //Mint debt tokens to the vault
-        if (amountWithFee != 0) {
-            _deposit(amountWithFee, vault);
+        _deposit(amountWithFee, vault);
 
-            //Call vault to check if it is still healthy after the debt is increased with amountWithFee.
-            (bool isHealthy, address trustedCreditor) = IVault(vault).isVaultHealthy(0, maxWithdraw(vault));
-            require(isHealthy && trustedCreditor == address(this), "LP_B: Reverted");
-
-            //Transfer fails if there is insufficient liquidity in the pool
-            asset.safeTransfer(to, amount);
-
+        //Add origination fee to the treasury
+        unchecked {
+            totalRealisedLiquidity += SafeCastLib.safeCastTo128(amountWithFee - amount);
             realisedLiquidityOf[treasury] += amountWithFee - amount;
-
-            emit Borrow(vault, referrer, amountWithFee);
         }
+
+        //Call vault to check if it is still healthy after the debt is increased with amountWithFee.
+        (bool isHealthy, address trustedCreditor) = IVault(vault).isVaultHealthy(0, maxWithdraw(vault));
+        require(isHealthy && trustedCreditor == address(this), "LP_B: Reverted");
+
+        //Transfer fails if there is insufficient liquidity in the pool
+        asset.safeTransfer(to, amount);
+
+        emit Borrow(vault, referrer, amountWithFee);
     }
 
     /**
@@ -441,17 +443,19 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             require(creditAllowance[vault][vaultOwner][msg.sender] == type(uint256).max, "LP_DAWL: UNAUTHORIZED");
         }
 
-        if (amountBorrowedWithFee != 0) {
-            //Mint debt tokens to the vault, debt must be minted Before the actions in the vault are performed.
-            _deposit(amountBorrowedWithFee, vault);
+        //Mint debt tokens to the vault, debt must be minted Before the actions in the vault are performed.
+        _deposit(amountBorrowedWithFee, vault);
 
-            //Send Borrowed funds to the actionHandler
-            asset.safeTransfer(actionHandler, amountBorrowed);
-
+        //Add origination fee to the treasury
+        unchecked {
+            totalRealisedLiquidity += SafeCastLib.safeCastTo128(amountBorrowedWithFee - amountBorrowed);
             realisedLiquidityOf[treasury] += amountBorrowedWithFee - amountBorrowed;
-
-            emit Borrow(vault, referrer, amountBorrowedWithFee);
         }
+
+        //Send Borrowed funds to the actionHandler
+        asset.safeTransfer(actionHandler, amountBorrowed);
+
+        emit Borrow(vault, referrer, amountBorrowedWithFee);
 
         //The actionhandler will use the borrowed funds (optionally with additional assets previously deposited in the Vault)
         //to excecute one or more actions (swap, deposit, mint...).
