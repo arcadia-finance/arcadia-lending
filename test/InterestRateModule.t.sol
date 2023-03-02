@@ -104,7 +104,7 @@ contract InterestRateModuleTest is Test {
 
         assertTrue(expectedInterestRate <= type(uint80).max);
 
-        vm.expectEmit(false, false, false, false);
+        vm.expectEmit(true, true, true, true);
         emit InterestRate(uint80(expectedInterestRate));
         interest.updateInterestRate(realisedDebt_, totalRealisedLiquidity_);
         uint256 actualInterestRate = interest.interestRate();
@@ -137,10 +137,13 @@ contract InterestRateModuleTest is Test {
         interest.setInterestConfig(config);
         // And: The interest is set for a certain combination of realisedDebt_ and totalRealisedLiquidity_
         interest.updateInterestRate(realisedDebt_, totalRealisedLiquidity_);
-        // And: actualInterestRate is interestRate from InterestRateModule contract
-        uint256 actualInterestRate = interest.interestRate();
 
         uint256 expectedInterestRate = baseRate_;
+
+        vm.expectEmit(true, true, true, true);
+        emit InterestRate(uint80(expectedInterestRate));
+        interest.updateInterestRate(realisedDebt_, totalRealisedLiquidity_);
+        uint256 actualInterestRate = interest.interestRate();
 
         // Then: actualInterestRate should be equal to expectedInterestRate
         assertEq(actualInterestRate, expectedInterestRate);
@@ -200,15 +203,15 @@ contract InterestRateModuleTest is Test {
         // When: The InterestConfiguration is set
         interest.setInterestConfig(config);
 
-        // And: actualInterestRate is calculateInterestRate with utilisation
-        uint256 actualInterestRate = interest.calculateInterestRate(utilisation);
-
         // And: lowSlopeInterest is utilisationThreshold multiplied by lowSlope, highSlopeInterest is utilisation minus utilisationThreshold multiplied by highSlope
         uint256 lowSlopeInterest = uint256(utilisationThreshold_) * lowSlope_;
         uint256 highSlopeInterest = uint256(utilisation - utilisationThreshold_) * highSlope_;
 
         // And: expectedInterestRate is baseRate added to lowSlopeInterest added to highSlopeInterest divided by divided by 100000
         uint256 expectedInterestRate = uint256(baseRate_) + (lowSlopeInterest + highSlopeInterest) / 100_000;
+
+        // And: actualInterestRate is calculateInterestRate with utilisation
+        uint256 actualInterestRate = interest.calculateInterestRate(utilisation);
 
         // Then: actualInterestRate should be equal to expectedInterestRate
         assertEq(actualInterestRate, expectedInterestRate);
