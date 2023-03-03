@@ -72,7 +72,6 @@ abstract contract TrancheTest is Test {
                         DEPLOYMENT
 //////////////////////////////////////////////////////////////*/
 contract DeploymentTest is TrancheTest {
-
     function setUp() public override {
         super.setUp();
     }
