@@ -30,6 +30,9 @@ contract Tranche is ITranche, ERC4626, Owned {
     bool public locked;
     bool public auctionInProgress;
 
+    event LockSet(bool status);
+    event AuctionFlagSet(bool status);
+
     modifier notLocked() {
         require(!locked, "TRANCHE: LOCKED");
         _;
@@ -76,6 +79,9 @@ contract Tranche is ITranche, ERC4626, Owned {
         require(msg.sender == address(lendingPool), "T_L: UNAUTHORIZED");
         locked = true;
         auctionInProgress = false;
+
+        emit LockSet(true);
+        emit AuctionFlagSet(false);
     }
 
     /**
@@ -85,6 +91,8 @@ contract Tranche is ITranche, ERC4626, Owned {
      */
     function unLock() external onlyOwner {
         locked = false;
+
+        emit LockSet(false);
     }
 
     /**
@@ -96,6 +104,8 @@ contract Tranche is ITranche, ERC4626, Owned {
     function setAuctionInProgress(bool auctionInProgress_) external {
         require(msg.sender == address(lendingPool), "T_SAIP: UNAUTHORIZED");
         auctionInProgress = auctionInProgress_;
+
+        emit AuctionFlagSet(auctionInProgress_);
     }
 
     /*//////////////////////////////////////////////////////////////
