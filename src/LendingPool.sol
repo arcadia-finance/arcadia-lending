@@ -21,46 +21,80 @@ import { InterestRateModule, DataTypes } from "./InterestRateModule.sol";
 import { Guardian } from "./security/Guardian.sol";
 
 /**
- * @title The Arcadia Lending Pool contract provides liquidity against positions backed by Arcadia Vaults as collateral.
+ * @title The Arcadia Lending Pool provides liquidity to borrowers, positions are backed by Arcadia Vaults as collateral.
  * @author Arcadia Finance
  * @notice The Lending pool contains the main logic to provide liquidity and take or repay loans for a certain asset
  * and does the accounting of the debtTokens (ERC4626).
  * @dev Implementation not vulnerable to ERC4626 inflation attacks,
- * since totalAssets() cannot be manipulated by first minter when total amount of shares are low.
+ * since totalAssets() cannot be manipulated by the first minter.
  * For more information, see https://github.com/OpenZeppelin/openzeppelin-contracts/issues/3706
  */
 contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule, ILendingPool {
     using SafeTransferLib for ERC20;
     using FixedPointMathLib for uint256;
 
-    // @dev based on 365 days * 24 hours * 60 minutes * 60 seconds, leap years ignored
+    /* //////////////////////////////////////////////////////////////
+                                STORAGE
+    ////////////////////////////////////////////////////////////// */
+
+    // Seconds per year, leap years ignored.
     uint256 public constant YEARLY_SECONDS = 31_536_000;
+    // Contract address of the Arcadia Vault Factory.
     address public immutable vaultFactory;
-    address public immutable liquidator; //address of the liquidator contract
+    // Contract address of the Liquidator contract.
+    address public immutable liquidator;
 
-    uint32 public lastSyncedTimestamp; //last time that interests were realised
-    uint8 public originationFee; //4 decimals precision (10 equals 0.001 or 0.1%), 255 = 2.55% max
-    uint24 public totalInterestWeight; //sum of the interestweights of the tranches + treasury
-    uint16 public interestWeightTreasury; //fraction of the interestfees that goes to the tresury
-    uint24 public totalLiquidationWeight; //sum of the liquidationweights of the tranches + treasury
-    uint16 public liquidationWeightTreasury; //fraction of the liquidation fees that goes to the tresury
+    // Last timestamp that interests were realized.
+    uint32 public lastSyncedTimestamp;
+    // Origination fee, 4 decimals precision (10 equals 0.001 or 0.1%), capped at 255 (2.55%).
+    uint8 public originationFee;
+    // Sum of all the interest weights of the tranches + treasury.
+    uint24 public totalInterestWeight;
+    // Fraction (interestWeightTreasury / totalInterestWeight) of the interest fees that go to the treasury.
+    uint16 public interestWeightTreasury;
+    // Sum of the liquidation weights of the tranches + treasury.
+    uint24 public totalLiquidationWeight;
+    // Fraction (liquidationWeightTreasury / totalLiquidationWeight) of the liquidation fees that goes to the treasury.
+    uint16 public liquidationWeightTreasury;
 
-    uint128 public totalRealisedLiquidity; //total amount of `asset` that is claimable by the LPs
-    uint128 public supplyCap; //max amount of `asset` that can be supplied to the pool
-    uint80 public maxInitiatorFee; //max fee that is paid to the initiator of a liquidation, in àsset` decimals
-    uint16 public auctionsInProgress; //number of auctions that are currently in progress
+    // Total amount of `underlying asset` that is claimable by the LPs. Does not take into account pending interests.
+    uint128 public totalRealisedLiquidity;
+    // Maximum amount of `underlying asset` that can be supplied to the pool.
+    uint128 public supplyCap;
+    // Maximum amount of `underlying asset` that is paid as fee to the initiator of a liquidation.
+    uint80 public maxInitiatorFee;
+    // Number of auctions that are currently in progress.
+    uint16 public auctionsInProgress;
+    // Address of the protocol treasury.
+    address public treasury;
 
-    address public treasury; //address of the protocol treasury
+    // Array of the interest weights of each Tranche.
+    // Fraction (interestWeightTranches[i] / totalInterestWeight) of the interest fees that go to Tranche i.
+    uint16[] public interestWeightTranches;
+    // Array of the liquidation weights of each Tranche.
+    // Fraction (liquidationWeightTranches[i] / totalLiquidationWeight) of the liquidation fees that go to Tranche i.
+    uint16[] public liquidationWeightTranches;
+    // Array of the contract addresses of the Tranches.
+    address[] public tranches;
 
-    uint16[] public interestWeightTranches; //interestweights of the tranches
-    uint16[] public liquidationWeightTranches; //liquidationweights of the tranches
-    address[] public tranches; //addresses of the tranches
-
+    // Map tranche => status
     mapping(address => bool) public isTranche;
+    // Map tranche => interestWeigh
+    // Fraction (interestWeightTranches[i] / totalInterestWeight) of the interest fees that go to Tranche i.
     mapping(address => uint256) public interestWeight;
+    // Map tranche => realisedLiquidity
+    // Amount of `underlying asset` that is claimable by the Tranche. Does not take into account pending interests.
     mapping(address => uint256) public realisedLiquidityOf;
+    // Map vault => initiator
+    // Stores the address of the initiator of an auction, used to pay out the initiation fee after auction is ended.
     mapping(address => address) public liquidationInitiator;
-    mapping(address => mapping(address => mapping(address => uint256))) public creditAllowance; //mapping of vault => owner => beneficiary => amount
+    // Map vault => owner => beneficiary => amount
+    // Stores the credit allowances for a beneficiary per Vault and per Owner.
+    mapping(address => mapping(address => mapping(address => uint256))) public creditAllowance;
+
+    /* //////////////////////////////////////////////////////////////
+                                EVENTS
+    ////////////////////////////////////////////////////////////// */
 
     event TrancheAdded(address indexed tranche, uint8 indexed index, uint16 interestWeight, uint16 liquidationWeight);
     event InterestWeightSet(uint256 indexed index, uint16 weight);
@@ -81,6 +115,10 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     event Repay(address indexed vault, address indexed from, uint256 amount);
     event VaultVersionSet(uint256 indexed vaultVersion, bool valid);
 
+    /* //////////////////////////////////////////////////////////////
+                                MODIFIERS
+    ////////////////////////////////////////////////////////////// */
+
     modifier onlyLiquidator() {
         require(liquidator == msg.sender, "LP: Only liquidator");
         _;
@@ -94,17 +132,21 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     modifier processInterests() {
         _syncInterests();
         _;
-        //_updateInterestRate() modifies the state (effect), but can safely be called after interactions
-        //Cannot be exploited by re-entrancy attack
+        //_updateInterestRate() modifies the state (effect), but can safely be called after interactions.
+        //Cannot be exploited by re-entrancy attack.
         _updateInterestRate(realisedDebt, totalRealisedLiquidity);
     }
+
+    /* //////////////////////////////////////////////////////////////
+                                CONSTRUCTOR
+    ////////////////////////////////////////////////////////////// */
 
     /**
      * @notice The constructor for a lending pool
      * @param asset_ The underlying ERC-20 token of the Lending Pool
      * @param treasury_ The address of the protocol treasury
      * @param vaultFactory_ The address of the vault factory
-     * @dev The name and symbol of the pool are automatically generated, based on the name and symbol of the underlying token
+     * @dev The name and symbol of the DebtToken are automatically generated, based on the name and symbol of the underlying token
      */
     constructor(ERC20 asset_, address treasury_, address vaultFactory_, address liquidator_)
         Guardian()
@@ -121,14 +163,14 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     ////////////////////////////////////////////////////////////// */
 
     /**
-     * @notice Adds a tranche to the Lending Pool
+     * @notice Adds a tranche to the Lending Pool.
      * @param tranche The address of the Tranche
      * @param interestWeight_ The interestWeight of the specific Tranche
      * @param liquidationWeight The liquidationWeight of the specific Tranche
-     * @param liquidationWeight fee determines the relative share of the liquidation fee that goes to its Liquidity providers
      * @dev The order of the tranches is important, the most senior tranche is added first at index 0, the most junior at the last index.
      * @dev Each Tranche is an ERC-4626 contract
-     * @dev The interestWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
+     * @dev The interestWeight of each Tranche determines the relative share of the yield (interest payments) that goes to its Liquidity providers.
+     * @dev The liquidationWeight of each Tranche determines the relative share of the liquidation fee that goes to its Liquidity providers.
      */
     function addTranche(address tranche, uint16 interestWeight_, uint16 liquidationWeight) external onlyOwner {
         require(!isTranche[tranche], "TR_AD: Already exists");
@@ -146,13 +188,13 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     }
 
     /**
-     * @notice Changes the interestWeight of a specific tranche
+     * @notice Changes the interestWeight of a specific Tranche.
      * @param index The index of the Tranche for which a new interestWeight is being set
      * @param weight The new interestWeight of the Tranche at the index
      * @dev The interestWeight of each Tranche determines the relative share yield (interest payments) that goes to its Liquidity providers
      */
     function setInterestWeight(uint256 index, uint16 weight) external onlyOwner {
-        require(index < tranches.length, "TR_SIW: Inexisting Tranche");
+        require(index < tranches.length, "TR_SIW: Non Existing Tranche");
         totalInterestWeight = totalInterestWeight - interestWeightTranches[index] + weight;
         interestWeightTranches[index] = weight;
         interestWeight[tranches[index]] = weight;
@@ -164,10 +206,10 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @notice Changes the liquidationWeight of a specific tranche
      * @param index The index of the Tranche for which a new liquidationWeight is being set
      * @param weight The new liquidationWeight of the Tranche at the index
-     * @dev The liquidationWeight fee determines the relative share of the liquidation fee that goes to its Liquidity providers
+     * @dev The liquidationWeight determines the relative share of the liquidation fee that goes to its Liquidity providers
      */
     function setLiquidationWeight(uint256 index, uint16 weight) external onlyOwner {
-        require(index < tranches.length, "TR_SLW: Inexisting Tranche");
+        require(index < tranches.length, "TR_SLW: Non Existing Tranche");
         totalLiquidationWeight = totalLiquidationWeight - liquidationWeightTranches[index] + weight;
         liquidationWeightTranches[index] = weight;
 
@@ -187,13 +229,13 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     }
 
     /**
-     * @notice Removes the tranche at the last index (most junior)
+     * @notice Removes the Tranche at the last index (most junior)
      * @param index The index of the last Tranche
      * @param tranche The address of the last Tranche
      * @dev This function can only be called by the function _processDefault(uint256 assets),
      * when there is a default as big as (or bigger than) the complete principal of the most junior tranche
      * @dev Passing the input parameters to the function saves gas compared to reading the address and index of the last tranche from memory.
-     * No need to check if index and tranche are indeed of the last tranche since function is only called by _processDefault.
+     * No need to check if index and Tranche are indeed of the last tranche since function is only called by _processDefault.
      */
     function _popTranche(uint256 index, address tranche) internal {
         totalInterestWeight -= interestWeightTranches[index];
@@ -213,7 +255,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     /**
      * @notice Changes the fraction of the interest payments that go to the treasury
      * @param interestWeightTreasury_ The new interestWeight of the treasury
-     * @dev The interestWeight fee determines the relative share of the yield (interest payments) that goes to the protocol treasury
+     * @dev The interestWeight determines the relative share of the yield (interest payments) that goes to the protocol treasury
      * @dev Setting interestWeightTreasury to a very high value will cause the treasury to collect all interest fees from that moment on.
      * Although this will affect the future profits of liquidity providers, no funds nor realized interest are at risk for LPs.
      */
@@ -228,8 +270,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     /**
      * @notice Changes the fraction of the liquidation fees that go to the treasury
      * @param liquidationWeightTreasury_ The new liquidationWeight of the liquidation fee fee
-     * @dev The liquidationWeight fee determines the relative share of the liquidation fee that goes to the protocol treasury
-     * @dev Setting liquidationWeightTreasury to a very high value will cause the tresury to collect all liquidation fees from that moment on.
+     * @dev The liquidationWeight determines the relative share of the liquidation fee that goes to the protocol treasury
+     * @dev Setting liquidationWeightTreasury to a very high value will cause the treasury to collect all liquidation fees from that moment on.
      * Although this will affect the future profits of liquidity providers in the Jr tranche, no funds nor realized interest are at risk for LPs.
      */
 
@@ -327,7 +369,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param assets The amount of assets of the underlying ERC-20 tokens being deposited.
      * @dev Can be used by anyone to donate assets to the Lending Pool.
      * It is supposed to serve as a way to compensate the jrTranche after an
-     * auction that didn't get sold.
+     * auction didn't get sold and was manually Liquidated by the Protocol.
      * @dev First minter of a tranche could abuse this function by mining only 1 share,
      * frontrun next minter by calling this function and inflate the share price.
      * This is mitigated by checking that there are at least 10 ** decimals shares outstanding.
@@ -381,8 +423,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     ////////////////////////////////////////////////////////////// */
 
     /**
-     * @notice Approve a beneficiacy to take out a loan against an Arcadia Vault
-     * @param beneficiary The address of beneficiacy who can take out loan backed by an Arcadia Vault
+     * @notice Approve a beneficiary to take out a loan against an Arcadia Vault
+     * @param beneficiary The address of the beneficiary who can take out a loan backed by an Arcadia Vault
      * @param amount The amount of underlying ERC-20 tokens to be lent out
      * @param vault The address of the Arcadia Vault backing the loan
      */
@@ -399,7 +441,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @notice Takes out a loan backed by collateral in an Arcadia Vault
      * @param amount The amount of underlying ERC-20 tokens to be lent out
      * @param vault The address of the Arcadia Vault backing the loan
-     * @param to The address who receives the lended out underlying tokens
+     * @param to The address who receives the lent out underlying tokens
+     * @param referrer A unique identifier of the referrer, who will receive part of the fees generated by this transaction.
      * @dev The sender might be different than the owner if they have the proper allowances
      */
     function borrow(uint256 amount, address vault, address to, bytes3 referrer)
@@ -441,10 +484,10 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     }
 
     /**
-     * @notice repays a loan
+     * @notice Repays a loan
      * @param amount The amount of underlying ERC-20 tokens to be repaid
      * @param vault The address of the Arcadia Vault backing the loan
-     * @dev if vault is not an actual address of a vault, maxWithdraw(vault) will always return 0.
+     * @dev if Vault is not an actual address of a Vault, maxWithdraw(vault) will always return 0.
      * Function will not revert, but transferAmount is always 0.
      * @dev Anyone (EOAs and contracts) can repay debt in the name of a vault.
      */
@@ -471,6 +514,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @param vault The address of the Arcadia Vault backing the loan
      * @param actionHandler the address of the action handler to call
      * @param actionData a bytes object containing two actionAssetData structs, an address array and a bytes array
+     * @param referrer A unique identifier of the referrer, who will receive part of the fees generated by this transaction.
      * @dev The sender might be different than the owner if they have the proper allowances.
      * @dev vaultManagementAction() works similar to flash loans, this function optimistically calls external logic and checks for the vault state at the very end.
      */
@@ -506,9 +550,9 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         //Send Borrowed funds to the actionHandler
         asset.safeTransfer(actionHandler, amountBorrowed);
 
-        //The actionhandler will use the borrowed funds (optionally with additional assets previously deposited in the Vault)
-        //to excecute one or more actions (swap, deposit, mint...).
-        //Next the actionhandler will deposit any of the remaining funds or any of the recipient token
+        //The actionHandler will use the borrowed funds (optionally with additional assets withdrawn from the Vault)
+        //to execute one or more actions (swap, deposit, mint...).
+        //Next the actionHandler will deposit any of the remaining funds or any of the recipient token
         //resulting from the actions back into the vault.
         //As last step, after all assets are deposited back into the vault a final health check is done:
         //The Collateral Value of all assets in the vault is bigger than the total liabilities against the vault (including the margin taken during this function).
@@ -528,7 +572,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      */
     function totalAssets() public view override returns (uint256 totalDebt) {
         // Avoid a second calculation of unrealised debt (expensive)
-        // if interersts are already synced this block.
+        // if interests are already synced this block.
         if (lastSyncedTimestamp != uint32(block.timestamp)) {
             totalDebt = realisedDebt + calcUnrealisedDebt();
         } else {
@@ -540,7 +584,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @notice Returns the redeemable amount of liquidity in the underlying asset of an address
      * @param owner_ The address of the liquidity provider
      * @return assets The redeemable amount of liquidity in the underlying asset
-     * @dev This function syncs the interests to prevent calculating UnrealisedDebt twice when depositing/withdrawing through the tranches.
+     * @dev This function syncs the interests to prevent calculating UnrealisedDebt twice when depositing/withdrawing through the Tranches.
      * @dev After calling this function, the interest rate will not be updated until the next processInterests() call.
      */
     function liquidityOfAndSync(address owner_) external returns (uint256 assets) {
@@ -555,7 +599,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      */
     function liquidityOf(address owner_) external view returns (uint256 assets) {
         // Avoid a second calculation of unrealised debt (expensive)
-        // if interersts are already synced this block.
+        // if interests are already synced this block.
         if (lastSyncedTimestamp != uint32(block.timestamp)) {
             // The total liquidity of a tranche equals the sum of the realised liquidity
             // of the tranche, and its pending interests
@@ -574,16 +618,16 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * to the sum of the available funds (the balanceOf() the underlying asset) in the pool and the total open debt.
      * In practice the actual sum of available funds and total open debt will always be bigger than the total Claimable Liquidity.
      * This because of the rounding errors of the ERC4626 calculations (conversions between assets and shares),
-     * or because someone accidently sent funds directly to the pool instead of depositing via a Tranche.
+     * or because someone accidentally sent funds directly to the pool instead of depositing via a Tranche.
      * This functions makes the surplus available to the Treasury (otherwise they would be lost forever).
-     * @dev In case you aaccidentally sent funds to the pool, contact the current treasury manager.
+     * @dev In case you accidentally sent funds to the pool, contact the current treasury manager.
      */
     function skim() external processInterests {
-        //During auctions, debt tokens are burned at start of auction, while auctions proceeds are only returned
-        //at the end of the auction -> skim function must be blocked.
+        //During auctions, debt tokens are burned at start of the auction, while auctions proceeds are only returned
+        //at the end of the auction -> skim function must be blocked during auctions.
         require(auctionsInProgress == 0, "LP_S: Auctions Ongoing");
 
-        //Pending interests are synced via processInterests modifier
+        //Pending interests are synced via the processInterests modifier
         uint256 delta = asset.balanceOf(address(this)) + realisedDebt - totalRealisedLiquidity;
 
         //Add difference to the treasury
@@ -599,7 +643,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
     /**
      * @notice Syncs all unrealised debt (= interest for LP and treasury).
-     * @dev Calculates the unrealised debt since last sync, and realises it by minting an aqual amount of
+     * @dev Calculates the unrealised debt since last sync, and realises it by minting an equal amount of
      * debt tokens to all debt holders and interests to LPs and the treasury
      */
     function _syncInterests() internal {
@@ -644,7 +688,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
             //gas: taking an imaginary worst-case scenario with max interest of 1000%
             //over a period of 5 years
-            //this won't overflow as long as opendebt < 3402823669209384912995114146594816
+            //this won't overflow as long as openDebt < 3402823669209384912995114146594816
             //which is 3.4 million billion *10**18 decimals
             unrealisedDebt = (realisedDebt * (LogExpMath.pow(base, exponent) - 1e18)) / 1e18;
         }
@@ -682,8 +726,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     ////////////////////////////////////////////////////////////// */
 
     /**
-     * @notice Set's the configration parameters of InterestRateConfiguration struct
-     * @param newConfig New set of configration parameters
+     * @notice Set's the configuration parameters of InterestRateConfiguration struct
+     * @param newConfig New set of configuration parameters
      */
     function setInterestConfig(DataTypes.InterestRateConfiguration calldata newConfig) external onlyOwner {
         _setInterestConfig(newConfig);
@@ -758,7 +802,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         //Make Initiator rewards claimable for liquidationInitiator[vault]
         realisedLiquidityOf[liquidationInitiator[vault]] += liquidationInitiatorReward;
 
-        if (badDebt != 0) {
+        if (badDebt > 0) {
             //Collateral was auctioned for less than the liabilities (openDebt + Liquidation Initiator Reward)
             //-> Default event, deduct badDebt from LPs, starting with most Junior Tranche.
             totalRealisedLiquidity =
@@ -773,7 +817,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             );
 
             //Any remaining assets after paying off liabilities and the fee go back to the original Vault Owner.
-            if (remainder != 0) {
+            if (remainder > 0) {
                 //Make remainder claimable by originalOwner
                 realisedLiquidityOf[originalOwner] += remainder;
             }
@@ -793,7 +837,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     /**
      * @notice Handles the bookkeeping in case of bad debt (Vault became undercollateralised).
      * @param badDebt The total amount of underlying assets that need to be written off as bad debt.
-     * @dev The order of the tranches is important, the most senior tranche is at index 0, the most junior at the last index.
+     * @dev The order of the Tranches is important, the most senior tranche is at index 0, the most junior at the last index.
      * @dev The most junior tranche will lose its underlying assets first. If all liquidity of a certain Tranche is written off,
      * the complete tranche is locked and removed. If there is still remaining bad debt, the next Tranche starts losing capital.
      */
@@ -807,15 +851,15 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             tranche = tranches[i];
             maxBurnable = realisedLiquidityOf[tranche];
             if (badDebt < maxBurnable) {
-                //Deduct badDebt from the balance of the most junior tranche
+                //Deduct badDebt from the balance of the most junior Tranche
                 unchecked {
                     realisedLiquidityOf[tranche] -= badDebt;
                 }
                 break;
             } else {
-                //Unhappy flow, should never occor in practice!
-                //badDebt is bigger than balance most junior tranche -> tranche is completely wiped out
-                //and temporaly locked (no new deposits or withdraws possible).
+                //Unhappy flow, should never occur in practice!
+                //badDebt is bigger than balance most junior Tranche -> tranche is completely wiped out
+                //and temporarily locked (no new deposits or withdraws possible).
                 //DAO or insurance might refund (Part of) the losses, and add Tranche back.
                 realisedLiquidityOf[tranche] = 0;
                 _popTranche(i, tranche);
@@ -867,8 +911,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     ////////////////////////////////////////////////////////////// */
 
     /**
-     * @notice Sets the validity of vault version to valid
-     * @param vaultVersion The version current version of the vault
+     * @notice Enables or disables a certain Vault version to be used as margin account.
+     * @param vaultVersion The Vault version to be enabled/disabled
      * @param valid The validity of the respective vaultVersion
      */
     function setVaultVersion(uint256 vaultVersion, bool valid) external onlyOwner {
