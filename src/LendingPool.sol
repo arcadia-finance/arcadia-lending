@@ -79,7 +79,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
     // Map tranche => status
     mapping(address => bool) public isTranche;
-    // Map tranche => interestWeigh
+    // Map tranche => interestWeight
     // Fraction (interestWeightTranches[i] / totalInterestWeight) of the interest fees that go to Tranche i.
     mapping(address => uint256) public interestWeight;
     // Map tranche => realisedLiquidity
