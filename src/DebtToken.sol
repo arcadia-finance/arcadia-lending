@@ -20,8 +20,18 @@ import { FixedPointMathLib } from "../lib/solmate/src/utils/FixedPointMathLib.so
 abstract contract DebtToken is ERC4626 {
     using FixedPointMathLib for uint256;
 
+    /* //////////////////////////////////////////////////////////////
+                                STORAGE
+    ////////////////////////////////////////////////////////////// */
+
+    // Total amount of `underlying asset` that debtors have in debt, does not take into account pending interests.
     uint256 public realisedDebt;
+    // Maximum amount of `underlying asset` in debt that a single debtor can take.
     uint128 public borrowCap;
+
+    /* //////////////////////////////////////////////////////////////
+                                CONSTRUCTOR
+    ////////////////////////////////////////////////////////////// */
 
     /**
      * @notice The constructor for the debt token
@@ -125,24 +135,40 @@ abstract contract DebtToken is ERC4626 {
                             ACCOUNTING LOGIC
     //////////////////////////////////////////////////////////////*/
 
+    /**
+     * @notice Modification of the standard ERC-4626 convertToShares implementation
+     * @dev Since debt is a liability instead of an asset, roundUp and roundDown are inverted compared to the standard implementation.
+     */
     function convertToShares(uint256 assets) public view override returns (uint256) {
         uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
 
         return supply == 0 ? assets : assets.mulDivUp(supply, totalAssets());
     }
 
+    /**
+     * @notice Modification of the standard ERC-4626 convertToShares implementation
+     * @dev Since debt is a liability instead of an asset, roundUp and roundDown are inverted compared to the standard implementation.
+     */
     function convertToAssets(uint256 shares) public view override returns (uint256) {
         uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
 
         return supply == 0 ? shares : shares.mulDivUp(totalAssets(), supply);
     }
 
+    /**
+     * @notice Modification of the standard ERC-4626 previewMint implementation
+     * @dev Since debt is a liability instead of an asset, roundUp and roundDown are inverted compared to the standard implementation.
+     */
     function previewMint(uint256 shares) public view override returns (uint256) {
         uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
 
         return supply == 0 ? shares : shares.mulDivDown(totalAssets(), supply);
     }
 
+    /**
+     * @notice Modification of the standard ERC-4626 previewWithdraw implementation
+     * @dev Since debt is a liability instead of an asset, roundUp and roundDown are inverted compared to the standard implementation.
+     */
     function previewWithdraw(uint256 assets) public view override returns (uint256) {
         uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
 

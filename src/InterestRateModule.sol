@@ -8,16 +8,42 @@ pragma solidity ^0.8.13;
 
 import { DataTypes } from "./libraries/DataTypes.sol";
 
+/**
+ * @title Interest Rate Module
+ * @author Arcadia Finance
+ * @notice The Logic to calculate and store the interest rate of the Lending Pool.
+ */
 contract InterestRateModule {
-    uint256 public interestRate; //18 decimals precision
+    /* //////////////////////////////////////////////////////////////
+                                STORAGE
+    ////////////////////////////////////////////////////////////// */
 
+    // The current interest rate, 18 decimals precision
+    uint256 public interestRate;
+    // A struct with the configuration of the interest rate curves,
+    // which give the interest rate in function of the utilisation of the Lending Pool.
     DataTypes.InterestRateConfiguration public interestRateConfig;
+
+    /* //////////////////////////////////////////////////////////////
+                                EVENTS
+    ////////////////////////////////////////////////////////////// */
 
     event InterestRate(uint80 interestRate);
 
+    /* //////////////////////////////////////////////////////////////
+                        INTEREST RATE LOGIC
+    ////////////////////////////////////////////////////////////// */
+
     /**
-     * @notice Set's the configration parameters of InterestRateConfiguration struct
-     * @param newConfig New set of configration parameters
+     * @notice Sets the configuration parameters of InterestRateConfiguration struct
+     * @param newConfig A struct with a new set of interest rate configuration parameters
+     * - baseRatePerYear The interest rate when utilisation is 0, 18 decimals precision
+     * - lowSlopePerYear The slope of the first curve, defined as the delta in interest rate for a delta in utilisation of 100%,
+     *   18 decimals precision
+     * - highSlopePerYear The slope of the second curve, defined as the delta in interest rate for a delta in utilisation of 100%,
+     *   18 decimals precision
+     * - utilisationThreshold the optimal utilisation, where we go from the flat first curve to the steeper second curve,
+     *   5 decimal precision
      */
     function _setInterestConfig(DataTypes.InterestRateConfiguration calldata newConfig) internal {
         interestRateConfig = newConfig;
@@ -25,9 +51,10 @@ contract InterestRateModule {
 
     /**
      * @notice Calculates the interest rate
-     * @param utilisation Utilisation rate in 5 decimal precision
-     * @dev This function can only be called by the function _updateInterestRate(uint256 realisedDebt_, uint256 totalRealisedLiquidity_)
-     * @return Interest rate
+     * @param utilisation Utilisation rate, 5 decimal precision
+     * @return interestRate The current interest rate, 18 decimal precision
+     * @dev The interest rate is a function of the utilisation of the Lending Pool.
+     * We use two linear curves: a flat one below the optimal utilisation and a steep one above.
      */
     function _calculateInterestRate(uint256 utilisation) internal view returns (uint256) {
         unchecked {
@@ -52,15 +79,15 @@ contract InterestRateModule {
 
     /**
      * @notice Updates the interest rate
-     * @param realisedDebt_ Realised debt that calculates after substracting unrealised debt from total debt
-     * @param totalRealisedLiquidity_ Total realised liquidity
+     * @param totalDebt Total amount of debt
+     * @param totalLiquidity Total amount of Liquidity (sum of borrowed out assets and assets still available in the Lending Pool)
      * @dev This function is only be called by the function _updateInterestRate(uint256 realisedDebt_, uint256 totalRealisedLiquidity_),
      * calculates the interest rate, if the totalRealisedLiquidity_ is zero then utilisation is zero
      */
-    function _updateInterestRate(uint256 realisedDebt_, uint256 totalRealisedLiquidity_) internal {
-        uint256 utilisation;
-        if (totalRealisedLiquidity_ > 0) {
-            utilisation = (100_000 * realisedDebt_) / totalRealisedLiquidity_;
+    function _updateInterestRate(uint256 totalDebt, uint256 totalLiquidity) internal {
+        uint256 utilisation; // 5 decimals precision
+        if (totalLiquidity > 0) {
+            utilisation = (100_000 * totalDebt) / totalLiquidity;
         }
 
         //Calculates and stores interestRate as a uint256, emits interestRate as a uint80 (interestRate is maximally equal to uint72 + uint72)

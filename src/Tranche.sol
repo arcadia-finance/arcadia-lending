@@ -27,11 +27,25 @@ contract Tranche is ITranche, ERC4626, Owned {
 
     ILendingPool public immutable lendingPool;
 
+    /* //////////////////////////////////////////////////////////////
+                                STORAGE
+    ////////////////////////////////////////////////////////////// */
+
+    // Flag indicating if the Tranche is locked or not.
     bool public locked;
+    // Flag indicating if there are ongoing auctions or not.
     bool public auctionInProgress;
+
+    /* //////////////////////////////////////////////////////////////
+                                EVENTS
+    ////////////////////////////////////////////////////////////// */
 
     event LockSet(bool status);
     event AuctionFlagSet(bool status);
+
+    /* //////////////////////////////////////////////////////////////
+                                MODIFIERS
+    ////////////////////////////////////////////////////////////// */
 
     modifier notLocked() {
         require(!locked, "TRANCHE: LOCKED");
@@ -48,6 +62,10 @@ contract Tranche is ITranche, ERC4626, Owned {
         require(!auctionInProgress, "TRANCHE: AUCTION IN PROGRESS");
         _;
     }
+
+    /* //////////////////////////////////////////////////////////////
+                                CONSTRUCTOR
+    ////////////////////////////////////////////////////////////// */
 
     /**
      * @notice The constructor for a tranche
