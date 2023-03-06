@@ -167,11 +167,11 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
     /**
      * @notice Adds a tranche to the Lending Pool.
-     * @param tranche The address of the Tranche
-     * @param interestWeight_ The interestWeight of the specific Tranche
-     * @param liquidationWeight The liquidationWeight of the specific Tranche
+     * @param tranche The address of the Tranche.
+     * @param interestWeight_ The interestWeight of the specific Tranche.
+     * @param liquidationWeight The liquidationWeight of the specific Tranche.
      * @dev The order of the tranches is important, the most senior tranche is added first at index 0, the most junior at the last index.
-     * @dev Each Tranche is an ERC-4626 contract
+     * @dev Each Tranche is an ERC-4626 contract.
      * @dev The interestWeight of each Tranche determines the relative share of the yield (interest payments) that goes to its Liquidity providers.
      * @dev The liquidationWeight of each Tranche determines the relative share of the liquidation fee that goes to its Liquidity providers.
      */
