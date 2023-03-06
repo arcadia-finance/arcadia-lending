@@ -167,7 +167,7 @@ abstract contract DebtToken is ERC4626 {
 
     /**
      * @notice Modification of the standard ERC-4626 previewWithdraw implementation
-     * @dev Since debt is a liability instead an asset, roundUp and roundDown are inverted compared to the standard implementation.
+     * @dev Since debt is a liability instead of an asset, roundUp and roundDown are inverted compared to the standard implementation.
      */
     function previewWithdraw(uint256 assets) public view override returns (uint256) {
         uint256 supply = totalSupply; // Saves an extra SLOAD if totalSupply is non-zero.
