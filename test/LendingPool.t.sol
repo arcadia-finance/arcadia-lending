@@ -105,6 +105,7 @@ abstract contract LendingPoolTest is Test {
     );
     event Repay(address indexed vault, address indexed from, uint256 amount);
     event MaxInitiatorFeeSet(uint80 maxInitiatorFee);
+    event FixedLiquidationCostSet(uint128 fixedLiquidationCost);
     event VaultVersionSet(uint256 indexed vaultVersion, bool valid);
 
     //Before
@@ -124,6 +125,7 @@ abstract contract LendingPoolTest is Test {
     function setUp() public virtual {
         vm.startPrank(creator);
         pool = new LendingPoolExtension(asset, treasury, address(factory), address(liquidator));
+        pool.setVaultVersion(0, true);
         srTranche = new Tranche(address(pool), "Senior", "SR");
         jrTranche = new Tranche(address(pool), "Junior", "JR");
         vm.stopPrank();
@@ -1009,6 +1011,46 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(collateralValue < amountLoaned);
 
         vault.setTotalValue(collateralValue);
+
+        vm.startPrank(vaultOwner);
+        // When: borrow amountLoaned as vaultOwner
+
+        // Then: borrow should revert with "LP_B: Reverted"
+        vm.expectRevert("LP_B: Reverted");
+        pool.borrow(amountLoaned, address(vault), to, emptyBytes3);
+        vm.stopPrank();
+    }
+
+    function testRevert_borrow_DifferentTrustedCreditor(
+        uint128 amountLoaned,
+        uint256 collateralValue,
+        address to,
+        address trustedCreditor
+    ) public {
+        // Given: collateralValue is less than amountLoaned, vault setTotalValue to colletrallValue
+        vm.assume(collateralValue >= amountLoaned);
+        vm.assume(trustedCreditor != address(pool));
+
+        vault.setTotalValue(collateralValue);
+        vault.setTrustedCreditor(trustedCreditor);
+
+        vm.startPrank(vaultOwner);
+        // When: borrow amountLoaned as vaultOwner
+
+        // Then: borrow should revert with "LP_B: Reverted"
+        vm.expectRevert("LP_B: Reverted");
+        pool.borrow(amountLoaned, address(vault), to, emptyBytes3);
+        vm.stopPrank();
+    }
+
+    function testRevert_borrow_BadVaultVersion(uint128 amountLoaned, uint256 collateralValue, address to) public {
+        // Given: collateralValue is less than amountLoaned, vault setTotalValue to colletrallValue
+        vm.assume(collateralValue >= amountLoaned);
+
+        vault.setTotalValue(collateralValue);
+
+        vm.prank(creator);
+        pool.setVaultVersion(0, false);
 
         vm.startPrank(vaultOwner);
         // When: borrow amountLoaned as vaultOwner
@@ -2245,6 +2287,29 @@ contract LiquidationTest is LendingPoolTest {
         assertEq(pool.maxInitiatorFee(), maxFee);
     }
 
+    function testRevert_setFixedLiquidationCost_Unauthorised(address unprivilegedAddress, uint128 fixedLiquidationCost)
+        public
+    {
+        // Given: unprivilegedAddress is not the Owner
+        vm.assume(unprivilegedAddress != creator);
+
+        // When: unprivilegedAddress sets the Liquidator
+        // Then: setMaxInitiatorFee should revert with "UNAUTHORIZED"
+        vm.startPrank(unprivilegedAddress);
+        vm.expectRevert("UNAUTHORIZED");
+        pool.setFixedLiquidationCost(fixedLiquidationCost);
+        vm.stopPrank();
+    }
+
+    function testSuccess_setFixedLiquidationCost(uint128 fixedLiquidationCost) public {
+        vm.prank(creator);
+        vm.expectEmit(true, true, true, true);
+        emit FixedLiquidationCostSet(fixedLiquidationCost);
+        pool.setFixedLiquidationCost(fixedLiquidationCost);
+
+        assertEq(pool.fixedLiquidationCost(), fixedLiquidationCost);
+    }
+
     function testRevert_liquidateVault_Paused(address liquidationInitiator, address vault_) public {
         // Given: The liquidator is set
         vm.warp(35 days);
@@ -2712,32 +2777,44 @@ contract VaultTest is LendingPoolTest {
         assertTrue(!pool.isValidVersion(vaultVersion));
     }
 
-    function testSuccess_openMarginAccount_InvalidVaultVersion(uint256 vaultVersion) public {
+    function testSuccess_openMarginAccount_InvalidVaultVersion(uint256 vaultVersion, uint128 fixedLiquidationCost)
+        public
+    {
         // Given: vaultVersion is invalid
-        vm.prank(creator);
+        vm.startPrank(creator);
         pool.setVaultVersion(vaultVersion, false);
+        pool.setFixedLiquidationCost(fixedLiquidationCost);
+        vm.stopPrank();
 
         // When: vault opens a margin account
-        (bool success, address basecurrency, address liquidator_) = pool.openMarginAccount(vaultVersion);
+        (bool success, address baseCurrency, address liquidator_, uint256 fixedLiquidationCost_) =
+            pool.openMarginAccount(vaultVersion);
 
-        // Then: openMarginAccount should return succes and correct contract addresses
+        // Then: openMarginAccount should return success and correct contract addresses
         assertTrue(!success);
-        assertEq(address(0), basecurrency);
+        assertEq(address(0), baseCurrency);
         assertEq(address(0), liquidator_);
+        assertEq(0, fixedLiquidationCost_);
     }
 
-    function testSuccess_openMarginAccount_ValidVaultVersion(uint256 vaultVersion) public {
+    function testSuccess_openMarginAccount_ValidVaultVersion(uint256 vaultVersion, uint128 fixedLiquidationCost)
+        public
+    {
         // Given: vaultVersion is valid
-        vm.prank(creator);
+        vm.startPrank(creator);
         pool.setVaultVersion(vaultVersion, true);
+        pool.setFixedLiquidationCost(fixedLiquidationCost);
+        vm.stopPrank();
 
         // When: vault opens a margin account
-        (bool success, address basecurrency, address liquidator_) = pool.openMarginAccount(vaultVersion);
+        (bool success, address baseCurrency, address liquidator_, uint256 fixedLiquidationCost_) =
+            pool.openMarginAccount(vaultVersion);
 
-        // Then: openMarginAccount should return succes and correct contract addresses
+        // Then: openMarginAccount should return success and correct contract addresses
         assertTrue(success);
-        assertEq(address(asset), basecurrency);
+        assertEq(address(asset), baseCurrency);
         assertEq(address(liquidator), liquidator_);
+        assertEq(fixedLiquidationCost, fixedLiquidationCost_);
     }
 
     function testSuccess_getOpenPosition(uint128 amountLoaned) public {

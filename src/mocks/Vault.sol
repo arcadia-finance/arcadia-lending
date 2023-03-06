@@ -12,6 +12,7 @@ contract Vault {
     uint256 public lockedValue;
     address public baseCurrency;
     address public trustedCreditor;
+    uint16 public vaultVersion;
 
     uint256 public mockToSurpressWarning;
 
@@ -30,7 +31,7 @@ contract Vault {
     function isVaultHealthy(uint256 amount, uint256 totalOpenDebt)
         external
         view
-        returns (bool success, address _trustedCreditor)
+        returns (bool success, address _trustedCreditor, uint256 vaultVersion_)
     {
         if (amount != 0) {
             //Check if vault is still healthy after an increase of used margin.
@@ -40,11 +41,11 @@ contract Vault {
             success = totalValue >= totalOpenDebt;
         }
 
-        return (success, trustedCreditor);
+        return (success, trustedCreditor, vaultVersion);
     }
 
-    function vaultManagementAction(address, bytes calldata) external returns (address) {
+    function vaultManagementAction(address, bytes calldata) external returns (address, uint256) {
         mockToSurpressWarning = 1;
-        return trustedCreditor;
+        return (trustedCreditor, vaultVersion);
     }
 }
