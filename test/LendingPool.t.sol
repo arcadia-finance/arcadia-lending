@@ -555,7 +555,6 @@ contract ProtocolCapTest is LendingPoolTest {
                     DEPOSIT / WITHDRAWAL LOGIC
 ////////////////////////////////////////////////////////////// */
 contract DepositAndWithdrawalTest is LendingPoolTest {
-
     error FunctionIsPaused();
 
     function setUp() public override {

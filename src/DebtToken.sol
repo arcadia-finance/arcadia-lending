@@ -30,7 +30,7 @@ abstract contract DebtToken is ERC4626 {
     uint128 public borrowCap;
 
     error FunctionNotImplemented();
-    
+
     /* //////////////////////////////////////////////////////////////
                                 CONSTRUCTOR
     ////////////////////////////////////////////////////////////// */
