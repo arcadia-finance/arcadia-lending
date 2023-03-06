@@ -55,6 +55,8 @@ contract GuardianUnitTest is Test {
         bool liquidationPauseUpdate
     );
 
+    error FunctionIsPaused();
+
     constructor() {
         vm.startPrank(owner);
         lendingPool = new LendingPoolMockup();
@@ -356,7 +358,7 @@ contract GuardianUnitTest is Test {
         vm.stopPrank();
 
         // When Then: a user tries to supply, it is reverted as paused
-        vm.expectRevert("Guardian: deposit paused");
+        vm.expectRevert(FunctionIsPaused.selector);
         vm.startPrank(user);
         lendingPool.depositGuarded(100);
         vm.stopPrank();
@@ -417,7 +419,7 @@ contract GuardianUnitTest is Test {
         assertEq(lendingPool.totalSupply(), 100);
 
         // When: user tries to borrow, which is paused
-        vm.expectRevert("Guardian: borrow paused");
+        vm.expectRevert(FunctionIsPaused.selector);
         vm.startPrank(user);
         lendingPool.borrowGuarded(100);
         vm.stopPrank();

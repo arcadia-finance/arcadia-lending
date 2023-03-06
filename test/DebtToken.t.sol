@@ -82,13 +82,15 @@ contract DepositWithdrawalTest is DebtTokenTest {
         super.setUp();
     }
 
+    error FunctionNotImplemented();
+
     function testRevert_deposit(uint256 assets, address receiver, address sender) public {
         // Given: all neccesary contracts are deployed on the setup
 
         vm.startPrank(sender);
         // When: sender deposits assets
-        // Then: deposit should revert with DT_D: DEPOSIT_NOT_SUPPORTED
-        vm.expectRevert("DT_D: DEPOSIT_NOT_SUPPORTED");
+        // Then: deposit should revert with FunctionNotImplemented()
+        vm.expectRevert(FunctionNotImplemented.selector);
         debt.deposit(assets, receiver);
         vm.stopPrank();
     }
@@ -137,8 +139,8 @@ contract DepositWithdrawalTest is DebtTokenTest {
 
         vm.startPrank(sender);
         // When: sender mint shares
-        // Then: mint should revert with DT_M: MINT_NOT_SUPPORTED
-        vm.expectRevert("DT_M: MINT_NOT_SUPPORTED");
+        // Then: mint should revert with FunctionNotImplemented()
+        vm.expectRevert(FunctionNotImplemented.selector);
         debt.mint(shares, receiver);
         vm.stopPrank();
     }
@@ -148,8 +150,8 @@ contract DepositWithdrawalTest is DebtTokenTest {
 
         vm.startPrank(sender);
         // When: sender withdraw
-        // Then: withdraw should revert with DT_W: WITHDRAW_NOT_SUPPORTED
-        vm.expectRevert("DT_W: WITHDRAW_NOT_SUPPORTED");
+        // Then: withdraw should revert with FunctionNotImplemented()
+        vm.expectRevert(FunctionNotImplemented.selector);
         debt.withdraw(assets, receiver, owner);
         vm.stopPrank();
     }
@@ -204,8 +206,8 @@ contract DepositWithdrawalTest is DebtTokenTest {
 
         vm.startPrank(sender);
         // When: sender redeem shares
-        // Then: redeem should revert with DT_R: REDEEM_NOT_SUPPORTED
-        vm.expectRevert("DT_R: REDEEM_NOT_SUPPORTED");
+        // Then: redeem should revert with FunctionNotImplemented()
+        vm.expectRevert(FunctionNotImplemented.selector);
         debt.redeem(shares, receiver, owner);
         vm.stopPrank();
     }
@@ -220,13 +222,15 @@ contract TransferTest is DebtTokenTest {
         super.setUp();
     }
 
+    error FunctionNotImplemented();
+
     function testRevert_approve(address spender, uint256 amount, address sender) public {
         // Given: all neccesary contracts are deployed on the setup
 
         vm.startPrank(sender);
         // When: sender approve
-        // Then: approve should revert with DT_A: APPROVE_NOT_SUPPORTED
-        vm.expectRevert("DT_A: APPROVE_NOT_SUPPORTED");
+        // Then: approve should revert with FunctionNotImplemented()
+        vm.expectRevert(FunctionNotImplemented.selector);
         debt.approve(spender, amount);
         vm.stopPrank();
     }
@@ -236,8 +240,8 @@ contract TransferTest is DebtTokenTest {
 
         vm.startPrank(sender);
         // When: sender transfer
-        // Then: transfer should revert with DT_T: TRANSFER_NOT_SUPPORTED
-        vm.expectRevert("DT_T: TRANSFER_NOT_SUPPORTED");
+        // Then: transfer should revert with FunctionNotImplemented()
+        vm.expectRevert(FunctionNotImplemented.selector);
         debt.transfer(to, amount);
         vm.stopPrank();
     }
@@ -247,8 +251,8 @@ contract TransferTest is DebtTokenTest {
 
         vm.startPrank(sender);
         // When: sender transferFrom
-        // Then: transferFrom should revert with DT_TF: TRANSFERFROM_NOT_SUPPORTED
-        vm.expectRevert("DT_TF: TRANSFROM_NOT_SUPPORTED");
+        // Then: transferFrom should revert with FunctionNotImplemented()
+        vm.expectRevert(FunctionNotImplemented.selector);
         debt.transferFrom(from, to, amount);
         vm.stopPrank();
     }
@@ -267,8 +271,8 @@ contract TransferTest is DebtTokenTest {
 
         vm.startPrank(sender);
         // When: sender permit
-        // Then: permit should revert with DT_TP: PERMIT_NOT_SUPPORTED
-        vm.expectRevert("DT_TP: PERMIT_NOT_SUPPORTED");
+        // Then: permit should revert with FunctionNotImplemented())
+        vm.expectRevert(FunctionNotImplemented.selector);
         debt.permit(owner, spender, value, deadline, v, r, s);
         vm.stopPrank();
     }

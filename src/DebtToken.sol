@@ -29,6 +29,8 @@ abstract contract DebtToken is ERC4626 {
     // Maximum amount of `underlying asset` in debt that a single debtor can take.
     uint128 public borrowCap;
 
+    error FunctionNotImplemented();
+
     /* //////////////////////////////////////////////////////////////
                                 CONSTRUCTOR
     ////////////////////////////////////////////////////////////// */
@@ -67,7 +69,7 @@ abstract contract DebtToken is ERC4626 {
      * @dev No public deposit allowed
      */
     function deposit(uint256, address) public pure override returns (uint256) {
-        revert("DT_D: DEPOSIT_NOT_SUPPORTED");
+        revert FunctionNotImplemented();
     }
 
     /**
@@ -93,7 +95,7 @@ abstract contract DebtToken is ERC4626 {
      * @dev No public mint allowed
      */
     function mint(uint256, address) public pure override returns (uint256) {
-        revert("DT_M: MINT_NOT_SUPPORTED");
+        revert FunctionNotImplemented();
     }
 
     /**
@@ -101,7 +103,7 @@ abstract contract DebtToken is ERC4626 {
      * @dev No public withdraw allowed
      */
     function withdraw(uint256, address, address) public pure override returns (uint256) {
-        revert("DT_W: WITHDRAW_NOT_SUPPORTED");
+        revert FunctionNotImplemented();
     }
 
     /**
@@ -128,7 +130,7 @@ abstract contract DebtToken is ERC4626 {
      * @dev No public redeem allowed
      */
     function redeem(uint256, address, address) public pure override returns (uint256) {
-        revert("DT_R: REDEEM_NOT_SUPPORTED");
+        revert FunctionNotImplemented();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -184,7 +186,7 @@ abstract contract DebtToken is ERC4626 {
      * @dev No public approve allowed
      */
     function approve(address, uint256) public pure override returns (bool) {
-        revert("DT_A: APPROVE_NOT_SUPPORTED");
+        revert FunctionNotImplemented();
     }
 
     /**
@@ -192,7 +194,7 @@ abstract contract DebtToken is ERC4626 {
      * @dev No public transfer allowed
      */
     function transfer(address, uint256) public pure override returns (bool) {
-        revert("DT_T: TRANSFER_NOT_SUPPORTED");
+        revert FunctionNotImplemented();
     }
 
     /**
@@ -200,7 +202,7 @@ abstract contract DebtToken is ERC4626 {
      * @dev No public transferFrom allowed
      */
     function transferFrom(address, address, uint256) public pure override returns (bool) {
-        revert("DT_TF: TRANSFROM_NOT_SUPPORTED");
+        revert FunctionNotImplemented();
     }
 
     /**
@@ -208,6 +210,6 @@ abstract contract DebtToken is ERC4626 {
      * @dev No public permit allowed
      */
     function permit(address, address, uint256, uint256, uint8, bytes32, bytes32) public pure override {
-        revert("DT_TP: PERMIT_NOT_SUPPORTED");
+        revert FunctionNotImplemented();
     }
 }
