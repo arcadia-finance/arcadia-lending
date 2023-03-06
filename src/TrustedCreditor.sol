@@ -13,7 +13,17 @@ pragma solidity ^0.8.13;
  * @dev For the implementation of Arcadia Vaults, see: https://github.com/arcadia-finance/arcadia-vaults
  */
 abstract contract TrustedCreditor {
+
+    /* //////////////////////////////////////////////////////////////
+                                STORAGE
+    ////////////////////////////////////////////////////////////// */
+
+    // Map vaultVersion => status
     mapping(uint256 => bool) public isValidVersion;
+
+    /* //////////////////////////////////////////////////////////////
+                                CONSTRUCTOR
+    ////////////////////////////////////////////////////////////// */
 
     constructor() { }
 
