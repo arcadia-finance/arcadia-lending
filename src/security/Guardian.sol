@@ -32,6 +32,8 @@ abstract contract Guardian is Owned {
         bool liquidationPauseUpdate
     );
 
+    error FunctionIsPaused();
+
     /*
     //////////////////////////////////////////////////////////////
                             STORAGE
@@ -65,7 +67,7 @@ abstract contract Guardian is Owned {
      * It throws if repay is paused.
      */
     modifier whenRepayNotPaused() {
-        require(!repayPaused, "Guardian: repay paused");
+        if (repayPaused) revert FunctionIsPaused();
         _;
     }
 
@@ -74,7 +76,7 @@ abstract contract Guardian is Owned {
      * It throws if withdraw is paused.
      */
     modifier whenWithdrawNotPaused() {
-        require(!withdrawPaused, "Guardian: withdraw paused");
+        if (withdrawPaused) revert FunctionIsPaused();
         _;
     }
 
@@ -83,7 +85,7 @@ abstract contract Guardian is Owned {
      * It throws if borrow is paused.
      */
     modifier whenBorrowNotPaused() {
-        require(!borrowPaused, "Guardian: borrow paused");
+        if (borrowPaused) revert FunctionIsPaused();
         _;
     }
 
@@ -92,7 +94,7 @@ abstract contract Guardian is Owned {
      * It throws if deposit is paused.
      */
     modifier whenDepositNotPaused() {
-        require(!depositPaused, "Guardian: deposit paused");
+        if (depositPaused) revert FunctionIsPaused();
         _;
     }
 
@@ -101,7 +103,7 @@ abstract contract Guardian is Owned {
      * It throws if liquidation is paused.
      */
     modifier whenLiquidationNotPaused() {
-        require(!liquidationPaused, "Guardian: liquidation paused");
+        if (liquidationPaused) revert FunctionIsPaused();
         _;
     }
 

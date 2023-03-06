@@ -553,6 +553,9 @@ contract ProtocolCapTest is LendingPoolTest {
                     DEPOSIT / WITHDRAWAL LOGIC
 ////////////////////////////////////////////////////////////// */
 contract DepositAndWithdrawalTest is LendingPoolTest {
+
+    error FunctionIsPaused();
+
     function setUp() public override {
         super.setUp();
 
@@ -605,11 +608,11 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         pool.pause();
 
         // Then: depositInLendingPool is reverted with PAUSED
-        vm.expectRevert("Guardian: deposit paused");
+        vm.expectRevert(FunctionIsPaused.selector);
         vm.prank(address(srTranche));
         pool.depositInLendingPool(amount0, liquidityProvider);
         // And: depositInLendingPool is reverted with PAUSED
-        vm.expectRevert("Guardian: deposit paused");
+        vm.expectRevert(FunctionIsPaused.selector);
         vm.prank(address(jrTranche));
         pool.depositInLendingPool(amount1, liquidityProvider);
     }
@@ -835,7 +838,7 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         pool.pause();
 
         // Then: withdrawFromLendingPool is reverted with PAUSED
-        vm.expectRevert("Guardian: withdraw paused");
+        vm.expectRevert(FunctionIsPaused.selector);
         vm.prank(address(srTranche));
         pool.withdrawFromLendingPool(assetsWithdrawn, receiver);
         vm.stopPrank();
@@ -871,6 +874,8 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
 ////////////////////////////////////////////////////////////// */
 contract LendingLogicTest is LendingPoolTest {
     using stdStorage for StdStorage;
+
+    error FunctionIsPaused();
 
     function setUp() public override {
         super.setUp();
@@ -1068,7 +1073,7 @@ contract LendingLogicTest is LendingPoolTest {
         pool.pause();
 
         // Then: borrow should revert with "Guardian borrow paused"
-        vm.expectRevert("Guardian: borrow paused");
+        vm.expectRevert(FunctionIsPaused.selector);
         vm.prank(vaultOwner);
         pool.borrow(amountLoaned, address(vault), to, emptyBytes3);
     }
@@ -1449,7 +1454,7 @@ contract LendingLogicTest is LendingPoolTest {
         vm.startPrank(sender);
         asset.approve(address(pool), type(uint256).max);
         // Then: repay should revert with an Paused
-        vm.expectRevert("Guardian: repay paused");
+        vm.expectRevert(FunctionIsPaused.selector);
         pool.repay(amountLoaned, address(vault));
         vm.stopPrank();
     }
@@ -2203,6 +2208,8 @@ contract InterestRateTest is LendingPoolTest {
 contract LiquidationTest is LendingPoolTest {
     using stdStorage for StdStorage;
 
+    error FunctionIsPaused();
+
     function setUp() public override {
         super.setUp();
 
@@ -2255,7 +2262,7 @@ contract LiquidationTest is LendingPoolTest {
 
         // When: liquidationInitiator tries to liquidate the vault
         // Then: liquidateVault should revert with "LP_LV: Pool is paused"
-        vm.expectRevert("Guardian: liquidation paused");
+        vm.expectRevert(FunctionIsPaused.selector);
         vm.prank(liquidationInitiator);
         pool.liquidateVault(vault_);
     }
@@ -2763,6 +2770,8 @@ contract GuardianTest is LendingPoolTest {
 
     address pauseGuardian = address(17);
 
+    error FunctionIsPaused();
+
     function setUp() public override {
         super.setUp();
 
@@ -2790,7 +2799,7 @@ contract GuardianTest is LendingPoolTest {
         vm.prank(liquidityProvider);
         asset.approve(address(pool), type(uint256).max);
         vm.prank(address(srTranche));
-        vm.expectRevert("Guardian: deposit paused");
+        vm.expectRevert(FunctionIsPaused.selector);
         pool.depositInLendingPool(type(uint128).max, liquidityProvider);
     }
 
@@ -2807,7 +2816,7 @@ contract GuardianTest is LendingPoolTest {
         assertTrue(pool.borrowPaused());
         vm.startPrank(vaultOwner);
         // And: the pool should not be able to borrow
-        vm.expectRevert("Guardian: borrow paused");
+        vm.expectRevert(FunctionIsPaused.selector);
         pool.borrow(uint256(20 * 10 ** 18), address(vault), address(412), emptyBytes3);
         vm.stopPrank();
     }
@@ -2825,7 +2834,7 @@ contract GuardianTest is LendingPoolTest {
         assertTrue(pool.withdrawPaused());
         vm.startPrank(address(srTranche));
         // And: the pool should not be able to borrow
-        vm.expectRevert("Guardian: withdraw paused");
+        vm.expectRevert(FunctionIsPaused.selector);
         pool.withdrawFromLendingPool(uint128(20 * 10 ** 18), address(42));
         vm.stopPrank();
     }
@@ -2842,7 +2851,7 @@ contract GuardianTest is LendingPoolTest {
         // Then: the pool should be paused
         assertTrue(pool.liquidationPaused());
         // And: the pool should not be able to borrow
-        vm.expectRevert("Guardian: liquidation paused");
+        vm.expectRevert(FunctionIsPaused.selector);
         pool.liquidateVault(address(vault));
         vm.stopPrank();
     }
@@ -2861,7 +2870,7 @@ contract GuardianTest is LendingPoolTest {
         vm.startPrank(vaultOwner);
         asset.approve(address(pool), type(uint256).max);
         // And: the pool should not be able to borrow
-        vm.expectRevert("Guardian: repay paused");
+        vm.expectRevert(FunctionIsPaused.selector);
         pool.repay(uint128(20 * 10 ** 18), address(42));
         vm.stopPrank();
     }
@@ -2900,7 +2909,7 @@ contract GuardianTest is LendingPoolTest {
         assertTrue(pool.repayPaused());
 
         // And: the pool should not be able to repay
-        vm.expectRevert("Guardian: repay paused");
+        vm.expectRevert(FunctionIsPaused.selector);
         pool.repay(uint128(20 * 10 ** 18), address(42));
         vm.stopPrank();
 
