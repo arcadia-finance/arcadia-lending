@@ -61,6 +61,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     uint128 public totalRealisedLiquidity;
     // Maximum amount of `underlying asset` that can be supplied to the pool.
     uint128 public supplyCap;
+    // Conservative estimate of the maximal gas cost to liquidate a position (fixed cost, independent of openDebt).
+    uint128 public fixedLiquidationCost;
     // Maximum amount of `underlying asset` that is paid as fee to the initiator of a liquidation.
     uint80 public maxInitiatorFee;
     // Number of auctions that are currently in progress.
@@ -113,6 +115,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         address indexed vault, address indexed by, address to, uint256 amount, uint256 fee, bytes3 indexed referrer
     );
     event Repay(address indexed vault, address indexed from, uint256 amount);
+    event FixedLiquidationCostSet(uint128 fixedLiquidationCost);
     event VaultVersionSet(uint256 indexed vaultVersion, bool valid);
 
     /* //////////////////////////////////////////////////////////////
@@ -217,18 +220,6 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     }
 
     /**
-     * @notice Sets the maxInitiatorFee.
-     * @param maxInitiatorFee_ The maximum fee that is paid to the initiator of a liquidation
-     * @dev The liquidator sets the % of the debt that is paid to the initiator of a liquidation.
-     * This fee is capped by the maxInitiatorFee.
-     */
-    function setMaxInitiatorFee(uint80 maxInitiatorFee_) external onlyOwner {
-        maxInitiatorFee = maxInitiatorFee_;
-
-        emit MaxInitiatorFeeSet(maxInitiatorFee_);
-    }
-
-    /**
      * @notice Removes the Tranche at the last index (most junior)
      * @param index The index of the last Tranche
      * @param tranche The address of the last Tranche
@@ -259,7 +250,6 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev Setting interestWeightTreasury to a very high value will cause the treasury to collect all interest fees from that moment on.
      * Although this will affect the future profits of liquidity providers, no funds nor realized interest are at risk for LPs.
      */
-
     function setTreasuryInterestWeight(uint16 interestWeightTreasury_) external onlyOwner {
         totalInterestWeight = totalInterestWeight - interestWeightTreasury + interestWeightTreasury_;
         interestWeightTreasury = interestWeightTreasury_;
@@ -274,7 +264,6 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev Setting liquidationWeightTreasury to a very high value will cause the treasury to collect all liquidation fees from that moment on.
      * Although this will affect the future profits of liquidity providers in the Jr tranche, no funds nor realized interest are at risk for LPs.
      */
-
     function setTreasuryLiquidationWeight(uint16 liquidationWeightTreasury_) external onlyOwner {
         totalLiquidationWeight = totalLiquidationWeight - liquidationWeightTreasury + liquidationWeightTreasury_;
         liquidationWeightTreasury = liquidationWeightTreasury_;
@@ -286,7 +275,6 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @notice Sets new treasury address
      * @param treasury_ The new address of the treasury
      */
-
     function setTreasury(address treasury_) external onlyOwner {
         treasury = treasury_;
 
@@ -299,7 +287,6 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @dev originationFee is limited by being a uint8 -> max value is 2.55%
      * 4 decimal precision (10 = 0.1%)
      */
-
     function setOriginationFee(uint8 originationFee_) external onlyOwner {
         originationFee = originationFee_;
 
@@ -320,13 +307,13 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
 
         emit BorrowCapSet(borrowCap_);
     }
+
     /**
      * @notice Sets the maximum amount of assets that can be deposited in the pool
      * @param supplyCap_ The new maximum amount of assets that can be deposited
      * @dev The supplyCap is the maximum amount of assets that can be deposited in the pool at any given time.
      * @dev If it is set to 0, there is no supply cap.
      */
-
     function setSupplyCap(uint128 supplyCap_) external onlyOwner {
         supplyCap = supplyCap_;
 
@@ -474,8 +461,9 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         }
 
         //Call vault to check if it is still healthy after the debt is increased with amountWithFee.
-        (bool isHealthy, address trustedCreditor) = IVault(vault).isVaultHealthy(0, maxWithdraw(vault));
-        require(isHealthy && trustedCreditor == address(this), "LP_B: Reverted");
+        (bool isHealthy, address trustedCreditor, uint256 vaultVersion) =
+            IVault(vault).isVaultHealthy(0, maxWithdraw(vault));
+        require(isHealthy && trustedCreditor == address(this) && isValidVersion[vaultVersion], "LP_B: Reverted");
 
         //Transfer fails if there is insufficient liquidity in the pool
         asset.safeTransfer(to, amount);
@@ -556,8 +544,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         //resulting from the actions back into the vault.
         //As last step, after all assets are deposited back into the vault a final health check is done:
         //The Collateral Value of all assets in the vault is bigger than the total liabilities against the vault (including the margin taken during this function).
-        address trustedCreditor = IVault(vault).vaultManagementAction(actionHandler, actionData);
-        require(trustedCreditor == address(this), "LP_DAWL: Not trusted");
+        (address trustedCreditor, uint256 vaultVersion) = IVault(vault).vaultManagementAction(actionHandler, actionData);
+        require(trustedCreditor == address(this) && isValidVersion[vaultVersion], "LP_DAWL: Reverted");
 
         emit Borrow(vault, msg.sender, actionHandler, amountBorrowed, amountBorrowedWithFee - amountBorrowed, referrer);
     }
@@ -744,6 +732,31 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     ////////////////////////////////////////////////////////////// */
 
     /**
+     * @notice Sets the maxInitiatorFee.
+     * @param maxInitiatorFee_ The maximum fee that is paid to the initiator of a liquidation
+     * @dev The liquidator sets the % of the debt that is paid to the initiator of a liquidation.
+     * This fee is capped by the maxInitiatorFee.
+     */
+    function setMaxInitiatorFee(uint80 maxInitiatorFee_) external onlyOwner {
+        maxInitiatorFee = maxInitiatorFee_;
+
+        emit MaxInitiatorFeeSet(maxInitiatorFee_);
+    }
+
+    /**
+     * @notice Sets the estimated max gas cost to liquidate a position, denominated in baseCurrency.
+     * @param fixedLiquidationCost_ The new fixedLiquidationCost.
+     * @dev Conservative estimate of the maximal gas cost to liquidate a position (fixed cost, independent of openDebt)
+     * The fixedLiquidationCost prevents dusting attacks, and ensures that upon Liquidations positions are big enough to cover
+     * gas costs of the Liquidator without resulting in badDebt.
+     */
+    function setFixedLiquidationCost(uint128 fixedLiquidationCost_) external onlyOwner {
+        fixedLiquidationCost = fixedLiquidationCost_;
+
+        emit FixedLiquidationCostSet(fixedLiquidationCost_);
+    }
+
+    /**
      * @notice Starts liquidation of a Vault.
      * @param vault The vault address.
      * @dev At the start of the liquidation the debt tokens are burned,
@@ -928,12 +941,13 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         external
         view
         override
-        returns (bool success, address baseCurrency, address liquidator_)
+        returns (bool success, address baseCurrency, address liquidator_, uint256 fixedLiquidationCost_)
     {
         if (isValidVersion[vaultVersion]) {
             success = true;
             baseCurrency = address(asset);
             liquidator_ = liquidator;
+            fixedLiquidationCost_ = fixedLiquidationCost;
         }
     }
 
