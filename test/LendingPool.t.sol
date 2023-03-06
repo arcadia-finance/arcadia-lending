@@ -265,8 +265,8 @@ contract TranchesTest is LendingPoolTest {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
         // When: creator setInterestWeight on index 0
-        // Then: setInterestWeight should revert with TR_SIW: Inexisting Tranche
-        vm.expectRevert("TR_SIW: Inexisting Tranche");
+        // Then: setInterestWeight should revert with TR_SIW: Non Existing Tranche
+        vm.expectRevert("TR_SIW: Non Existing Tranche");
         pool.setInterestWeight(0, 50);
         vm.stopPrank();
     }
@@ -304,8 +304,8 @@ contract TranchesTest is LendingPoolTest {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
         // When: creator setInterestWeight on index 0
-        // Then: setInterestWeight should revert with TR_SIW: Inexisting Tranche
-        vm.expectRevert("TR_SLW: Inexisting Tranche");
+        // Then: setInterestWeight should revert with TR_SIW: Non Existing Tranche
+        vm.expectRevert("TR_SLW: Non Existing Tranche");
         pool.setLiquidationWeight(0, 50);
         vm.stopPrank();
     }
