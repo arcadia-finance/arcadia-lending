@@ -13,6 +13,8 @@ contract InterestRateModule {
 
     DataTypes.InterestRateConfiguration public interestRateConfig;
 
+    event InterestRate(uint80 interestRate);
+
     /**
      * @notice Set's the configration parameters of InterestRateConfiguration struct
      * @param newConfig New set of configration parameters
@@ -30,16 +32,16 @@ contract InterestRateModule {
     function _calculateInterestRate(uint256 utilisation) internal view returns (uint256) {
         unchecked {
             if (utilisation >= interestRateConfig.utilisationThreshold) {
-                // 1e23 = (uT * 1e5) * (ls * 1e18)
+                // 1e23 = uT (1e5) * ls (1e18)
                 uint256 lowSlopeInterest =
                     uint256(interestRateConfig.utilisationThreshold) * interestRateConfig.lowSlopePerYear;
-                // 1e23 = ((uT - u) * 1e5) * (hs * 1e18)
+                // 1e23 = (uT - u) (1e5) * hs (e18)
                 uint256 highSlopeInterest = uint256((utilisation - interestRateConfig.utilisationThreshold))
                     * interestRateConfig.highSlopePerYear;
-                // 1e18 = (bs * 1e18) + ((lsIR * 1e23) + (hsIR * 1e23) / 1e5)
+                // 1e18 = bs (1e18) + (lsIR (e23) + hsIR (1e23)) / 1e5
                 return uint256(interestRateConfig.baseRatePerYear) + ((lowSlopeInterest + highSlopeInterest) / 100_000);
             } else {
-                // 1e18 = br * 1e18 + (ls * 1e18) * (u * 1e5) / 1e5
+                // 1e18 = br (1e18) + (ls (1e18) * u (1e5)) / 1e5
                 return uint256(
                     uint256(interestRateConfig.baseRatePerYear)
                         + ((uint256(interestRateConfig.lowSlopePerYear) * utilisation) / 100_000)
@@ -60,6 +62,9 @@ contract InterestRateModule {
         if (totalRealisedLiquidity_ > 0) {
             utilisation = (100_000 * realisedDebt_) / totalRealisedLiquidity_;
         }
-        interestRate = _calculateInterestRate(utilisation);
+
+        //Calculates and stores interestRate as a uint256, emits interestRate as a uint80 (interestRate is maximally equal to uint72 + uint72)
+        //_updateInterestRate() will be called a lot, saves a read from from storage or a write+read from memory
+        emit InterestRate(uint80(interestRate = _calculateInterestRate(utilisation)));
     }
 }

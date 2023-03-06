@@ -47,6 +47,13 @@ contract GuardianUnitTest is Test {
     address owner = address(2);
 
     event GuardianChanged(address indexed oldGuardian, address indexed newGuardian);
+    event PauseUpdate(
+        bool repayPauseUpdate,
+        bool withdrawPauseUpdate,
+        bool borrowPauseUpdate,
+        bool supplyPauseUpdate,
+        bool liquidationPauseUpdate
+    );
 
     constructor() {
         vm.startPrank(owner);
@@ -88,7 +95,7 @@ contract GuardianUnitTest is Test {
         vm.startPrank(owner);
 
         // When: the owner changes the guardian
-        vm.expectEmit(true, true, false, false);
+        vm.expectEmit(true, true, true, false);
         emit GuardianChanged(guardian, newGuardian_);
         lendingPool.changeGuardian(newGuardian_);
         vm.stopPrank();
@@ -168,6 +175,8 @@ contract GuardianUnitTest is Test {
 
         // Given: the lending pool is paused
         vm.startPrank(guardian);
+        vm.expectEmit(true, true, true, true);
+        emit PauseUpdate(true, true, true, true, true);
         lendingPool.pause();
         vm.stopPrank();
 
@@ -226,6 +235,8 @@ contract GuardianUnitTest is Test {
 
         // When: the user unPause
         vm.startPrank(user);
+        vm.expectEmit(true, true, true, true);
+        emit PauseUpdate(false, false, false, false, false);
         lendingPool.unPause();
         vm.stopPrank();
 
@@ -251,6 +262,8 @@ contract GuardianUnitTest is Test {
 
         // When: the owner unPauses the supply
         vm.startPrank(owner);
+        vm.expectEmit(true, true, true, true);
+        emit PauseUpdate(true, true, true, false, true);
         lendingPool.unPause(true, true, true, false, true);
         vm.stopPrank();
 

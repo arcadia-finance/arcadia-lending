@@ -88,7 +88,24 @@ abstract contract LendingPoolTest is Test {
 
     bytes3 public emptyBytes3;
 
-    event Borrow(address indexed vault, bytes3 indexed referrer, uint256 amount);
+    event TrancheAdded(address indexed tranche, uint8 indexed index, uint16 interestWeight, uint16 liquidationWeight);
+    event InterestWeightSet(uint256 indexed index, uint16 weight);
+    event LiquidationWeightSet(uint256 indexed index, uint16 weight);
+    event TranchePopped(address tranche);
+    event TreasuryInterestWeightSet(uint16 weight);
+    event TreasuryLiquidationWeightSet(uint16 weight);
+    event TreasurySet(address treasury);
+    event OriginationFeeSet(uint8 originationFee);
+    event BorrowCapSet(uint128 borrowCap);
+    event SupplyCapSet(uint128 supplyCap);
+    event Donate(address indexed from, address indexed tranche, uint256 amount);
+    event CreditApproval(address indexed vault, address indexed owner, address indexed beneficiary, uint256 amount);
+    event Borrow(
+        address indexed vault, address indexed by, address to, uint256 amount, uint256 fee, bytes3 indexed referrer
+    );
+    event Repay(address indexed vault, address indexed from, uint256 amount);
+    event MaxInitiatorFeeSet(uint80 maxInitiatorFee);
+    event VaultVersionSet(uint256 indexed vaultVersion, bool valid);
 
     //Before
     constructor() {
@@ -165,9 +182,12 @@ contract TranchesTest is LendingPoolTest {
 
     function testSuccess_addTranche_SingleTranche(uint16 interestWeight, uint16 liquidationWeight) public {
         // Given: all neccesary contracts are deployed on the setup
-        vm.prank(creator);
         // When: creator calls addTranche with srTranche as Tranche address and 50 as interestWeight
+        vm.startPrank(creator);
+        vm.expectEmit(true, true, true, true);
+        emit TrancheAdded(address(srTranche), 0, interestWeight, liquidationWeight);
         pool.addTranche(address(srTranche), interestWeight, liquidationWeight);
+        vm.stopPrank();
 
         // Then: pool totalInterestWeight should be equal to 50, interestWeightTranches 0 should be equal to 50,
         // interestWeight of srTranche should be equal to 50, tranches 0 should be equal to srTranche,
@@ -202,7 +222,12 @@ contract TranchesTest is LendingPoolTest {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
         // When: creator calls addTranche for srTranche and jrTranche with 50 and 40 interestWeightTranches
+        vm.expectEmit(true, true, true, true);
+        emit TrancheAdded(address(srTranche), 0, interestWeightSr, liquidationWeightSr);
         pool.addTranche(address(srTranche), interestWeightSr, liquidationWeightSr);
+
+        vm.expectEmit(true, true, true, true);
+        emit TrancheAdded(address(jrTranche), 1, interestWeightJr, liquidationWeightJr);
         pool.addTranche(address(jrTranche), interestWeightJr, liquidationWeightJr);
         vm.stopPrank();
 
@@ -251,6 +276,9 @@ contract TranchesTest is LendingPoolTest {
         vm.startPrank(creator);
         // When: creator calls addTranche with srTranche and 50, calss setInterestWeight with 0 and 40
         pool.addTranche(address(srTranche), 50, 0);
+
+        vm.expectEmit(true, true, true, true);
+        emit InterestWeightSet(0, 40);
         pool.setInterestWeight(0, 40);
         vm.stopPrank();
 
@@ -287,6 +315,9 @@ contract TranchesTest is LendingPoolTest {
         vm.startPrank(creator);
         // When: creator calls addTranche with srTranche and 50, calss setInterestWeight with 0 and 40
         pool.addTranche(address(srTranche), 50, 0);
+
+        vm.expectEmit(true, true, true, true);
+        emit LiquidationWeightSet(0, 40);
         pool.setLiquidationWeight(0, 40);
         vm.stopPrank();
 
@@ -304,6 +335,8 @@ contract TranchesTest is LendingPoolTest {
         vm.stopPrank();
 
         // And: calls popTranche with 1 and jrTranche
+        vm.expectEmit(true, true, true, true);
+        emit TranchePopped(address(jrTranche));
         pool.popTranche(1, address(jrTranche));
 
         // Then: pool totalInterestWeight should be equal to 50, interestWeightTranches index 0 should be equal to 50,
@@ -345,6 +378,9 @@ contract ProtocolFeeTest is LendingPoolTest {
         vm.startPrank(creator);
         // When: creator addTranche with 50 interestWeight, setTreasuryInterestWeight 5
         pool.addTranche(address(srTranche), 50, 0);
+
+        vm.expectEmit(true, true, true, true);
+        emit TreasuryInterestWeightSet(5);
         pool.setTreasuryInterestWeight(5);
         vm.stopPrank();
 
@@ -380,6 +416,8 @@ contract ProtocolFeeTest is LendingPoolTest {
         vm.startPrank(creator);
         // When: creator addTranche with 50 liquidationWeight, setTreasuryLiquidationWeight 5
         pool.addTranche(address(srTranche), 0, 50);
+        vm.expectEmit(true, true, true, true);
+        emit TreasuryLiquidationWeightSet(5);
         pool.setTreasuryLiquidationWeight(5);
         vm.stopPrank();
 
@@ -413,6 +451,8 @@ contract ProtocolFeeTest is LendingPoolTest {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
         // When: creator setTreasury with creator address input
+        vm.expectEmit(true, true, true, true);
+        emit TreasurySet(creator);
         pool.setTreasury(creator);
         vm.stopPrank();
 
@@ -436,6 +476,8 @@ contract ProtocolFeeTest is LendingPoolTest {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
         // When: creator calls setOriginationFee
+        vm.expectEmit(true, true, true, true);
+        emit OriginationFeeSet(fee);
         pool.setOriginationFee(fee);
         vm.stopPrank();
 
@@ -469,8 +511,11 @@ contract ProtocolCapTest is LendingPoolTest {
         // Given: all neccesary contracts are deployed on the setup
 
         // When: Owner calls setBorrowCap
-        vm.prank(creator);
+        vm.startPrank(creator);
+        vm.expectEmit(true, true, true, true);
+        emit BorrowCapSet(borrowCap);
         pool.setBorrowCap(borrowCap);
+        vm.stopPrank();
 
         //Then: New borrowCap is set
         assertEq(pool.borrowCap(), borrowCap);
@@ -493,8 +538,11 @@ contract ProtocolCapTest is LendingPoolTest {
         // Given: all neccesary contracts are deployed on the setup
 
         // When: Owner calls setSupplyCap
-        vm.prank(creator);
+        vm.startPrank(creator);
+        vm.expectEmit(true, true, true, true);
+        emit SupplyCapSet(supplyCap);
         pool.setSupplyCap(supplyCap);
+        vm.stopPrank();
 
         //Then: New supplyCap is set
         assertEq(pool.supplyCap(), supplyCap);
@@ -712,6 +760,8 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         asset.approve(address(pool), type(uint256).max);
 
         // When: donateToPool
+        vm.expectEmit(true, true, true, true);
+        emit Donate(donator, tranche, assets);
         pool.donateToTranche(index, assets);
         vm.stopPrank();
 
@@ -869,9 +919,12 @@ contract LendingLogicTest is LendingPoolTest {
 
     function testSuccess_approveBeneficiary(address beneficiary, uint256 amount) public {
         // Given: all neccesary contracts are deployed on the setup
-        vm.prank(vaultOwner);
+        vm.startPrank(vaultOwner);
         // When: approveBeneficiary as vaultOwner
+        vm.expectEmit(true, true, true, true);
+        emit CreditApproval(address(vault), vaultOwner, beneficiary, amount);
         pool.approveBeneficiary(beneficiary, amount, address(vault));
+        vm.stopPrank();
 
         // Then: creditAllowance should be equal to amount
         assertEq(pool.creditAllowance(address(vault), vaultOwner, beneficiary), amount);
@@ -1323,7 +1376,7 @@ contract LendingLogicTest is LendingPoolTest {
         vm.assume(to != liquidityProvider);
         vm.assume(to != address(pool));
 
-        uint256 amountLoanedWithFee = amountLoaned + (amountLoaned * originationFee / 10_000);
+        uint256 fee = amountLoaned * originationFee / 10_000;
 
         vm.prank(creator);
         pool.setOriginationFee(originationFee);
@@ -1336,7 +1389,7 @@ contract LendingLogicTest is LendingPoolTest {
 
         vm.startPrank(vaultOwner);
         vm.expectEmit(true, true, true, true);
-        emit Borrow(address(vault), ref, amountLoanedWithFee);
+        emit Borrow(address(vault), vaultOwner, to, amountLoaned, fee, ref);
         pool.borrow(amountLoaned, address(vault), to, ref);
         vm.stopPrank();
     }
@@ -1442,6 +1495,8 @@ contract LendingLogicTest is LendingPoolTest {
         vm.startPrank(sender);
         // When: sender approve pool with max value, repay amountRepaid
         asset.approve(address(pool), type(uint256).max);
+        vm.expectEmit(true, true, true, true);
+        emit Repay(address(vault), sender, amountRepaid);
         pool.repay(amountRepaid, address(vault));
         vm.stopPrank();
 
@@ -1473,6 +1528,8 @@ contract LendingLogicTest is LendingPoolTest {
         vm.startPrank(sender);
         // When: sender approve pool with max value, repay amountLoaned
         asset.approve(address(pool), type(uint256).max);
+        vm.expectEmit(true, true, true, true);
+        emit Repay(address(vault), sender, amountLoaned);
         pool.repay(amountLoaned, address(vault));
         vm.stopPrank();
 
@@ -1507,6 +1564,9 @@ contract LendingLogicTest is LendingPoolTest {
         vm.startPrank(sender);
         // When: sender approve pool with max value, repay availablefunds
         asset.approve(address(pool), type(uint256).max);
+
+        vm.expectEmit(true, true, true, true);
+        emit Repay(address(vault), sender, amountLoaned);
         pool.repay(availablefunds, address(vault));
         vm.stopPrank();
 
@@ -1756,7 +1816,7 @@ contract LeveragedActions is LendingPoolTest {
         vm.assume(actionHandler != address(0));
         vm.assume(actionHandler != liquidityProvider);
 
-        uint256 amountLoanedWithFee = amountLoaned + (amountLoaned * originationFee / 10_000);
+        uint256 fee = amountLoaned * originationFee / 10_000;
 
         vm.prank(creator);
         pool.setOriginationFee(originationFee);
@@ -1769,7 +1829,7 @@ contract LeveragedActions is LendingPoolTest {
 
         vm.startPrank(vaultOwner);
         vm.expectEmit(true, true, true, true);
-        emit Borrow(address(vault), ref, amountLoanedWithFee);
+        emit Borrow(address(vault), vaultOwner, actionHandler, amountLoaned, fee, ref);
         // When: vaultOwner does action with leverage of amountLoaned
         pool.doActionWithLeverage(amountLoaned, address(vault), actionHandler, actionData, ref);
         vm.stopPrank();
@@ -2178,6 +2238,8 @@ contract LiquidationTest is LendingPoolTest {
 
     function testSuccess_setMaxInitiatorFee(uint80 maxFee) public {
         vm.prank(creator);
+        vm.expectEmit(true, true, true, true);
+        emit MaxInitiatorFeeSet(maxFee);
         pool.setMaxInitiatorFee(maxFee);
 
         assertEq(pool.maxInitiatorFee(), maxFee);
@@ -2631,8 +2693,11 @@ contract VaultTest is LendingPoolTest {
     }
 
     function testSuccess_setVaultVersion_setValid(uint256 vaultVersion) public {
-        vm.prank(creator);
+        vm.startPrank(creator);
+        vm.expectEmit(true, true, true, true);
+        emit VaultVersionSet(vaultVersion, true);
         pool.setVaultVersion(vaultVersion, true);
+        vm.stopPrank();
 
         assertTrue(pool.isValidVersion(vaultVersion));
     }

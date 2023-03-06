@@ -25,7 +25,6 @@ abstract contract Guardian is Owned {
 
     event GuardianChanged(address indexed oldGuardian, address indexed newGuardian);
     event PauseUpdate(
-        address account,
         bool repayPauseUpdate,
         bool withdrawPauseUpdate,
         bool borrowPauseUpdate,
@@ -137,7 +136,7 @@ abstract contract Guardian is Owned {
         depositPaused = true;
         liquidationPaused = true;
         pauseTimestamp = block.timestamp;
-        emit PauseUpdate(msg.sender, true, true, true, true, true);
+        emit PauseUpdate(true, true, true, true, true);
     }
 
     /**
@@ -163,7 +162,7 @@ abstract contract Guardian is Owned {
         borrowPaused = borrowPaused && borrowPaused_;
         depositPaused = depositPaused && depositPaused_;
         liquidationPaused = liquidationPaused && liquidationPaused_;
-        emit PauseUpdate(msg.sender, repayPaused, withdrawPaused, borrowPaused, depositPaused, liquidationPaused);
+        emit PauseUpdate(repayPaused, withdrawPaused, borrowPaused, depositPaused, liquidationPaused);
     }
 
     /**
@@ -182,7 +181,7 @@ abstract contract Guardian is Owned {
             borrowPaused = false;
             depositPaused = false;
             liquidationPaused = false;
-            emit PauseUpdate(msg.sender, false, false, false, false, false);
+            emit PauseUpdate(false, false, false, false, false);
         }
     }
 }

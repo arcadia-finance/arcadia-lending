@@ -91,6 +91,9 @@ contract DeploymentTest is TrancheTest {
 contract LockingTest is TrancheTest {
     using stdStorage for StdStorage;
 
+    event LockSet(bool status);
+    event AuctionFlagSet(bool status);
+
     function setUp() public override {
         super.setUp();
     }
@@ -114,8 +117,13 @@ contract LockingTest is TrancheTest {
         tranche.setAuctionInProgress(true);
 
         // When: pool lock
-        vm.prank(address(pool));
+        vm.startPrank(address(pool));
+        vm.expectEmit(true, true, true, true);
+        emit LockSet(true);
+        vm.expectEmit(true, true, true, true);
+        emit AuctionFlagSet(false);
         tranche.lock();
+        vm.stopPrank();
 
         // Then: locked should return true
         assertTrue(tranche.locked());
@@ -145,9 +153,12 @@ contract LockingTest is TrancheTest {
         tranche.lock();
         assertTrue(tranche.locked());
 
-        vm.prank(creator);
+        vm.startPrank(creator);
         // When: creator unlock
+        vm.expectEmit(true, true, true, true);
+        emit LockSet(false);
         tranche.unLock();
+        vm.stopPrank();
 
         // Then: locked should return false
         assertFalse(tranche.locked());
@@ -167,6 +178,8 @@ contract LockingTest is TrancheTest {
 
     function testSuccess_setAuctionInProgress(bool set) public {
         vm.startPrank(address(pool));
+        vm.expectEmit(true, true, true, true);
+        emit AuctionFlagSet(set);
         tranche.setAuctionInProgress(set);
         vm.stopPrank();
 
