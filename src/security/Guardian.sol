@@ -15,7 +15,7 @@ import { IGuardian } from "../interfaces/IGuardian.sol";
  * @author Arcadia Finance
  * @notice This module provides the logic that allows authorized accounts to trigger an emergency stop
  */
-abstract contract Guardian is Owned {
+abstract contract Guardian is Owned, IGuardian {
     /* //////////////////////////////////////////////////////////////
                                 STORAGE
     ////////////////////////////////////////////////////////////// */
