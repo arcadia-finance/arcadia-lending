@@ -76,7 +76,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     event Donate(address indexed from, address indexed tranche, uint256 amount);
     event CreditApproval(address indexed vault, address indexed owner, address indexed beneficiary, uint256 amount);
     event Borrow(
-        address indexed vault, address by, address indexed to, uint256 amount, uint256 fee, bytes3 indexed referrer
+        address indexed vault, address indexed by, address to, uint256 amount, uint256 fee, bytes3 indexed referrer
     );
     event Repay(address indexed vault, address indexed from, uint256 amount);
     event VaultVersionSet(uint256 indexed vaultVersion, bool valid);
