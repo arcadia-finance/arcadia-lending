@@ -94,6 +94,8 @@ contract OwnershipTest is TrancheTest {
     }
 
     function testRevert_transferOwnership_nonOwner(address unpriv, address newOwner) public {
+        vm.assume(unpriv != creator);
+
         vm.startPrank(unpriv);
         vm.expectRevert("UNAUTHORIZED");
         tranche.transferOwnership(newOwner);

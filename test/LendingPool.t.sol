@@ -169,6 +169,8 @@ contract OwnershipTest is LendingPoolTest {
     }
 
     function testRevert_transferOwnership_nonOwner(address unpriv, address newOwner) public {
+        vm.assume(unpriv != creator);
+
         vm.startPrank(unpriv);
         vm.expectRevert("UNAUTHORIZED");
         pool.transferOwnership(newOwner);
@@ -587,6 +589,7 @@ contract ProtocolCapTest is LendingPoolTest {
 ////////////////////////////////////////////////////////////// */
 contract DepositAndWithdrawalTest is LendingPoolTest {
     error FunctionIsPaused();
+    error supplyCapExceeded();
 
     function setUp() public override {
         super.setUp();
@@ -658,8 +661,8 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         vm.prank(creator);
         pool.setSupplyCap(supplyCap);
 
-        // Then: depositInLendingPool is reverted with SUPPLY_CAP_REACHED
-        vm.expectRevert("LP_DFLP: Supply cap exceeded");
+        // Then: depositInLendingPool is reverted with supplyCapExceeded()
+        vm.expectRevert(supplyCapExceeded.selector);
         vm.prank(address(srTranche));
         pool.depositInLendingPool(amount, liquidityProvider);
     }
@@ -673,8 +676,8 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         vm.prank(creator);
         pool.setSupplyCap(1);
 
-        // Then: depositInLendingPool is reverted with SUPPLY_CAP_REACHED
-        vm.expectRevert("LP_DFLP: Supply cap exceeded");
+        // Then: depositInLendingPool is reverted with supplyCapExceeded()
+        vm.expectRevert(supplyCapExceeded.selector);
         vm.prank(address(srTranche));
         pool.depositInLendingPool(amount, liquidityProvider);
 
@@ -744,8 +747,8 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         vm.prank(creator);
         pool.setSupplyCap(supplyCap);
 
-        // Then: depositInLendingPool is reverted with SUPPLY_CAP_REACHED
-        vm.expectRevert("LP_DTT: Supply cap exceeded");
+        // Then: depositInLendingPool is reverted with supplyCapExceeded()
+        vm.expectRevert(supplyCapExceeded.selector);
         pool.donateToTranche(1, amount);
     }
 
