@@ -15,7 +15,7 @@ import { ILiquidator } from "./interfaces/ILiquidator.sol";
 import { ILendingPool } from "./interfaces/ILendingPool.sol";
 import { TrustedCreditor } from "./TrustedCreditor.sol";
 import { ERC20, ERC4626, DebtToken } from "./DebtToken.sol";
-import { InterestRateModule, DataTypes } from "./InterestRateModule.sol";
+import { InterestRateModule } from "./InterestRateModule.sol";
 import { Guardian } from "./security/Guardian.sol";
 
 /**
@@ -716,7 +716,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * @notice Set's the configuration parameters of InterestRateConfiguration struct.
      * @param newConfig New set of configuration parameters.
      */
-    function setInterestConfig(DataTypes.InterestRateConfiguration calldata newConfig) external onlyOwner {
+    function setInterestConfig(InterestRateConfiguration calldata newConfig) external onlyOwner {
         _setInterestConfig(newConfig);
     }
 

@@ -10,7 +10,7 @@ import "../src/InterestRateModule.sol";
 contract InterestRateModuleExtension is InterestRateModule {
     //Extensions to test internal functions
 
-    function setInterestConfig(DataTypes.InterestRateConfiguration calldata newConfig) public {
+    function setInterestConfig(InterestRateConfiguration calldata newConfig) public {
         _setInterestConfig(newConfig);
     }
 
@@ -40,7 +40,7 @@ contract InterestRateModuleTest is Test {
         uint8 utilisationThreshold_
     ) public {
         // Given: A certain InterestRateConfiguration
-        DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
+        InterestRateModule.InterestRateConfiguration memory config = InterestRateModule.InterestRateConfiguration({
             baseRatePerYear: baseRate_,
             highSlopePerYear: highSlope_,
             lowSlopePerYear: lowSlope_,
@@ -72,7 +72,7 @@ contract InterestRateModuleTest is Test {
         vm.assume(realisedDebt_ <= totalRealisedLiquidity_);
         vm.assume(utilisationThreshold_ <= 100_000);
 
-        DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
+        InterestRateModule.InterestRateConfiguration memory config = InterestRateModule.InterestRateConfiguration({
             baseRatePerYear: baseRate_,
             highSlopePerYear: highSlope_,
             lowSlopePerYear: lowSlope_,
@@ -124,7 +124,7 @@ contract InterestRateModuleTest is Test {
         vm.assume(utilisationThreshold_ <= 100_000);
 
         // And: a certain InterestRateConfiguration
-        DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
+        InterestRateModule.InterestRateConfiguration memory config = InterestRateModule.InterestRateConfiguration({
             baseRatePerYear: baseRate_,
             highSlopePerYear: highSlope_,
             lowSlopePerYear: lowSlope_,
@@ -159,7 +159,7 @@ contract InterestRateModuleTest is Test {
         vm.assume(utilisation <= utilisationThreshold_);
 
         // And: a certain InterestRateConfiguration
-        DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
+        InterestRateModule.InterestRateConfiguration memory config = InterestRateModule.InterestRateConfiguration({
             baseRatePerYear: baseRate_,
             highSlopePerYear: highSlope_,
             lowSlopePerYear: lowSlope_,
@@ -191,7 +191,7 @@ contract InterestRateModuleTest is Test {
         vm.assume(utilisation > utilisationThreshold_);
 
         // And: a certain InterestRateConfiguration
-        DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
+        InterestRateModule.InterestRateConfiguration memory config = InterestRateModule.InterestRateConfiguration({
             baseRatePerYear: baseRate_,
             highSlopePerYear: highSlope_,
             lowSlopePerYear: lowSlope_,
