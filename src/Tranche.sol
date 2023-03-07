@@ -68,11 +68,11 @@ contract Tranche is ITranche, ERC4626, Owned {
     ////////////////////////////////////////////////////////////// */
 
     /**
-     * @notice The constructor for a tranche
+     * @notice The constructor for a tranche.
      * @param lendingPool_ the Lending Pool of the underlying ERC-20 token, with the lending logic.
-     * @param prefix_ The prefix of the contract name (eg. Senior -> Mezzanine -> Junior)
-     * @param prefixSymbol_ The prefix of the contract symbol (eg. SR  -> MZ -> JR)
-     * @dev The name and symbol of the tranche are automatically generated, based on the name and symbol of the underlying token
+     * @param prefix_ The prefix of the contract name (eg. Senior -> Mezzanine -> Junior).
+     * @param prefixSymbol_ The prefix of the contract symbol (eg. SR  -> MZ -> JR).
+     * @dev The name and symbol of the tranche are automatically generated, based on the name and symbol of the underlying token.
      */
     constructor(address lendingPool_, string memory prefix_, string memory prefixSymbol_)
         ERC4626(
@@ -90,7 +90,7 @@ contract Tranche is ITranche, ERC4626, Owned {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Locks the tranche in case all liquidity of the tranche is written off due to bad debt
+     * @notice Locks the tranche in case all liquidity of the tranche is written off due to bad debt.
      * @dev Only the Lending Pool can call this function, only trigger is a severe default event.
      */
     function lock() external {
@@ -114,7 +114,8 @@ contract Tranche is ITranche, ERC4626, Owned {
     }
 
     /**
-     * @notice Locks the tranche when an auction is in progress
+     * @notice Locks the tranche when an auction is in progress.
+     * @param auctionInProgress_ Flag indicating if there are auctions in progress.
      * @dev Only the Lending Pool can call this function.
      * This function is to make sure no JIT liquidity is provided during a positive auction,
      * and that no liquidity can be withdrawn during a negative auction.
@@ -131,10 +132,10 @@ contract Tranche is ITranche, ERC4626, Owned {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Modification of the standard ERC-4626 deposit implementation
-     * @param assets The amount of assets of the underlying ERC-20 token being deposited
+     * @notice Modification of the standard ERC-4626 deposit implementation.
+     * @param assets The amount of assets of the underlying ERC-20 token being deposited.
      * @param receiver The address that receives the minted shares.
-     * @return shares The amount of shares minted
+     * @return shares The amount of shares minted.
      * @dev This contract does not directly transfer the underlying assets from the sender to the receiver.
      * Instead it calls the deposit of the Lending Pool which calls the transferFrom of the underlying assets.
      * Hence the sender should not give this contract an allowance to transfer the underlying asset but the Lending Pool.
@@ -158,10 +159,10 @@ contract Tranche is ITranche, ERC4626, Owned {
     }
 
     /**
-     * @notice Modification of the standard ERC-4626 mint implementation
-     * @param shares The amount of shares minted
+     * @notice Modification of the standard ERC-4626 mint implementation.
+     * @param shares The amount of shares minted.
      * @param receiver The address that receives the minted shares.
-     * @return assets The corresponding amount of assets of the underlying ERC-20 token being deposited
+     * @return assets The corresponding amount of assets of the underlying ERC-20 token being deposited.
      * @dev This contract does not directly transfers the underlying assets from the sender to the receiver.
      * Instead it calls the deposit of the Lending Pool which calls the transferFrom of the underlying assets.
      * Hence the sender should not give this contract an allowance to transfer the underlying asset but the Lending Pool.
@@ -184,11 +185,11 @@ contract Tranche is ITranche, ERC4626, Owned {
     }
 
     /**
-     * @notice Modification of the standard ERC-4626 withdraw implementation
-     * @param assets The amount of assets of the underlying ERC-20 token being withdrawn
-     * @param receiver The address of the receiver of the underlying ERC-20 tokens
-     * @param owner_ The address of the owner of the assets being withdrawn
-     * @return shares The corresponding amount of shares redeemed
+     * @notice Modification of the standard ERC-4626 withdraw implementation.
+     * @param assets The amount of assets of the underlying ERC-20 token being withdrawn.
+     * @param receiver The address of the receiver of the underlying ERC-20 tokens.
+     * @param owner_ The address of the owner of the assets being withdrawn.
+     * @return shares The corresponding amount of shares redeemed.
      */
     function withdraw(uint256 assets, address receiver, address owner_)
         public
@@ -215,11 +216,11 @@ contract Tranche is ITranche, ERC4626, Owned {
     }
 
     /**
-     * @notice Modification of the standard ERC-4626 redeem implementation
-     * @param shares the amount of shares being redeemed
-     * @param receiver The address of the receiver of the underlying ERC-20 tokens
-     * @param owner_ The address of the owner of the shares being redeemed
-     * @return assets The corresponding amount of assets withdrawn
+     * @notice Modification of the standard ERC-4626 redeem implementation.
+     * @param shares the amount of shares being redeemed.
+     * @param receiver The address of the receiver of the underlying ERC-20 tokens.
+     * @param owner_ The address of the owner of the shares being redeemed.
+     * @return assets The corresponding amount of assets withdrawn.
      */
     function redeem(uint256 shares, address receiver, address owner_)
         public
@@ -251,8 +252,8 @@ contract Tranche is ITranche, ERC4626, Owned {
     //////////////////////////////////////////////////////////////*/
 
     /**
-     * @notice Returns the total amount of underlying assets, to which liquidity providers have a claim
-     * @return assets The total amount of underlying assets, to which liquidity providers have a claim
+     * @notice Returns the total amount of underlying assets, to which liquidity providers have a claim.
+     * @return assets The total amount of underlying assets, to which liquidity providers have a claim.
      * @dev The Liquidity Pool does the accounting of the outstanding claim on liquidity per tranche.
      */
     function totalAssets() public view override returns (uint256 assets) {

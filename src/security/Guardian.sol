@@ -12,7 +12,7 @@ import { Owned } from "../../lib/solmate/src/auth/Owned.sol";
 /**
  * @title Guardian
  * @author Arcadia Finance
- * @notice This module provides the logic that allows authorized accounts to trigger an emergency stop
+ * @notice This module provides the logic that allows authorized accounts to trigger an emergency stop.
  */
 abstract contract Guardian is Owned {
     /* //////////////////////////////////////////////////////////////
@@ -120,7 +120,7 @@ abstract contract Guardian is Owned {
     ////////////////////////////////////////////////////////////// */
 
     /**
-     * @notice This function is used to set the guardian address
+     * @notice This function is used to set the guardian address.
      * @param guardian_ The address of the new guardian.
      * @dev Allows onlyOwner to change the guardian address.
      */
@@ -165,6 +165,7 @@ abstract contract Guardian is Owned {
      * @param withdrawPaused_ false when withdraw functionality should be unPaused.
      * @param borrowPaused_ false when borrow functionality should be unPaused.
      * @param depositPaused_ false when deposit functionality should be unPaused.
+     * @param liquidationPaused_ false when liquidation functionality should be unPaused.
      * @dev This function can unPause repay, withdraw, borrow, and deposit individually.
      * @dev Can only update flags from paused (true) to unPaused (false), cannot be used the other way around
      * (to set unPaused flags to paused).

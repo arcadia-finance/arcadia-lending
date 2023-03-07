@@ -16,7 +16,7 @@ interface ILendingPool {
     function supplyCap() external view returns (uint128);
 
     /**
-     * @notice returns the total realised liquidit of the Lending Pool.
+     * @notice returns the total realised liquidity of the Lending Pool.
      * @return totalRealisedLiquidity The total realised liquidity of the Lending Pool.
      */
     function totalRealisedLiquidity() external view returns (uint128);
