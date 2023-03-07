@@ -471,9 +471,3 @@ library LogExpMath {
         return seriesSum * 2;
     }
 }
-
-contract mathtest {
-    function pow(uint256 base, uint256 power) public pure returns (uint256) {
-        return LogExpMath.pow(base, power);
-    }
-}

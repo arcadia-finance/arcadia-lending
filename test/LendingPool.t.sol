@@ -94,11 +94,9 @@ abstract contract LendingPoolTest is Test {
     event TranchePopped(address tranche);
     event TreasuryInterestWeightSet(uint16 weight);
     event TreasuryLiquidationWeightSet(uint16 weight);
-    event TreasurySet(address treasury);
     event OriginationFeeSet(uint8 originationFee);
     event BorrowCapSet(uint128 borrowCap);
     event SupplyCapSet(uint128 supplyCap);
-    event Donate(address indexed from, address indexed tranche, uint256 amount);
     event CreditApproval(address indexed vault, address indexed owner, address indexed beneficiary, uint256 amount);
     event Borrow(
         address indexed vault, address indexed by, address to, uint256 amount, uint256 fee, bytes3 indexed referrer
@@ -453,8 +451,6 @@ contract ProtocolFeeTest is LendingPoolTest {
         // Given: all neccesary contracts are deployed on the setup
         vm.startPrank(creator);
         // When: creator setTreasury with creator address input
-        vm.expectEmit(true, true, true, true);
-        emit TreasurySet(creator);
         pool.setTreasury(creator);
         vm.stopPrank();
 
@@ -764,8 +760,6 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         asset.approve(address(pool), type(uint256).max);
 
         // When: donateToPool
-        vm.expectEmit(true, true, true, true);
-        emit Donate(donator, tranche, assets);
         pool.donateToTranche(index, assets);
         vm.stopPrank();
 

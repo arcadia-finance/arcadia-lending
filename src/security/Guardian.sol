@@ -8,14 +8,13 @@
 pragma solidity ^0.8.13;
 
 import { Owned } from "../../lib/solmate/src/auth/Owned.sol";
-import { IGuardian } from "../interfaces/IGuardian.sol";
 
 /**
  * @title Guardian
  * @author Arcadia Finance
  * @notice This module provides the logic that allows authorized accounts to trigger an emergency stop
  */
-abstract contract Guardian is Owned, IGuardian {
+abstract contract Guardian is Owned {
     /* //////////////////////////////////////////////////////////////
                                 STORAGE
     ////////////////////////////////////////////////////////////// */
