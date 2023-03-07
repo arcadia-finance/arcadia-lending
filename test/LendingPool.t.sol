@@ -2182,7 +2182,7 @@ contract InterestRateTest is LendingPoolTest {
         vm.assume(unprivilegedAddress != creator);
 
         // And: InterestRateConfiguration setted as config
-        DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
+        InterestRateModule.InterestRateConfiguration memory config = InterestRateModule.InterestRateConfiguration({
             baseRatePerYear: baseRate_,
             highSlopePerYear: highSlope_,
             lowSlopePerYear: lowSlope_,
@@ -2204,7 +2204,7 @@ contract InterestRateTest is LendingPoolTest {
         uint8 utilisationThreshold_
     ) public {
         // Given: InterestRateConfiguration data type setted as config
-        DataTypes.InterestRateConfiguration memory config = DataTypes.InterestRateConfiguration({
+        InterestRateModule.InterestRateConfiguration memory config = InterestRateModule.InterestRateConfiguration({
             baseRatePerYear: baseRate_,
             highSlopePerYear: highSlope_,
             lowSlopePerYear: lowSlope_,

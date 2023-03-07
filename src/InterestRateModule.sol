@@ -4,23 +4,36 @@
  */
 pragma solidity ^0.8.13;
 
-import { DataTypes } from "./libraries/DataTypes.sol";
-
 /**
  * @title Interest Rate Module.
  * @author Pragma Labs
  * @notice The Logic to calculate and store the interest rate of the Lending Pool.
  */
 contract InterestRateModule {
+    /**
+     * A struct with the set of interest rate configuration parameters:
+     * - baseRatePerYear The interest rate when utilisation is 0.
+     * - lowSlopePerYear The slope of the first curve, defined as the delta in interest rate for a delta in utilisation of 100%.
+     * - highSlopePerYear The slope of the second curve, defined as the delta in interest rate for a delta in utilisation of 100%.
+     * - utilisationThreshold the optimal utilisation, where we go from the flat first curve to the steeper second curve.
+     */
+    struct InterestRateConfiguration {
+        uint72 baseRatePerYear; //18 decimals precision.
+        uint72 lowSlopePerYear; //18 decimals precision.
+        uint72 highSlopePerYear; //18 decimals precision.
+        uint40 utilisationThreshold; //5 decimal precision.
+    }
+
     /* //////////////////////////////////////////////////////////////
                                 STORAGE
     ////////////////////////////////////////////////////////////// */
 
     // The current interest rate, 18 decimals precision.
     uint256 public interestRate;
+
     // A struct with the configuration of the interest rate curves,
     // which give the interest rate in function of the utilisation of the Lending Pool.
-    DataTypes.InterestRateConfiguration public interestRateConfig;
+    InterestRateConfiguration public interestRateConfig;
 
     /* //////////////////////////////////////////////////////////////
                                 EVENTS
@@ -43,7 +56,7 @@ contract InterestRateModule {
      * - utilisationThreshold the optimal utilisation, where we go from the flat first curve to the steeper second curve,
      *   5 decimal precision.
      */
-    function _setInterestConfig(DataTypes.InterestRateConfiguration calldata newConfig) internal {
+    function _setInterestConfig(InterestRateConfiguration calldata newConfig) internal {
         interestRateConfig = newConfig;
     }
 
