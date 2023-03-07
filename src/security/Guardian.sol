@@ -1,7 +1,5 @@
 /**
- * Created by Arcadia Finance
- * https://www.arcadia.finance
- *
+ * Created by Pragma Labs
  * SPDX-License-Identifier: BUSL-1.1
  */
 
@@ -11,7 +9,7 @@ import { Owned } from "../../lib/solmate/src/auth/Owned.sol";
 
 /**
  * @title Guardian
- * @author Arcadia Finance
+ * @author Pragma Labs
  * @notice This module provides the logic that allows authorized accounts to trigger an emergency stop.
  */
 abstract contract Guardian is Owned {
