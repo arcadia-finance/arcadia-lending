@@ -10,6 +10,17 @@ pragma solidity ^0.8.13;
  * @notice The Logic to calculate and store the interest rate of the Lending Pool.
  */
 contract InterestRateModule {
+    /* //////////////////////////////////////////////////////////////
+                                STORAGE
+    ////////////////////////////////////////////////////////////// */
+
+    // The current interest rate, 18 decimals precision.
+    uint256 public interestRate;
+
+    // A struct with the configuration of the interest rate curves,
+    // which give the interest rate in function of the utilisation of the Lending Pool.
+    InterestRateConfiguration public interestRateConfig;
+
     /**
      * A struct with the set of interest rate configuration parameters:
      * - baseRatePerYear The interest rate when utilisation is 0.
@@ -23,17 +34,6 @@ contract InterestRateModule {
         uint72 highSlopePerYear; //18 decimals precision.
         uint40 utilisationThreshold; //5 decimal precision.
     }
-
-    /* //////////////////////////////////////////////////////////////
-                                STORAGE
-    ////////////////////////////////////////////////////////////// */
-
-    // The current interest rate, 18 decimals precision.
-    uint256 public interestRate;
-
-    // A struct with the configuration of the interest rate curves,
-    // which give the interest rate in function of the utilisation of the Lending Pool.
-    InterestRateConfiguration public interestRateConfig;
 
     /* //////////////////////////////////////////////////////////////
                                 EVENTS
