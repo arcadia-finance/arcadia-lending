@@ -105,7 +105,7 @@ abstract contract LendingPoolTest is Test {
     );
     event Repay(address indexed vault, address indexed from, uint256 amount);
     event MaxInitiatorFeeSet(uint80 maxInitiatorFee);
-    event FixedLiquidationCostSet(uint128 fixedLiquidationCost);
+    event FixedLiquidationCostSet(uint96 fixedLiquidationCost);
     event VaultVersionSet(uint256 indexed vaultVersion, bool valid);
 
     //Before
@@ -2293,7 +2293,7 @@ contract LiquidationTest is LendingPoolTest {
         assertEq(pool.maxInitiatorFee(), maxFee);
     }
 
-    function testRevert_setFixedLiquidationCost_Unauthorised(address unprivilegedAddress, uint128 fixedLiquidationCost)
+    function testRevert_setFixedLiquidationCost_Unauthorised(address unprivilegedAddress, uint96 fixedLiquidationCost)
         public
     {
         // Given: unprivilegedAddress is not the Owner
@@ -2307,7 +2307,7 @@ contract LiquidationTest is LendingPoolTest {
         vm.stopPrank();
     }
 
-    function testSuccess_setFixedLiquidationCost(uint128 fixedLiquidationCost) public {
+    function testSuccess_setFixedLiquidationCost(uint96 fixedLiquidationCost) public {
         vm.prank(creator);
         vm.expectEmit(true, true, true, true);
         emit FixedLiquidationCostSet(fixedLiquidationCost);
@@ -2783,7 +2783,7 @@ contract VaultTest is LendingPoolTest {
         assertTrue(!pool.isValidVersion(vaultVersion));
     }
 
-    function testSuccess_openMarginAccount_InvalidVaultVersion(uint256 vaultVersion, uint128 fixedLiquidationCost)
+    function testSuccess_openMarginAccount_InvalidVaultVersion(uint256 vaultVersion, uint96 fixedLiquidationCost)
         public
     {
         // Given: vaultVersion is invalid
@@ -2803,7 +2803,7 @@ contract VaultTest is LendingPoolTest {
         assertEq(0, fixedLiquidationCost_);
     }
 
-    function testSuccess_openMarginAccount_ValidVaultVersion(uint256 vaultVersion, uint128 fixedLiquidationCost)
+    function testSuccess_openMarginAccount_ValidVaultVersion(uint256 vaultVersion, uint96 fixedLiquidationCost)
         public
     {
         // Given: vaultVersion is valid

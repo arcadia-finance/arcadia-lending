@@ -62,7 +62,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     // Maximum amount of `underlying asset` that can be supplied to the pool.
     uint128 public supplyCap;
     // Conservative estimate of the maximal gas cost to liquidate a position (fixed cost, independent of openDebt).
-    uint128 public fixedLiquidationCost;
+    uint96 public fixedLiquidationCost;
     // Maximum amount of `underlying asset` that is paid as fee to the initiator of a liquidation.
     uint80 public maxInitiatorFee;
     // Number of auctions that are currently in progress.
@@ -115,7 +115,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         address indexed vault, address indexed by, address to, uint256 amount, uint256 fee, bytes3 indexed referrer
     );
     event Repay(address indexed vault, address indexed from, uint256 amount);
-    event FixedLiquidationCostSet(uint128 fixedLiquidationCost);
+    event FixedLiquidationCostSet(uint96 fixedLiquidationCost);
     event VaultVersionSet(uint256 indexed vaultVersion, bool valid);
 
     /* //////////////////////////////////////////////////////////////
@@ -750,7 +750,7 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      * The fixedLiquidationCost prevents dusting attacks, and ensures that upon Liquidations positions are big enough to cover
      * gas costs of the Liquidator without resulting in badDebt.
      */
-    function setFixedLiquidationCost(uint128 fixedLiquidationCost_) external onlyOwner {
+    function setFixedLiquidationCost(uint96 fixedLiquidationCost_) external onlyOwner {
         fixedLiquidationCost = fixedLiquidationCost_;
 
         emit FixedLiquidationCostSet(fixedLiquidationCost_);
