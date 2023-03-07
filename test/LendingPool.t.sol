@@ -161,6 +161,41 @@ contract DeploymentTest is LendingPoolTest {
 }
 
 /* //////////////////////////////////////////////////////////////
+                        OWNERSHIP LOGIC
+////////////////////////////////////////////////////////////// */
+contract OwnershipTest is LendingPoolTest {
+    function setUp() public override {
+        super.setUp();
+    }
+
+    function testRevert_transferOwnership_nonOwner(address unpriv, address newOwner) public {
+        vm.startPrank(unpriv);
+        vm.expectRevert("UNAUTHORIZED");
+        pool.transferOwnership(newOwner);
+        vm.stopPrank();
+    }
+
+    function testSuccess_transferOwnership(address newOwner) public {
+        vm.startPrank(creator);
+        pool.transferOwnership(newOwner);
+        vm.stopPrank();
+
+        assertEq(newOwner, pool.owner());
+    }
+
+    function testSuccess_transferOwnership_newOwnerHasPrivs(address newOwner) public {
+        vm.startPrank(creator);
+        pool.transferOwnership(newOwner);
+        vm.stopPrank();
+
+        assertEq(newOwner, pool.owner());
+
+        vm.prank(newOwner);
+        pool.setTreasuryLiquidationWeight(1); //a random onlyOwner function
+    }
+}
+
+/* //////////////////////////////////////////////////////////////
                         TRANCHES LOGIC
 ////////////////////////////////////////////////////////////// */
 contract TranchesTest is LendingPoolTest {

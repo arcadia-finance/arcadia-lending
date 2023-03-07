@@ -85,6 +85,41 @@ contract DeploymentTest is TrancheTest {
     }
 }
 
+/* //////////////////////////////////////////////////////////////
+                        OWNERSHIP LOGIC
+////////////////////////////////////////////////////////////// */
+contract OwnershipTest is TrancheTest {
+    function setUp() public override {
+        super.setUp();
+    }
+
+    function testRevert_transferOwnership_nonOwner(address unpriv, address newOwner) public {
+        vm.startPrank(unpriv);
+        vm.expectRevert("UNAUTHORIZED");
+        tranche.transferOwnership(newOwner);
+        vm.stopPrank();
+    }
+
+    function testSuccess_transferOwnership(address newOwner) public {
+        vm.startPrank(creator);
+        tranche.transferOwnership(newOwner);
+        vm.stopPrank();
+
+        assertEq(newOwner, tranche.owner());
+    }
+
+    function testSuccess_transferOwnership_newOwnerHasPrivs(address newOwner) public {
+        vm.startPrank(creator);
+        tranche.transferOwnership(newOwner);
+        vm.stopPrank();
+
+        assertEq(newOwner, tranche.owner());
+
+        vm.prank(newOwner);
+        tranche.unLock(); //a random onlyOwner function
+    }
+}
+
 /*//////////////////////////////////////////////////////////////
                     LOCKING LOGIC
 //////////////////////////////////////////////////////////////*/
