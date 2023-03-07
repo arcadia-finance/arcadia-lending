@@ -23,8 +23,8 @@ contract ArcadiaLendingTransferOwnership is Script {
         uint256 ownerPrivateKey = vm.envUint("OWNER_PRIVATE_KEY");
         vm.startBroadcast(ownerPrivateKey);
         // Transfer ownership to respected addresses
-        lendingPoolUSDC.setOwner(ArcadiaAddresses.lendingPoolUSDCOwner);
-        lendingPoolWETH.setOwner(ArcadiaAddresses.lendingPoolWETHOwner);
+        lendingPoolUSDC.transferOwnership(ArcadiaAddresses.lendingPoolUSDCOwner);
+        lendingPoolWETH.transferOwnership(ArcadiaAddresses.lendingPoolWETHOwner);
 
         // Set guardian
         lendingPoolUSDC.changeGuardian(ArcadiaAddresses.guardian);

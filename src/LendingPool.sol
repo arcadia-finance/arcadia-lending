@@ -105,11 +105,9 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     event TranchePopped(address tranche);
     event TreasuryInterestWeightSet(uint16 weight);
     event TreasuryLiquidationWeightSet(uint16 weight);
-    event TreasurySet(address treasury);
     event OriginationFeeSet(uint8 originationFee);
     event BorrowCapSet(uint128 borrowCap);
     event SupplyCapSet(uint128 supplyCap);
-    event Donate(address indexed from, address indexed tranche, uint256 amount);
     event CreditApproval(address indexed vault, address indexed owner, address indexed beneficiary, uint256 amount);
     event Borrow(
         address indexed vault, address indexed by, address to, uint256 amount, uint256 fee, bytes3 indexed referrer
@@ -277,8 +275,6 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      */
     function setTreasury(address treasury_) external onlyOwner {
         treasury = treasury_;
-
-        emit TreasurySet(treasury_);
     }
 
     /**
@@ -377,8 +373,6 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             realisedLiquidityOf[tranche] += assets; //[̲̅$̲̅(̲̅ ͡° ͜ʖ ͡°̲̅)̲̅$̲̅]
             totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
         }
-
-        emit Donate(msg.sender, tranche, assets);
     }
 
     /**
