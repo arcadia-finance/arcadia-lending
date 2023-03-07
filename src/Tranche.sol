@@ -1,7 +1,5 @@
 /**
- * Created by Arcadia Finance
- * https://www.arcadia.finance
- *
+ * Created by Pragma Labs
  * SPDX-License-Identifier: BUSL-1.1
  */
 pragma solidity ^0.8.13;
@@ -15,7 +13,7 @@ import { IGuardian } from "./interfaces/IGuardian.sol";
 
 /**
  * @title Tranche
- * @author Arcadia Finance
+ * @author Pragma Labs
  * @notice The Tranche contract allows for lending of a specified ERC20 token, managed by a lending pool.
  * @dev Protocol is according the ERC4626 standard, with a certain ERC20 as underlying
  * @dev Implementation not vulnerable to ERC4626 inflation attacks,

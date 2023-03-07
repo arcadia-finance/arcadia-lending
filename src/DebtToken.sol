@@ -1,6 +1,5 @@
 /**
- * Created by Arcadia Finance
- * https://www.arcadia.finance
+ * Created by Pragma Labs
  * SPDX-License-Identifier: BUSL-1.1
  */
 pragma solidity ^0.8.13;
@@ -10,7 +9,7 @@ import { FixedPointMathLib } from "../lib/solmate/src/utils/FixedPointMathLib.so
 
 /**
  * @title Debt Token.
- * @author Arcadia Finance
+ * @author Pragma Labs
  * @notice The Logic to do the debt accounting for a lending pool for a certain ERC20 token.
  * @dev Protocol is according the ERC4626 standard, with a certain ERC20 as underlying.
  * @dev Implementation not vulnerable to ERC4626 inflation attacks,

@@ -1,14 +1,12 @@
 /**
- * Created by Arcadia Finance
- * https://www.arcadia.finance
- *
+ * Created by Pragma Labs
  * SPDX-License-Identifier: BUSL-1.1
  */
 pragma solidity ^0.8.13;
 
 /**
  * @title Trusted Creditor implementation.
- * @author Arcadia Finance
+ * @author Pragma Labs
  * @notice This contract contains the minimum functionality a Trusted Creditor, interacting with Arcadia Vaults, needs to implement.
  * @dev For the implementation of Arcadia Vaults, see: https://github.com/arcadia-finance/arcadia-vaults.
  */

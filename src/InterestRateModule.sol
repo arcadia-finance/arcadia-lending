@@ -1,7 +1,5 @@
 /**
- * Created by Arcadia Finance
- * https://www.arcadia.finance
- *
+ * Created by Pragma Labs
  * SPDX-License-Identifier: BUSL-1.1
  */
 pragma solidity ^0.8.13;
@@ -10,7 +8,7 @@ import { DataTypes } from "./libraries/DataTypes.sol";
 
 /**
  * @title Interest Rate Module.
- * @author Arcadia Finance
+ * @author Pragma Labs
  * @notice The Logic to calculate and store the interest rate of the Lending Pool.
  */
 contract InterestRateModule {

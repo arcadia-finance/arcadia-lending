@@ -1,7 +1,5 @@
 /**
- * Created by Arcadia Finance
- * https://www.arcadia.finance
- *
+ * Created by Pragma Labs
  * SPDX-License-Identifier: BUSL-1.1
  */
 pragma solidity ^0.8.13;
@@ -22,7 +20,7 @@ import { Guardian } from "./security/Guardian.sol";
 
 /**
  * @title Arcadia LendingPool.
- * @author Arcadia Finance
+ * @author Pragma Labs
  * @notice The Lending pool contains the main logic to provide liquidity and take or repay loans for a certain asset
  * and does the accounting of the debtTokens (ERC4626).
  * @dev Implementation not vulnerable to ERC4626 inflation attacks,
