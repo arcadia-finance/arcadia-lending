@@ -116,6 +116,8 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     event FixedLiquidationCostSet(uint96 fixedLiquidationCost);
     event VaultVersionSet(uint256 indexed vaultVersion, bool valid);
 
+    error supplyCapExceeded();
+
     /* //////////////////////////////////////////////////////////////
                                 MODIFIERS
     ////////////////////////////////////////////////////////////// */
@@ -334,7 +336,9 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
         onlyTranche
         processInterests
     {
-        if (supplyCap > 0) require(totalRealisedLiquidity + assets <= supplyCap, "LP_DFLP: Supply cap exceeded");
+        if (supplyCap > 0) {
+            if (totalRealisedLiquidity + assets > supplyCap) revert supplyCapExceeded();
+        }
         // Need to transfer before minting or ERC777s could reenter.
         // Address(this) is trusted -> no risk on re-entrancy attack after transfer.
         asset.safeTransferFrom(from, address(this), assets);
@@ -361,7 +365,9 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
     function donateToTranche(uint256 trancheIndex, uint256 assets) external whenDepositNotPaused processInterests {
         require(assets > 0, "LP_DTT: Amount is 0");
 
-        if (supplyCap > 0) require(totalRealisedLiquidity + assets <= supplyCap, "LP_DTT: Supply cap exceeded");
+        if (supplyCap > 0) {
+            if (totalRealisedLiquidity + assets > supplyCap) revert supplyCapExceeded();
+        }
 
         address tranche = tranches[trancheIndex];
         //Mitigate share manipulation, where first Liquidity Provider mints just 1 share.
