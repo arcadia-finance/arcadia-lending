@@ -275,7 +275,6 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
      */
     function setTreasury(address treasury_) external onlyOwner {
         treasury = treasury_;
-
     }
 
     /**
@@ -374,7 +373,6 @@ contract LendingPool is Guardian, TrustedCreditor, DebtToken, InterestRateModule
             realisedLiquidityOf[tranche] += assets; //[̲̅$̲̅(̲̅ ͡° ͜ʖ ͡°̲̅)̲̅$̲̅]
             totalRealisedLiquidity += SafeCastLib.safeCastTo128(assets);
         }
-
     }
 
     /**
