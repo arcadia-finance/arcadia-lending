@@ -872,7 +872,6 @@ contract DepositAndWithdrawalTest is LendingPoolTest {
         vm.expectRevert(FunctionIsPaused.selector);
         vm.prank(address(srTranche));
         pool.withdrawFromLendingPool(assetsWithdrawn, receiver);
-        vm.stopPrank();
     }
 
     function testSuccess_withdrawFromLendingPool(uint128 assetsDeposited, uint128 assetsWithdrawn, address receiver)
@@ -2897,7 +2896,6 @@ contract GuardianTest is LendingPoolTest {
         // When: the guardian pauses the pool
         vm.prank(pauseGuardian);
         pool.pause();
-        vm.stopPrank();
 
         // Then: the pool should be paused
         assertTrue(pool.depositPaused());
@@ -2916,7 +2914,6 @@ contract GuardianTest is LendingPoolTest {
         // When: the guardian pauses the pool
         vm.prank(pauseGuardian);
         pool.pause();
-        vm.stopPrank();
 
         // Then: the pool should be paused
         assertTrue(pool.borrowPaused());
@@ -2934,7 +2931,6 @@ contract GuardianTest is LendingPoolTest {
         // When: the guardian pauses the pool
         vm.prank(pauseGuardian);
         pool.pause();
-        vm.stopPrank();
 
         // Then: the pool should be paused
         assertTrue(pool.withdrawPaused());
@@ -2952,14 +2948,12 @@ contract GuardianTest is LendingPoolTest {
         // When: the guardian pauses the pool
         vm.prank(pauseGuardian);
         pool.pause();
-        vm.stopPrank();
 
         // Then: the pool should be paused
         assertTrue(pool.liquidationPaused());
         // And: the pool should not be able to borrow
         vm.expectRevert(FunctionIsPaused.selector);
         pool.liquidateVault(address(vault));
-        vm.stopPrank();
     }
 
     function testRevert_repay_Paused() public {
@@ -2969,7 +2963,6 @@ contract GuardianTest is LendingPoolTest {
         // When: the guardian pauses the pool
         vm.prank(pauseGuardian);
         pool.pause();
-        vm.stopPrank();
 
         // Then: the pool should be paused
         assertTrue(pool.repayPaused());
@@ -2998,7 +2991,6 @@ contract GuardianTest is LendingPoolTest {
         // And: the guardian pauses the pool
         vm.prank(pauseGuardian);
         pool.pause();
-        vm.stopPrank();
 
         // And: and time passes
         vm.warp(block.timestamp + timePassed);
@@ -3006,7 +2998,6 @@ contract GuardianTest is LendingPoolTest {
         // When: the owner unpauses the pool, only withdraw and deposit
         vm.prank(creator);
         pool.unPause(true, false, true, false, true);
-        vm.stopPrank();
 
         // Then: the variables should be set correctly
         assertTrue(!pool.depositPaused());
@@ -3017,7 +3008,6 @@ contract GuardianTest is LendingPoolTest {
         // And: the pool should not be able to repay
         vm.expectRevert(FunctionIsPaused.selector);
         pool.repay(uint128(20 * 10 ** 18), address(42));
-        vm.stopPrank();
 
         // And: the pool should be able to deposit and withdraw
         vm.prank(liquidityProvider);
@@ -3050,7 +3040,6 @@ contract GuardianTest is LendingPoolTest {
         // And: the guardian pauses the pool
         vm.prank(pauseGuardian);
         pool.pause();
-        vm.stopPrank();
 
         // And: and time passes
         vm.warp(block.timestamp + timePassed);
@@ -3058,7 +3047,6 @@ contract GuardianTest is LendingPoolTest {
         // When: the randomUser unpauses the pool
         vm.prank(randomUser);
         pool.unPause();
-        vm.stopPrank();
 
         // Then: the variables should be set correctly
         assertTrue(!pool.depositPaused());
