@@ -4,7 +4,7 @@
  */
 pragma solidity ^0.8.13;
 
-import "../../lib/ds-test/src/test.sol";
+import "../../lib/forge-std/lib/ds-test/src/test.sol";
 import "../../lib/forge-std/src/Script.sol";
 import "../../lib/forge-std/src/console.sol";
 import "../../lib/forge-std/src/Vm.sol";
